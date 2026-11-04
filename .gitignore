@@ -1,0 +1,8 @@
+build/
+output/
+packaging/
+.DS_Store
+xcuserdata/
+*.xcuserstate
+*.p12
+*.mobileprovision
