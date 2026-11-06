@@ -8,6 +8,7 @@ mkdir -p "$OUTPUT" "$PACKAGE/Payload"
 python3 "$ROOT/scripts/validate.py"
 /usr/bin/plutil -lint "$ROOT/Diastomy/Info.plist" "$ROOT/Diastomy.xcodeproj/project.pbxproj"
 xcodebuild -version
+python3 "$ROOT/scripts/test_ios_startup.py"
 xcodebuild -project "$ROOT/Diastomy.xcodeproj" -scheme Diastomy \
   -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
   -derivedDataPath "$DERIVED" \

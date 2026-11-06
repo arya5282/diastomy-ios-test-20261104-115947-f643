@@ -8,6 +8,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var webView: WKWebView!
     private let server = URL(string: "https://diastomy.top")!
     private var webRoot: URL!
+    private var startupPanel: UIView?
+    private var startupTimer: Timer?
     private var player: AVPlayer?
     private var playerController: AVPlayerViewController?
     private var progressObserver: Any?
@@ -35,6 +37,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         api = URLSession(configuration: session, delegate: self, delegateQueue: .main)
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
+        // Info.plist opts into app-bound domains. Local files also need this
+        // flag to use message handlers and JavaScript evaluation on iOS.
+        configuration.limitsNavigationsToAppBoundDomains = true
         configuration.allowsInlineMediaPlayback = true
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
@@ -54,27 +59,140 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             webView.topAnchor.constraint(equalTo: view.topAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+        loadBundledInterface()
+    }
+
+    private func loadBundledInterface() {
+        startupTimer?.invalidate()
+        showStartupPanel(message: "در حال آماده‌سازی دیاستومی…", canRetry: false)
         guard let index = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Web") else {
-            let label = UILabel(frame: view.bounds)
-            label.text = "فایل‌های رابط برنامه موجود نیست."
-            label.textColor = .white
-            label.textAlignment = .center
-            view.addSubview(label)
+            startupFailed("فایل‌های رابط برنامه موجود نیستند؛ نسخهٔ کامل را دوباره نصب کنید.")
             return
         }
         webRoot = index.deletingLastPathComponent().standardizedFileURL
+        for name in ["index.html", "app.js", "app.css", "assets/Yekan.woff2", "assets/logo.svg"] {
+            guard FileManager.default.fileExists(atPath: webRoot.appendingPathComponent(name).path) else {
+                startupFailed("فایل‌های رابط برنامه ناقص‌اند؛ نسخهٔ کامل را دوباره نصب کنید.")
+                return
+            }
+        }
+        startupTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { [weak self] _ in
+            self?.startupFailed("رابط برنامه آماده نشد. روی تلاش دوباره بزنید.")
+        }
         webView.loadFileURL(index, allowingReadAccessTo: webRoot)
     }
 
     private func isLocal(_ url: URL?) -> Bool {
         guard let url = url, url.isFileURL, let root = webRoot else { return false }
-        return url.standardizedFileURL.path.hasPrefix(root.path + "/")
+        // /var and /private/var can identify the same iOS bundle. Compare
+        // canonical path components, without a fragile trailing-slash prefix.
+        let base = root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        let target = url.resolvingSymlinksInPath().standardizedFileURL.pathComponents
+        return target.count > base.count && Array(target.prefix(base.count)) == base
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        // Remote HTML can never become the app's main document or use its bridge.
-        decisionHandler(isLocal(action.request.url) ? .allow : .cancel)
+        let allowed = isLocal(action.request.url)
+        decisionHandler(allowed ? .allow : .cancel)
+        if !allowed && action.targetFrame?.isMainFrame != false {
+            startupFailed("باز کردن این صفحه داخل برنامه مجاز نیست.")
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard isLocal(webView.url) else { return }
+        // Exercise both JS execution and the real native reply bridge. This
+        // catches iOS app-bound-domain failures that a browser-only test misses.
+        webView.callAsyncJavaScript(
+            "if (!document.querySelector('#app')?.firstElementChild || getComputedStyle(document.querySelector('nav')).position !== 'fixed') { throw new Error('UI not initialized'); } return await window.webkit.messageHandlers.native.postMessage({action:'startupCheck'});",
+            arguments: [:], in: nil, in: .page) { [weak self] result in
+                guard let self = self else { return }
+                switch result {
+                case .success(let value):
+                    guard let reply = value as? [String: Any], reply["ok"] as? Bool == true else {
+                        self.startupFailed("ارتباط رابط برنامه برقرار نشد."); return
+                    }
+                    self.startupTimer?.invalidate()
+                    self.startupPanel?.removeFromSuperview()
+                    self.startupPanel = nil
+                    self.writeStartupReport(ready: true)
+                case .failure(let error):
+                    self.startupFailed("رابط برنامه اجرا نشد. کد خطا: \((error as NSError).code)")
+                }
+            }
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        navigationFailed(error)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        navigationFailed(error)
+    }
+
+    private func navigationFailed(_ error: Error) {
+        let problem = error as NSError
+        if problem.domain == NSURLErrorDomain && problem.code == NSURLErrorCancelled { return }
+        startupFailed("باز کردن رابط برنامه ناموفق بود. کد خطا: \(problem.code)")
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        startupFailed("بخش رابط برنامه متوقف شد. روی تلاش دوباره بزنید.")
+    }
+
+    private func showStartupPanel(message: String, canRetry: Bool) {
+        startupPanel?.removeFromSuperview()
+        let panel = UIView()
+        panel.backgroundColor = .black
+        panel.translatesAutoresizingMaskIntoConstraints = false
+        let label = UILabel()
+        label.text = message
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 17)
+        label.textAlignment = .center
+        label.numberOfLines = 0
+        let retry = UIButton(type: .system)
+        retry.setTitle("تلاش دوباره", for: .normal)
+        retry.tintColor = .white
+        retry.isHidden = !canRetry
+        retry.addTarget(self, action: #selector(retryStartup), for: .touchUpInside)
+        let stack = UIStackView(arrangedSubviews: [label, retry])
+        stack.axis = .vertical
+        stack.spacing = 24
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        panel.addSubview(stack)
+        view.addSubview(panel)
+        NSLayoutConstraint.activate([
+            panel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            panel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            panel.topAnchor.constraint(equalTo: view.topAnchor),
+            panel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            stack.centerXAnchor.constraint(equalTo: panel.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: panel.centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: panel.leadingAnchor, constant: 28),
+            stack.trailingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -28)
+        ])
+        startupPanel = panel
+    }
+
+    @objc private func retryStartup() { loadBundledInterface() }
+
+    private func startupFailed(_ message: String) {
+        startupTimer?.invalidate()
+        showStartupPanel(message: message, canRetry: true)
+        writeStartupReport(ready: false, message: message)
+    }
+
+    private func writeStartupReport(ready: Bool, message: String? = nil) {
+        #if DEBUG
+        guard ProcessInfo.processInfo.arguments.contains("--offline-startup-test") else { return }
+        let report: [String: Any] = ["ready": ready, "localDocument": isLocal(webView.url), "message": message ?? "",
+                                     "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""]
+        if let data = try? JSONSerialization.data(withJSONObject: report) {
+            try? data.write(to: documents.appendingPathComponent("startup-report.json"), options: .atomic)
+        }
+        #endif
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
@@ -111,6 +229,11 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     private func send(_ path: String, method: String = "GET", body: Any? = nil,
                       completion: @escaping ([String: Any]) -> Void) {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--offline-startup-test") {
+            completion(["status": 0, "data": ["error": "Offline startup test"]]); return
+        }
+        #endif
         guard let url = allowed(path), ["GET", "POST"].contains(method) else {
             completion(["status": 400, "data": ["error": "درخواست معتبر نیست."]]); return
         }
@@ -141,11 +264,13 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage,
                                replyHandler: @escaping (Any?, String?) -> Void) {
-        guard message.frameInfo.isMainFrame, isLocal(message.frameInfo.request.url),
+        guard message.frameInfo.isMainFrame, isLocal(message.frameInfo.request.url ?? webView.url),
               let data = message.body as? [String: Any], let action = data["action"] as? String else {
             replyHandler(nil, "Untrusted document"); return
         }
-        if action == "request", let path = data["path"] as? String {
+        if action == "startupCheck" {
+            replyHandler(["ok": true], nil)
+        } else if action == "request", let path = data["path"] as? String {
             send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
         } else if action == "play", let kind = data["kind"] as? String,
                   ["movie", "series"].contains(kind), let id = data["id"] as? Int, id > 0 {

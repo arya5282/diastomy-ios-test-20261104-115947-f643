@@ -25,6 +25,10 @@ assert 'webView.loadFileURL(index, allowingReadAccessTo: webRoot)' in native
 assert 'webView.load(URLRequest' not in native
 assert 'message.frameInfo.isMainFrame, isLocal' in native
 assert 'AVURLAssetHTTPCookiesKey' in native
-for path in (root / 'backend').glob('*.py'):
+assert 'configuration.limitsNavigationsToAppBoundDomains = true' in native
+assert 'resolvingSymlinksInPath()' in native
+assert 'func webView(_ webView: WKWebView, didFailProvisionalNavigation' in native
+assert 'test_ios_startup.py' in (root / 'scripts/build-ipa.sh').read_text()
+for path in list((root / 'backend').glob('*.py')) + list((root / 'scripts').glob('*.py')):
     ast.parse(path.read_text(), filename=str(path))
 print('PASS: local HTML/CSS/font resources, Xcode bundle wiring, native document boundary and backend Python syntax')
