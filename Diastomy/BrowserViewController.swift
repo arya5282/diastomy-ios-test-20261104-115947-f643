@@ -1,45 +1,51 @@
 import UIKit
 import WebKit
+import AVKit
 
-final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
-    private let home = URL(string: "https://diastomy.top/?source=pwa&client=ios")!
-    private let trustedHosts: Set<String> = ["diastomy.top", "www.diastomy.top"]
+// All documents, scripts, fonts and styles are shipped in Web/.
+// Only JSON APIs and explicitly authorized media use the network.
+final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate {
     private var webView: WKWebView!
-    private let cover = UIView()
-    private let progress = UIProgressView(progressViewStyle: .bar)
-    private var observation: NSKeyValueObservation?
-    private var downloadedFiles: [ObjectIdentifier: URL] = [:]
-    private var errorView: UIView?
+    private let server = URL(string: "https://diastomy.top")!
+    private var webRoot: URL!
+    private var player: AVPlayer?
+    private var playerController: AVPlayerViewController?
+    private var progressObserver: Any?
+    private var progressTarget: [String: Any] = [:]
+    private var api: URLSession!
+    private var socket: URLSessionWebSocketTask?
+    private var roomTimer: Timer?
+    private var roomCode: String?
+    private var playingRoom: String?
+    private var roomState: [String: Any]?
+    private var serverOffset = 0.0
+    private let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
-    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        UIDevice.current.userInterfaceIdiom == .pad ? .all : .allButUpsideDown
-    }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .allButUpsideDown }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        let session = URLSessionConfiguration.default
+        session.httpCookieStorage = .shared
+        session.httpShouldSetCookies = true
+        session.requestCachePolicy = .reloadIgnoringLocalCacheData
+        session.timeoutIntervalForRequest = 25
+        api = URLSession(configuration: session, delegate: self, delegateQueue: .main)
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.allowsInlineMediaPlayback = true
-        configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
-        configuration.limitsNavigationsToAppBoundDomains = true
-        configuration.applicationNameForUserAgent = "DiastomyIOS/1.0"
-        if let scriptURL = Bundle.main.url(forResource: "AppMode", withExtension: "js"),
-           let script = try? String(contentsOf: scriptURL, encoding: .utf8) {
-            configuration.userContentController.addUserScript(
-                WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        }
+        configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "native")
+        configuration.applicationNameForUserAgent = "DiastomyIOS/2.0"
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
-        webView.uiDelegate = self
         webView.isOpaque = false
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
         webView.scrollView.contentInsetAdjustmentBehavior = .never
-        webView.allowsBackForwardNavigationGestures = true
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
         NSLayoutConstraint.activate([
@@ -48,196 +54,241 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKUID
             webView.topAnchor.constraint(equalTo: view.topAnchor),
             webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        installLaunchCover()
-        observation = webView.observe(\.estimatedProgress, options: [.new]) { [weak self] browser, _ in
-            self?.progress.setProgress(Float(browser.estimatedProgress), animated: true)
+        guard let index = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Web") else {
+            let label = UILabel(frame: view.bounds)
+            label.text = "فایل‌های رابط برنامه موجود نیست."
+            label.textColor = .white
+            label.textAlignment = .center
+            view.addSubview(label)
+            return
         }
-        webView.load(URLRequest(url: home))
+        webRoot = index.deletingLastPathComponent().standardizedFileURL
+        webView.loadFileURL(index, allowingReadAccessTo: webRoot)
     }
 
-    private func installLaunchCover() {
-        cover.backgroundColor = .black
-        cover.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(cover)
-        let logo = UIImageView(image: UIImage(named: "LaunchLogo"))
-        logo.contentMode = .scaleAspectFit
-        logo.translatesAutoresizingMaskIntoConstraints = false
-        cover.addSubview(logo)
-        progress.progressTintColor = UIColor(red: 0.87, green: 0.01, blue: 0.02, alpha: 1)
-        progress.trackTintColor = UIColor(white: 0.12, alpha: 1)
-        progress.translatesAutoresizingMaskIntoConstraints = false
-        cover.addSubview(progress)
-        NSLayoutConstraint.activate([
-            cover.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            cover.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            cover.topAnchor.constraint(equalTo: view.topAnchor),
-            cover.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            logo.centerXAnchor.constraint(equalTo: cover.centerXAnchor),
-            logo.centerYAnchor.constraint(equalTo: cover.centerYAnchor, constant: -12),
-            logo.widthAnchor.constraint(equalToConstant: 150),
-            logo.heightAnchor.constraint(equalToConstant: 36),
-            progress.centerXAnchor.constraint(equalTo: cover.centerXAnchor),
-            progress.topAnchor.constraint(equalTo: logo.bottomAnchor, constant: 18),
-            progress.widthAnchor.constraint(equalToConstant: 120),
-            progress.heightAnchor.constraint(equalToConstant: 2)
-        ])
-    }
-
-    private func revealPage() {
-        guard !cover.isHidden else { return }
-        UIView.animate(withDuration: 0.2, animations: { self.cover.alpha = 0 }) { _ in
-            self.cover.isHidden = true
-        }
-    }
-
-    private func isTrusted(_ url: URL) -> Bool {
-        url.scheme?.lowercased() == "https" && trustedHosts.contains(url.host?.lowercased() ?? "")
+    private func isLocal(_ url: URL?) -> Bool {
+        guard let url = url, url.isFileURL, let root = webRoot else { return false }
+        return url.standardizedFileURL.path.hasPrefix(root.path + "/")
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let url = action.request.url else { decisionHandler(.cancel); return }
-        // Embedded media/frames are subresources; only top-level navigation leaves the app.
-        if action.targetFrame?.isMainFrame == false { decisionHandler(.allow); return }
-        if isTrusted(url) {
-            if action.shouldPerformDownload { decisionHandler(.download); return }
-            if action.targetFrame == nil {
-                decisionHandler(.cancel)
-                webView.load(action.request)
-            } else { decisionHandler(.allow) }
-            return
+        // Remote HTML can never become the app's main document or use its bridge.
+        decisionHandler(isLocal(action.request.url) ? .allow : .cancel)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        // API redirects usually mean an expired login; never load the HTML login page.
+        completionHandler(nil)
+    }
+
+    private func allowed(_ path: String) -> URL? {
+        guard path.hasPrefix("/"), !path.hasPrefix("//"),
+              !path.contains("\\"), let url = URL(string: path, relativeTo: server)?.absoluteURL,
+              url.scheme == "https", url.host == server.host, url.user == nil,
+              url.fragment == nil, url.port == nil else { return nil }
+        let p = url.path
+        let exact: Set<String> = [
+            "/movie/api/filter/", "/movie/api/actors/", "/accounts/api/login-password/",
+            "/accounts/api/check-phone/", "/accounts/api/send-otp/", "/accounts/api/verify-otp/",
+            "/accounts/api/complete-registration/", "/accounts/api/logout/",
+            "/accounts/api/forgot-password-request/", "/accounts/api/forgot-password-verify/",
+            "/accounts/api/forgot-password-reset/", "/accounts/api/notifications/",
+            "/accounts/api/notifications/mark-read/", "/accounts/api/change-password/",
+            "/accounts/api/update-profile/", "/accounts/api/update-player-quality/",
+            "/accounts/api/set-language/", "/accounts/api/plans/", "/accounts/api/payments/",
+            "/accounts/api/create-payment/",
+            "/api/bookmark/toggle/", "/api/watch-progress/", "/api/watch-time/",
+            "/accounts/support/api/messages/", "/accounts/support/api/send/"
+        ]
+        if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") {
+            return url
         }
-        if url.scheme == "blob" || url.absoluteString == "about:blank" {
-            decisionHandler(action.shouldPerformDownload ? .download : .allow)
-            return
-        }
-        decisionHandler(.cancel)
-        if ["https", "http", "mailto", "tel", "tg"].contains(url.scheme?.lowercased() ?? "") {
-            UIApplication.shared.open(url)
-        }
-    }
-
-    func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse,
-                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
-        guard response.isForMainFrame else { decisionHandler(.allow); return }
-        decisionHandler(response.canShowMIMEType ? .allow : .download)
-    }
-
-    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        errorView?.removeFromSuperview()
-        errorView = nil
-        // The document's own PWA loader now takes over from the native launch cover.
-        revealPage()
-    }
-
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { revealPage() }
-
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        showConnectionError(error)
-    }
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        showConnectionError(error)
-    }
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
-
-    private func showConnectionError(_ error: Error) {
-        let error = error as NSError
-        guard error.code != NSURLErrorCancelled else { return }
-        revealPage()
-        errorView?.removeFromSuperview()
-        let container = UIView()
-        container.backgroundColor = .black
-        container.translatesAutoresizingMaskIntoConstraints = false
-        let label = UILabel()
-        label.text = "اتصال به دیاستومی برقرار نشد.\nاینترنت را بررسی و دوباره تلاش کنید."
-        label.textColor = .white
-        label.numberOfLines = 0
-        label.textAlignment = .center
-        label.font = .systemFont(ofSize: 16)
-        let retry = UIButton(type: .system)
-        retry.setTitle("تلاش دوباره", for: .normal)
-        retry.tintColor = .white
-        retry.backgroundColor = UIColor(red: 0.8, green: 0, blue: 0.04, alpha: 1)
-        retry.layer.cornerRadius = 12
-        retry.addTarget(self, action: #selector(retryConnection), for: .touchUpInside)
-        let stack = UIStackView(arrangedSubviews: [label, retry])
-        stack.axis = .vertical
-        stack.spacing = 24
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(stack)
-        view.addSubview(container)
-        NSLayoutConstraint.activate([
-            container.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            container.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            container.topAnchor.constraint(equalTo: view.topAnchor),
-            container.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            stack.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualToConstant: 320),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 24),
-            retry.heightAnchor.constraint(equalToConstant: 46)
-        ])
-        errorView = container
-    }
-
-    @objc private func retryConnection() {
-        errorView?.removeFromSuperview()
-        errorView = nil
-        webView.load(URLRequest(url: webView.url.flatMap { isTrusted($0) ? $0 : nil } ?? home))
-    }
-
-    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
-                 for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-        // Top-level popup requests are handled by decidePolicyFor navigationAction.
         return nil
     }
 
-    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
-                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
-        let alert = UIAlertController(title: "Diastomy", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "باشه", style: .default) { _ in completionHandler() })
-        present(alert, animated: true)
+    private func send(_ path: String, method: String = "GET", body: Any? = nil,
+                      completion: @escaping ([String: Any]) -> Void) {
+        guard let url = allowed(path), ["GET", "POST"].contains(method) else {
+            completion(["status": 400, "data": ["error": "درخواست معتبر نیست."]]); return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("DiastomyIOS/2.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://diastomy.top", forHTTPHeaderField: "Origin")
+        request.setValue("https://diastomy.top/", forHTTPHeaderField: "Referer")
+        if method == "POST" {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let cookie = HTTPCookieStorage.shared.cookies(for: server)?.first(where: { $0.name == "csrftoken" }) {
+                request.setValue(cookie.value, forHTTPHeaderField: "X-CSRFToken")
+            }
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body ?? [:])
+        }
+        api.dataTask(with: request) { data, response, error in
+            if error != nil { completion(["status": 0, "data": ["error": "اتصال به سرور برقرار نشد."]]); return }
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard let data = data, let json = try? JSONSerialization.jsonObject(with: data) else {
+                completion(["status": status == 200 ? 502 : status,
+                            "data": ["error": "پاسخ API معتبر نیست؛ اتصال یا ورود را بررسی کنید."]]); return
+            }
+            completion(["status": status, "data": json])
+        }.resume()
     }
 
-    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
-                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
-        let alert = UIAlertController(title: "Diastomy", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "انصراف", style: .cancel) { _ in completionHandler(false) })
-        alert.addAction(UIAlertAction(title: "تأیید", style: .default) { _ in completionHandler(true) })
-        present(alert, animated: true)
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage,
+                               replyHandler: @escaping (Any?, String?) -> Void) {
+        guard message.frameInfo.isMainFrame, isLocal(message.frameInfo.request.url),
+              let data = message.body as? [String: Any], let action = data["action"] as? String else {
+            replyHandler(nil, "Untrusted document"); return
+        }
+        if action == "request", let path = data["path"] as? String {
+            send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
+        } else if action == "play", let kind = data["kind"] as? String,
+                  ["movie", "series"].contains(kind), let id = data["id"] as? Int, id > 0 {
+            let code = data["room"] as? String
+            let room = code != nil && code == roomCode ? "?room=" + code! : ""
+            send("/api/app/v1/playback/\(kind)/\(id)/" + room) { result in
+                guard result["status"] as? Int == 200, let info = result["data"] as? [String: Any],
+                      let value = info["url"] as? String, let url = URL(string: value),
+                      url.scheme == "https", url.host == self.server.host,
+                      url.path.hasPrefix("/movie/\(kind)-direct-hls/") else { replyHandler(result, nil); return }
+                self.playingRoom = room.isEmpty ? nil : code
+                self.presentPlayer(url, info: info)
+                replyHandler(["status": 200, "data": ["playing": true]], nil)
+            }
+        } else if action == "checkout", let plan = data["plan"] as? Int, plan > 0 {
+            send("/accounts/api/create-payment/", method: "POST", body: ["plan_id": plan, "discount_code": data["discount"] as? String ?? ""]) { result in
+                guard let info = result["data"] as? [String: Any], info["success"] as? Bool == true,
+                      let value = info["redirect_url"] as? String, let url = URL(string: value),
+                      url.scheme == "https", let host = url.host,
+                      host == "zibal.ir" || host.hasSuffix(".zibal.ir") || host == "zarinpal.com" || host.hasSuffix(".zarinpal.com") else {
+                    replyHandler(result, nil); return
+                }
+                UIApplication.shared.open(url) { opened in replyHandler(["status": opened ? 200 : 502, "data": ["opened": opened]], nil) }
+            }
+        } else if action == "roomOpen", let code = data["code"] as? String,
+                  code.range(of: "^[A-Za-z0-9_-]{1,16}$", options: .regularExpression) != nil {
+            socket?.cancel(with: .goingAway, reason: nil)
+            roomCode = code
+            var request = URLRequest(url: URL(string: "wss://diastomy.top/ws/movie-room/\(code)/")!)
+            request.setValue("https://diastomy.top", forHTTPHeaderField: "Origin")
+            let cookies = HTTPCookieStorage.shared.cookies(for: server) ?? []
+            for (key, value) in HTTPCookie.requestHeaderFields(with: cookies) { request.setValue(value, forHTTPHeaderField: key) }
+            let next = api.webSocketTask(with: request)
+            socket = next
+            next.resume()
+            receiveRoom(next)
+            roomTimer?.invalidate()
+            roomTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.syncRoom() }
+            replyHandler(["ok": true], nil)
+        } else if action == "roomSend", let value = data["message"] as? [String: Any],
+                  let bytes = try? JSONSerialization.data(withJSONObject: value),
+                  let string = String(data: bytes, encoding: .utf8), let socket = socket {
+            socket.send(.string(string)) { error in
+                DispatchQueue.main.async { replyHandler(["ok": error == nil], nil) }
+            }
+        } else if action == "roomClose" {
+            socket?.cancel(with: .goingAway, reason: nil)
+            socket = nil
+            roomTimer?.invalidate()
+            roomTimer = nil
+            roomCode = nil
+            roomState = nil
+            if playingRoom != nil { player?.pause() }
+            playingRoom = nil
+            replyHandler(["ok": true], nil)
+        } else if action == "clearCache" {
+            webView.evaluateJavaScript("localStorage.clear()") { _, _ in replyHandler(["ok": true], nil) }
+        } else {
+            replyHandler(nil, "Unsupported action")
+        }
     }
 
-    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
-                 initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
-                 decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-        decisionHandler(origin.protocol == "https" && trustedHosts.contains(origin.host) ? .prompt : .deny)
+    private func presentPlayer(_ url: URL, info: [String: Any]) {
+        if let token = progressObserver, let previous = player { previous.removeTimeObserver(token) }
+        let cookies = HTTPCookieStorage.shared.cookies(for: server) ?? []
+        let asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let next = AVPlayer(playerItem: AVPlayerItem(asset: asset))
+        player = next
+        progressTarget = info["target"] as? [String: Any] ?? [:]
+        let controller = AVPlayerViewController()
+        controller.player = next
+        controller.delegate = self
+        controller.modalPresentationStyle = .fullScreen
+        controller.allowsPictureInPicturePlayback = true
+        playerController = controller
+        let position = info["position"] as? Double ?? 0
+        if position > 0 { next.seek(to: CMTime(seconds: position, preferredTimescale: 600)) }
+        progressObserver = next.addPeriodicTimeObserver(forInterval: CMTime(seconds: 15, preferredTimescale: 1), queue: .main) { [weak self, weak controller] time in
+            guard let self = self, controller?.presentingViewController != nil,
+                  time.seconds.isFinite, let total = self.player?.currentItem?.duration.seconds,
+                  total.isFinite, total > 0 else { return }
+            var body = self.progressTarget
+            body["watched_duration"] = Int(time.seconds)
+            body["total_duration"] = Int(total)
+            self.send("/api/watch-progress/", method: "POST", body: body) { _ in }
+        }
+        present(controller, animated: true) {
+            if self.playingRoom != nil { self.syncRoom() } else { next.play() }
+        }
+    }
+    func playerViewController(_ playerViewController: AVPlayerViewController,
+                              willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+        coordinator.animate(alongsideTransition: nil) { [weak self] context in
+            guard let self = self, !context.isCancelled else { return }
+            self.player?.pause()
+            self.playingRoom = nil
+        }
     }
 
-    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
-        download.delegate = self
+    private func receiveRoom(_ task: URLSessionWebSocketTask) {
+        task.receive { [weak self, weak task] result in
+            DispatchQueue.main.async {
+                guard let self = self, let task = task, self.socket === task else { return }
+                switch result {
+                case .success(let message):
+                    let bytes: Data
+                    switch message {
+                    case .string(let text): bytes = Data(text.utf8)
+                    case .data(let data): bytes = data
+                    @unknown default: return
+                    }
+                    if let value = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] {
+                        if value["type"] as? String == "state", let state = value["state"] as? [String: Any] {
+                            self.roomState = state
+                            if let timestamp = value["server_ts"] as? Double { self.serverOffset = timestamp - Date().timeIntervalSince1970 }
+                            self.syncRoom()
+                        }
+                        self.webView.callAsyncJavaScript(
+                            "window.dispatchEvent(new CustomEvent('diastomy-room', {detail: message}))",
+                            arguments: ["message": value], in: nil, contentWorld: .page, completionHandler: nil)
+                    }
+                    self.receiveRoom(task)
+                case .failure:
+                    self.webView.callAsyncJavaScript(
+                        "window.dispatchEvent(new CustomEvent('diastomy-room', {detail: {type:'error', message:'اتصال اتاق قطع شد؛ دوباره وارد اتاق شوید.'}}))",
+                        arguments: [:], in: nil, contentWorld: .page, completionHandler: nil)
+                }
+            }
+        }
     }
-    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
-        download.delegate = self
+
+    private func syncRoom() {
+        guard playingRoom != nil, playingRoom == roomCode, playerController?.presentingViewController != nil, let state = roomState, let player = player else { return }
+        if state["closed"] as? Bool == true { player.pause(); return }
+        let paused = state["paused_position"] as? Double
+        let start = state["starts_at"] as? Double ?? Date().timeIntervalSince1970
+        let position = paused ?? Date().timeIntervalSince1970 + serverOffset - start
+        if position < 0 { player.pause(); return }
+        let current = player.currentTime().seconds
+        if !current.isFinite || abs(current - position) > 2 { player.seek(to: CMTime(seconds: position, preferredTimescale: 600)) }
+        if paused != nil { player.pause() } else { player.play() }
     }
-    func download(_ download: WKDownload, decideDestinationUsing response: URLResponse,
-                  suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
-        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let name = String((suggestedFilename as NSString).lastPathComponent.prefix(180))
-        let destination = documents.appendingPathComponent(String(UUID().uuidString.prefix(8)) + "-" + (name.isEmpty ? "download" : name))
-        downloadedFiles[ObjectIdentifier(download)] = destination
-        completionHandler(destination)
-    }
-    func downloadDidFinish(_ download: WKDownload) {
-        guard let file = downloadedFiles.removeValue(forKey: ObjectIdentifier(download)) else { return }
-        let sheet = UIActivityViewController(activityItems: [file], applicationActivities: nil)
-        sheet.popoverPresentationController?.sourceView = webView
-        sheet.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
-        if presentedViewController == nil { present(sheet, animated: true) }
-    }
-    func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
-        downloadedFiles.removeValue(forKey: ObjectIdentifier(download))
-        let alert = UIAlertController(title: "دانلود انجام نشد", message: "اتصال اینترنت و فضای خالی دستگاه را بررسی کنید و دوباره تلاش کنید.", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "باشه", style: .default))
-        if presentedViewController == nil { present(alert, animated: true) }
-    }
+
 }

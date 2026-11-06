@@ -5,6 +5,9 @@
 	};
 	"objectVersion" = "56";
 	"objects" = {
+        AAAAAAAAAAAAAAAAAAAAAA01 = { isa = PBXFileReference; lastKnownFileType = folder; path = Web; sourceTree = "<group>"; };
+        AAAAAAAAAAAAAAAAAAAAAA02 = { isa = PBXBuildFile; fileRef = AAAAAAAAAAAAAAAAAAAAAA01; };
+
 		"5F2EA2997C7EB214A3EECC26" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
@@ -78,6 +81,7 @@
 				"40D375C717897EE1A9FB9AB7",
 				"9AC3B5AD93CBC0305C62F78F",
 				"FF7EC0873047107CAD7E30F1",
+                AAAAAAAAAAAAAAAAAAAAAA01,
 				"795A02A63DC9C1E86758E98F",
 				"3EEDD63E9B2EA829C0B60076",
 			);
@@ -135,6 +139,7 @@
 			"buildActionMask" = "2147483647";
 			"files" = (
 				"5AC2CDF980778E9D3963C56F",
+                AAAAAAAAAAAAAAAAAAAAAA02,
 				"8E377B3649334919644881C4",
 				"1F8F22BFA283E468D54F722E",
 			);

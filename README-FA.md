@@ -1,68 +1,65 @@
-# دیاستومی برای تست روی آیفون، با ویندوز و بدون مک شخصی
+# دیاستومی iOS — رابط محلی، نسخهٔ ۲
 
-این بسته **پروژهٔ اپ** است؛ فایل نصب IPA هنوز ساخته نشده است.
-خروجی نصب با GitHub Actions ساخته می‌شود و با Sideloadly روی ویندوز امضا و نصب می‌شود.
+این پروژه جایگزین پوستهٔ قبلی می‌شود: برنامه فایل `Diastomy/Web/index.html` را از خود بسته باز می‌کند. هیچ صفحهٔ HTML، اسکریپت، فونت یا CSS از سایت دریافت نمی‌شود. رابط آفلاین برای این معماری بازنویسی شده؛ تمام جزئیات بصری و امکانات نسخهٔ وب عیناً منتقل نشده‌اند.
 
-## ۱. آپلود پروژه در GitHub
+## داخل برنامه
 
-1. در حساب خودت یک repository خالی با نام `diastomy-ios` بساز. می‌تواند **Private** باشد؛ ساخت در محدودهٔ سهمیهٔ رایگان Actions انجام می‌شود. برای این تست نیازی به فعال کردن پرداخت یا خرید Apple Developer نیست.
-2. ZIP را روی ویندوز Extract کن و وارد پوشهٔ `Diastomy-iOS` شو.
-3. در GitHub روی **Add file → Upload files** بزن. **محتویات پوشه** را آپلود کن، نه ZIP یا خود پوشهٔ مادر. این‌ها باید در ریشهٔ مخزن باشند:
-   - `Diastomy/`
-   - `Diastomy.xcodeproj/`
-   - `scripts/`
-   - `.github/` (فایل ساخت داخل همین پوشه است)
-   - فایل‌های راهنما و `BUILD-IPA.yml`
-4. **Commit changes** را بزن.
-5. اگر workflow در Actions دیده نشد: **Add file → Create new file**، نام فایل را دقیقاً `.github/workflows/build-ios.yml` بگذار، محتوای `BUILD-IPA.yml` را کپی کن و Commit کن.
+صفحهٔ اصلی، آرشیو، جست‌وجو، جزئیات عنوان و قسمت‌ها، بازیگران، حساب، ورود با رمز/کد، ثبت‌نام، بازیابی رمز، لیست من، تنظیمات، اعلان‌ها، پشتیبانی، اشتراک و اتاق فیلم همگی مسیر محلی دارند. فایل‌های HTML/JS/CSS، فونت و لوگو همراه اپ نصب می‌شوند.
 
-## ۲. ساخت IPA
+اطلاعات عمومیِ دریافت‌شده از API تا سقف ۸۰ پاسخ برای مشاهدهٔ بعدی نگهداری می‌شود. حتی اولین اجرا در حالت هواپیما صفحه‌ها و فرم‌ها را باز می‌کند؛ بدون دادهٔ قبلی، فهرست فیلم خالی خواهد بود. اطلاعات حساب، پیام‌ها و مجوز پخش در کش عمومی ذخیره نمی‌شوند. ورود، ارسال پیام، پرداخت، دادهٔ جدید و پخش آنلاین نیاز به اینترنت دارند. پوسترها و سایر تصاویر محتوایی از URLهای داخل پاسخ API دریافت می‌شوند؛ نمایش آفلاین آن‌ها تضمین نشده است.
 
-1. وارد بخش **Actions** شو.
-2. **Build iPhone IPA** را انتخاب و **Run workflow** را بزن.
-3. پس از سبز شدن ساخت، پایین همان اجرا در **Artifacts**، فایل `Diastomy-iPhone-IPA` را دانلود و از ZIP خارج کن.
-4. خروجی نصب `Diastomy-unsigned.ipa` است. «unsigned» یعنی امضای شخصی در مرحلهٔ نصب روی ویندوز اضافه می‌شود.
+پخش با AVPlayer و مسیر HLS فعلی سرور انجام می‌شود. کوکی حساب از نشست بومی به AVPlayer داده می‌شود و سرور روی API پخش و مسیرهای HLS اشتراک را بررسی می‌کند. کیفیت از صفحهٔ جزئیات انتخاب می‌شود؛ زیرنویس و کنترل‌های موجود در HLS با کنترل‌های بومی اپل نمایش داده می‌شوند. این نسخه انتقال عین‌به‌عین پلیر سفارشی وب نیست.
 
-ساخت فقط با اجرای دستی انجام می‌شود؛ هر اجرا حداکثر ۲۵ دقیقه وقت دارد و خروجی ۷ روز در GitHub نگه داشته می‌شود.
-در مخزن خصوصی سهمیهٔ رایگان حساب مصرف می‌شود. اگر سهمیه تمام شده باشد، برای حفظ شرط «بدون هزینه» پرداخت را فعال نکن؛ ابتدا وضعیت Billing/Actions را بررسی کن.
+اتاق فیلم از همان WebSocket فعلی با کوکی حساب استفاده می‌کند؛ صفحه، گفت‌وگو و کنترل میزبان محلی هستند و پخش بومی از وضعیت اتاق پیروی می‌کند. پرداخت در مرورگر خارجیِ درگاه باز می‌شود. دانلود مدیریت‌شدهٔ فیلم، آپلود پیوست، ورود Google و همهٔ امکانات سفارشی پلیر وب در این نسخه پیاده نشده‌اند.
 
-## ۳. نصب از ویندوز روی آیفون
+## سرور
 
-1. Sideloadly را فقط از **https://sideloadly.io/** بگیر.
-2. پیش‌نیازهای رسمی Windows آن، شامل نسخهٔ لازم iTunes و iCloud، را طبق همان سایت نصب کن.
-3. آیفون را با کابل وصل و روی آیفون **Trust This Computer** را تأیید کن.
-4. فایل `Diastomy-unsigned.ipa` را داخل Sideloadly بکش.
-5. Apple ID خودت را **فقط داخل برنامه روی ویندوز خودت** وارد کن. Apple ID، رمز یا کد تأیید را در GitHub، فایل‌های پروژه یا چت وارد نکن.
-6. Start را بزن. در صورت درخواست آیفون، پروفایل توسعه‌دهنده را از **Settings → General → VPN & Device Management** تأیید کن. اگر iOS درخواست کرد، **Developer Mode** را در **Settings → Privacy & Security** روشن و مراحل راه‌اندازی مجدد را انجام بده.
-7. اپ Diastomy را باز کن و با حساب سایت وارد شو. نشست ورود اپ از Safari و PWA قبلی جداست.
+فایل `backend/mobile_app_api.py` APIهای JSON مورد نیاز را به پروژهٔ Django اضافه می‌کند. هیچ migration یا تغییری در مدل‌ها نیاز نیست. قبل از ساخت IPA باید این APIها روی سرور فعال باشند:
 
-با Apple ID رایگان، اعتبار امضا **۷ روز** است. بعد باید با Sideloadly تمدید شود. گزینهٔ تمدید خودکار در صورت آماده بودن کامپیوتر/اتصال طبق راهنمای Sideloadly قابل استفاده است.
+- `GET /api/app/v1/session/`
+- `GET /api/app/v1/home/`
+- `GET /api/app/v1/title/<movie|series>/<slug>/`
+- `GET /api/app/v1/playback/<movie|series>/<video_id>/`
+- `GET /api/app/v1/library/`
+- `GET /api/app/v1/settings/`
+- `GET/POST /api/app/v1/rooms/`
+- `GET /api/app/v1/rooms/<code>/`
 
-## در این نسخه چه چیزی داریم؟
+برای سرور دیگر ابتدا پیش‌نمایش و بعد نصب:
 
-- همان وب‌اپ زندهٔ `https://diastomy.top`، با تشخیص حالت PWA در WebView؛ Django و دیتابیس داخل اپ کپی نمی‌شوند.
-- آیکون، صفحهٔ شروع محلی، نگهداری کوکی ورود، پس‌زمینهٔ مشکی و پشتیبانی عمودی/افقی.
-- پخش inline ویدیو با کنترل‌های فعلی سایت، AirPlay و اجازهٔ Picture in Picture در WebKit.
-- لینک‌های بیرونی در مرورگر سیستم باز می‌شوند.
-- دانلودهای معمولیِ پشتیبانی‌شدهٔ WebKit در Documents برنامه ذخیره می‌شوند و در پایان پنجرهٔ اشتراک‌گذاری دارند؛ پوشهٔ Documents از Files نیز قابل دسترسی است.
-- کلید و گواهی امضا، اطلاعات کاربر، دیتابیس یا تنظیمات خصوصی سرور در بسته وجود ندارد.
+```bash
+python3 backend/install_backend.py /path/to/django
+python3 backend/install_backend.py /path/to/django --apply
+/path/to/venv/bin/python /path/to/django/manage.py check
+```
 
-## مواردی که باید روی دستگاه تست شوند
+نصاب از `diastomy/urls.py` و API قبلی در صورت وجود پشتیبان می‌گیرد؛ سرویس را خودش reload نمی‌کند. در این محیط API روی سرور دیاستومی نصب و جداگانه بررسی شده است؛ جزئیات در BUILD-STATUS.md است.
 
-ورود/خروج، انتخاب زبان، فیلم و سریال، ادامهٔ پخش، انتخاب صدا و زیرنویس، چرخش، تمام‌صفحه، اتاق فیلم، چت و دانلود.
-قابلیت‌های وب‌اپ مانند اعلان وب، کش Service Worker، دانلود آفلاین HLS و ادامهٔ دانلود در پس‌زمینه را نباید با صرف قرار گرفتن در WebView تضمین‌شده فرض کرد؛ این نسخه هنوز تست فیزیکی نشده است.
-اگر پخش آنلاین روی منبع/سرور ایراد داشته باشد، بسته‌بندی آن به اپ به‌تنهایی آن را رفع نمی‌کند.
-این بسته برای تست شخصی آماده شده؛ امضای نصب، ساخت موفق Xcode و تست آیفون هنوز باید انجام شوند.
+## ساخت با مخزن قبلی
 
-## اگر ساخت قرمز شد
+مخزن: https://github.com/arya5282/diastomy-ios-test-20261104-115947-f643
 
-روی مرحلهٔ قرمز بزن و متن خطای Build را بفرست؛ رمز یا کد تأیید لازم نیست.
-نام اپ در فایل‌های پروژه `Diastomy` و Bundle ID آزمایشی `top.diastomy.ios.test` است.
-اگر خطای Bundle ID تکراری بود، در Sideloadly یک Bundle ID شخصیِ ثابت تعیین کن و در تمدیدهای بعد همان را استفاده کن.
+۱. ZIP سورس جدید را Extract کن. محتویات پوشه را در ریشهٔ همین مخزن جایگزین کن؛ مخصوصاً `Diastomy`، `Diastomy.xcodeproj`، `scripts` و `.github/workflows/build-ios.yml`. فایل ZIP یا پوشهٔ مادر را به‌جای محتویات آپلود نکن. پوشهٔ مخفی `.github` را فراموش نکن.
 
-## منابع رسمی
+۲. در Actions، اجرای `Build iPhone IPA` را با Run workflow شروع کن. اگر `.github` را نمی‌توانی آپلود کنی، محتوای BUILD-IPA.yml را در مسیر `.github/workflows/build-ios.yml` قرار بده.
 
-- GitHub Actions: https://docs.github.com/en/billing/concepts/product-billing/github-actions
-- Sideloadly: https://sideloadly.io/
-- WebKit: https://developer.apple.com/documentation/webkit/wkwebview
-- Inline video: https://developer.apple.com/documentation/webkit/wkwebviewconfiguration/allowsinlinemediaplayback
+۳. بعد از سبز شدن ساخت، Artifact با نام `Diastomy-iPhone-IPA` را بگیر. داخلش `Diastomy-unsigned.ipa` قرار دارد. این فایل باید روی کامپیوتر خودت با Sideloadly امضا و روی آیفون نصب شود.
+
+۴. Bundle ID همان `top.diastomy.ios.test` است. برای به‌روزرسانی روی نصب قبلی، حساب و Bundle ID امضای قبلی را نگه دار. دیتابیس سرور، رمز، کلید امضا و اطلاعات خصوصی داخل این بسته نیستند.
+
+## بررسی‌ها
+
+```bash
+python3 scripts/validate.py
+python3 scripts/validate_offline.py
+node --check Diastomy/Web/app.js
+python3 tests/test_bundled_ui.py  # نیازمند Playwright + WebKit
+/path/to/venv/bin/python backend/check_current_catalogue.py /path/to/django
+```
+
+بررسی مرورگر، قرارداد API و منابع جای ساخت Xcode و تست آیفون را نمی‌گیرند. این محیط Linux است و خروجی IPA محلی تولید نشده است.
+
+مستندات فنی اپل:
+- https://developer.apple.com/documentation/webkit/wkwebview/loadfileurl(_:allowingreadaccessto:)
+- https://developer.apple.com/documentation/webkit/wkscriptmessagehandlerwithreply
+- https://developer.apple.com/documentation/avfoundation/avurlassethttpcookieskey
