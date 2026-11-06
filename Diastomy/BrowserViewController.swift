@@ -267,13 +267,13 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                         }
                         self.webView.callAsyncJavaScript(
                             "window.dispatchEvent(new CustomEvent('diastomy-room', {detail: message}))",
-                            arguments: ["message": value], in: nil, contentWorld: .page, completionHandler: nil)
+                            arguments: ["message": value], in: nil, in: .page, completionHandler: nil)
                     }
                     self.receiveRoom(task)
                 case .failure:
                     self.webView.callAsyncJavaScript(
                         "window.dispatchEvent(new CustomEvent('diastomy-room', {detail: {type:'error', message:'اتصال اتاق قطع شد؛ دوباره وارد اتاق شوید.'}}))",
-                        arguments: [:], in: nil, contentWorld: .page, completionHandler: nil)
+                        arguments: [:], in: nil, in: .page, completionHandler: nil)
                 }
             }
         }
