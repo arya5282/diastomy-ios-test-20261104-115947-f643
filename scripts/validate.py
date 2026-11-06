@@ -9,6 +9,10 @@ root = Path(__file__).resolve().parents[1]
 info = plistlib.loads((root / 'Diastomy/Info.plist').read_bytes())
 assert info['WKAppBoundDomains'] == ['diastomy.top', 'www.diastomy.top']
 assert info['UILaunchStoryboardName'] == 'LaunchScreen'
+# The window is owned by SceneDelegate; reject partially uploaded lifecycle files.
+config = info['UIApplicationSceneManifest']['UISceneConfigurations']['UIWindowSceneSessionRoleApplication'][0]
+assert config['UISceneDelegateClassName'] == '$(PRODUCT_MODULE_NAME).SceneDelegate'
+assert 'final class SceneDelegate' in (root / 'Diastomy/AppDelegate.swift').read_text()
 assert 'NSAllowsArbitraryLoads' not in info.get('NSAppTransportSecurity', {})
 for path in [root / 'Diastomy/LaunchScreen.storyboard',
              root / 'Diastomy.xcodeproj/xcshareddata/xcschemes/Diastomy.xcscheme']:

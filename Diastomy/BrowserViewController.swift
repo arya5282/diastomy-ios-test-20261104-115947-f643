@@ -28,6 +28,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        StartupDiagnostics.record(stage: "controllerLoaded")
         view.backgroundColor = .black
         let session = URLSessionConfiguration.default
         session.httpCookieStorage = .shared
@@ -79,6 +80,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         startupTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: false) { [weak self] _ in
             self?.startupFailed("رابط برنامه آماده نشد. روی تلاش دوباره بزنید.")
         }
+        StartupDiagnostics.record(stage: "loadingLocalDocument", localDocument: isLocal(index))
         webView.loadFileURL(index, allowingReadAccessTo: webRoot)
     }
 
@@ -100,7 +102,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         }
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        StartupDiagnostics.record(stage: "documentCommitted", localDocument: isLocal(webView.url))
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        StartupDiagnostics.record(stage: "checkingNativeBridge", localDocument: isLocal(webView.url))
         guard isLocal(webView.url) else { return }
         // Exercise both JS execution and the real native reply bridge. This
         // catches iOS app-bound-domain failures that a browser-only test misses.
@@ -185,14 +192,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     private func writeStartupReport(ready: Bool, message: String? = nil) {
-        #if DEBUG
-        guard ProcessInfo.processInfo.arguments.contains("--offline-startup-test") else { return }
-        let report: [String: Any] = ["ready": ready, "localDocument": isLocal(webView.url), "message": message ?? "",
-                                     "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""]
-        if let data = try? JSONSerialization.data(withJSONObject: report) {
-            try? data.write(to: documents.appendingPathComponent("startup-report.json"), options: .atomic)
-        }
-        #endif
+        StartupDiagnostics.record(stage: ready ? "ready" : "failed", ready: ready,
+                                  localDocument: isLocal(webView.url), message: message ?? "")
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask,
@@ -230,7 +231,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private func send(_ path: String, method: String = "GET", body: Any? = nil,
                       completion: @escaping ([String: Any]) -> Void) {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--offline-startup-test") {
+        if StartupDiagnostics.isOfflineTest {
             completion(["status": 0, "data": ["error": "Offline startup test"]]); return
         }
         #endif
