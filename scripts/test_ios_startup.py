@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 import time
@@ -29,14 +30,22 @@ def wait_for_report(report, timeout=60):
     raise RuntimeError('UI never reached a terminal startup state. Last native report: ' + str(latest))
 
 
+def compatible_runtime(identifier):
+    # WebKit bug 293831: refined Swift WebKit APIs crash on the 18.5
+    # simulator when built with a deployment target below 18.4. This
+    # restriction applies only to the simulator smoke build, not the IPA.
+    match = re.search(r'\.iOS-(\d+)-(\d+)(?:-|$)', identifier)
+    return match is not None and tuple(map(int, match.groups())) >= (18, 4)
+
+
 def main():
     devices = json.loads(run('xcrun', 'simctl', 'list', 'devices', 'available', '--json'))['devices']
     types = {x['name']: x['identifier'] for x in json.loads(run('xcrun', 'simctl', 'list', 'devicetypes', '--json'))['devicetypes']}
-    choice = next(((runtime, device) for runtime, rows in devices.items() if '.iOS-' in runtime
+    choice = next(((runtime, device) for runtime, rows in devices.items() if compatible_runtime(runtime)
                    for device in rows if device.get('isAvailable') and device['name'].startswith('iPhone')
                    and device['name'] in types), None)
     if choice is None:
-        raise RuntimeError('No available iPhone simulator runtime. Install one in Xcode Settings > Components.')
+        raise RuntimeError('No available iOS 18.4+ iPhone simulator runtime. Install one in Xcode Settings > Components.')
     runtime, device = choice
     simulator = run('xcrun', 'simctl', 'create', 'Diastomy offline startup check', types[device['name']], runtime)
     container = None
@@ -47,6 +56,7 @@ def main():
             'xcodebuild', '-quiet', '-project', str(root / 'Diastomy.xcodeproj'), '-scheme', 'Diastomy',
             '-configuration', 'Debug', '-sdk', 'iphonesimulator',
             '-destination', 'generic/platform=iOS Simulator', '-derivedDataPath', str(derived),
+            'IPHONEOS_DEPLOYMENT_TARGET=18.4',
             'CODE_SIGNING_ALLOWED=YES', 'CODE_SIGNING_REQUIRED=YES', 'CODE_SIGN_IDENTITY=-', 'build',
         ], check=True, timeout=600)
         print('PASS: simulator compilation', flush=True)
