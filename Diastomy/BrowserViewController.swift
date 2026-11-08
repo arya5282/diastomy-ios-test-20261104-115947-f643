@@ -164,7 +164,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         retry.tintColor = .white
         retry.isHidden = !canRetry
         retry.addTarget(self, action: #selector(retryStartup), for: .touchUpInside)
-        let stack = UIStackView(arrangedSubviews: [label, retry])
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        let versionLabel = UILabel()
+        versionLabel.text = "نسخهٔ \(version) · بیلد \(build)"
+        versionLabel.textColor = .lightGray
+        versionLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+        versionLabel.textAlignment = .center
+        let stack = UIStackView(arrangedSubviews: [label, retry, versionLabel])
         stack.axis = .vertical
         stack.spacing = 24
         stack.translatesAutoresizingMaskIntoConstraints = false
