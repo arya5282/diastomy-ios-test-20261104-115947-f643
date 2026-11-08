@@ -293,13 +293,17 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         } else if action == "play", let kind = data["kind"] as? String,
                   ["movie", "series"].contains(kind), let id = data["id"] as? Int, id > 0 {
             let code = data["room"] as? String
-            let room = code != nil && code == roomCode ? "?room=" + code! : ""
+            guard code == nil || code == roomCode else {
+                replyHandler(["status": 400, "data": ["error": "ابتدا وارد اتاق شوید."]], nil)
+                return
+            }
+            let room = code.map { "?room=" + $0 } ?? ""
             send("/api/app/v1/playback/\(kind)/\(id)/" + room) { result in
                 guard result["status"] as? Int == 200, let info = result["data"] as? [String: Any],
                       let value = info["url"] as? String, let url = URL(string: value),
                       url.scheme == "https", url.host == self.server.host,
                       url.path.hasPrefix("/movie/\(kind)-direct-hls/") else { replyHandler(result, nil); return }
-                if room.isEmpty, data["inline"] as? Bool == true {
+                if data["inline"] as? Bool == true {
                     let store = self.webView.configuration.websiteDataStore.httpCookieStore
                     let group = DispatchGroup()
                     for cookie in HTTPCookieStorage.shared.cookies(for: url) ?? [] {
@@ -356,6 +360,13 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                     replyHandler(result, nil); return
                 }
                 UIApplication.shared.open(url) { opened in replyHandler(["status": opened ? 200 : 502, "data": ["opened": opened]], nil) }
+            }
+        } else if action == "openSocial", let site = data["site"] as? String,
+                  let address = ["instagram": "https://instagram.com/diastomyplus",
+                                 "telegram": "https://t.me/diastomyplus"][site],
+                  let url = URL(string: address) {
+            UIApplication.shared.open(url) { opened in
+                replyHandler(opened ? ["ok": true] : ["ok": false, "error": "باز کردن پیوند ممکن نشد."], nil)
             }
         } else if action == "shareRoom", let code = data["code"] as? String,
                   code.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil,

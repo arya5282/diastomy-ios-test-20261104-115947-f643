@@ -62,10 +62,12 @@ window.PWA = (() => {
   }
   function historyCard(item) {
     const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
+    const remaining = Math.max(0, Math.floor((item.total || 0) - (item.position || 0)));
+    const time = Math.floor(remaining / 60) + ':' + String(remaining % 60).padStart(2, '0');
     return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '" aria-label="ادامه تماشا">' +
-      '<img src="' + media(item.banner || item.cover) + '" alt="' + esc(item.title) + '" loading="lazy">' +
-      '<progress class="local-library-progress" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><strong>' +
-      name(item) + '</strong><small>' + Math.max(0, Math.ceil((item.total - item.position) / 60)) + ' دقیقه باقی مانده</small></div></article>';
+      '<img src="' + media(item.snapshot || item.banner || item.cover) + '" data-history-fallback="' + media(item.banner || item.cover) + '" alt="' + esc(item.title) + '" loading="lazy">' +
+      '<svg class="local-history-mark" viewBox="0 0 28 24" aria-hidden="true"><use href="#dm-poster-mark-v1"/></svg><progress class="local-library-progress" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><strong>' +
+      name(item) + '</strong><small dir="ltr">' + time + ' باقی‌مانده</small></div></article>';
   }
   function detail(item, episodes) {
     const series = item.type === 'series';
@@ -106,17 +108,21 @@ window.PWA = (() => {
         '<p>تریلر در دسترس نیست.</p>') + '</div>' +
       '<div data-detail-panel="similar" hidden><a class="button" href="#/browse/' + (item.type === 'series' ? 'series' : 'movie') + '">مشاهده آرشیو</a></div></div></article>';
   }
-  function account(user, history) {
-    const minutes = Math.floor((history || []).reduce((total, item) => total + (Number(item.position) || 0), 0) / 60);
-    const watchTime = user && history ? '<a class="reference-watch-time" href="#/library"><span aria-hidden="true">◷</span><span><small>مجموع زمان تماشای شما</small><strong>' +
-      Math.floor(minutes / 60) + ' ساعت و ' + minutes % 60 + ' دقیقه</strong></span><span aria-hidden="true">‹</span></a>' : '';
-    const identity = user
-      ? (user.avatar ? '<img class="reference-profile-avatar" src="' + media(user.avatar) + '" alt="">' : '') + '<div><strong>' + esc(user.name) + '</strong><small dir="ltr">' + esc(user.phone || user.username) + '</small><span class="reference-subscription-badge">' + (user.subscribed ? 'اشتراک فعال' : 'بدون اشتراک فعال') + '</span></div>'
-      : '<strong class="dm-app-menu-guest-title">به دیاستومی خوش آمدید</strong><span class="dm-app-menu-guest-caption">وارد دنیای فیلم و سریال شوید</span><a class="dm-app-menu-login" href="#/login">ورود یا ثبت‌نام</a>';
-    return '<div id="dm-app-menu" class="dm-app-menu" open><div class="dm-app-menu-shell"><div class="dm-app-menu-top"><div class="ar-menu-heading"><h1>پروفایل کاربری</h1><img src="' +
-      logo + '" alt="Diastomy"></div><a class="dm-app-menu-close" href="#/home" aria-label="بازگشت">‹</a></div><div class="dm-app-menu-profile' + (user ? '' : ' reference-guest') + '">' + identity +
-      '</div>' + watchTime + '<div class="dm-app-menu-nav">' + PWA_SOURCE.accountRows + '<a class="dm-app-menu-row" href="#/about">دربارهٔ برنامه</a></div>' +
-      (user ? '<button id="logout" class="wide">خروج از حساب کاربری ↗</button>' : '') + '<footer class="reference-profile-footer"><img src="' + logo + '" alt="Diastomy"><p>برای مطلع شدن از آخرین اخبار و به‌روزرسانی‌ها، دیاستومی را در شبکه‌های اجتماعی دنبال کنید.</p></footer></div></div>';
+  function account(user, viewing, back) {
+    const watchTime = viewing ? '<a class="dm-viewing-summary" href="#/library?tab=history"><span class="dm-viewing-icon">' +
+      PWA_SOURCE.watchIcon + '</span><span class="dm-viewing-copy"><small>مجموع زمان تماشای شما</small><strong>' +
+      esc(viewing.hours) + ' ساعت و ' + esc(viewing.minutes) + ' دقیقه</strong></span>' + PWA_SOURCE.watchChevron + '</a>' : '';
+    const identity = (user.avatar ? '<img class="reference-profile-avatar" src="' + media(user.avatar) + '" alt="">' : '') +
+      '<div><strong>' + esc(user.name) + '</strong><small dir="ltr">' + esc(user.phone || user.username) + '</small>' +
+      '<div class="local-subscription-line"><span class="reference-subscription-badge">' + (user.subscribed ? 'اشتراک فعال' : 'بدون اشتراک فعال') + '</span>' +
+      (user.subscription_days != null ? '<small>' + esc(user.subscription_days) + ' روز باقی مانده</small>' : '') + '</div></div>';
+    return '<div id="dm-app-menu" class="dm-app-menu" open><div class="dm-app-menu-shell"><div class="dm-app-menu-top">' +
+      '<div class="ar-menu-heading"><h1>پروفایل کاربری</h1><img src="' + logo + '" alt="Diastomy"></div>' +
+      '<a class="dm-app-menu-close" href="' + esc(back) + '" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a></div>' +
+      '<div class="dm-app-menu-profile">' + identity + '</div>' + watchTime + '<div class="dm-app-menu-nav">' + PWA_SOURCE.accountRows +
+      '</div><button id="logout" type="button">خروج از حساب کاربری ↗</button>' +
+      '<footer class="reference-profile-footer"><img src="' + logo + '" alt="Diastomy"><p>برای مطلع شدن از آخرین اخبار و به‌روزرسانی‌ها،<br>دیاستومی را در شبکه‌های اجتماعی دنبال کنید.</p>' +
+      PWA_SOURCE.accountSocial + '</footer></div></div>';
   }
   function auth(title, body) {
     return '<div id="dm-auth-reference"><div class="dm-auth-shell"><div class="dm-auth-logo"><img src="' + logo +
@@ -138,6 +144,13 @@ window.PWA = (() => {
     button.replaceWith(form);
   }
   function install() {
+    document.addEventListener('error', event => {
+      const image = event.target;
+      if (!(image instanceof HTMLImageElement) || !image.dataset.historyFallback) return;
+      const fallback = image.dataset.historyFallback;
+      delete image.dataset.historyFallback;
+      if (image.getAttribute('src') !== fallback) image.src = fallback;
+    }, true);
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
     document.getElementById('pwa-nav').innerHTML = PWA_SOURCE.nav;
     document.getElementById('pwa-sprite').innerHTML = PWA_SOURCE.sprite;
@@ -149,7 +162,10 @@ window.PWA = (() => {
         dot.setAttribute('aria-pressed', String(Number(dot.dataset.slide) === active)));
     }, true);
     document.addEventListener('click', event => {
-      if (event.target.closest('[data-local-menu]')) location.hash = '#/account';
+      if (event.target.closest('[data-local-menu]')) {
+        PWA.accountBack = location.hash || '#/home';
+        location.hash = '#/account';
+      }
       if (event.target.closest('[data-local-search]')) location.hash = '#/search';
       const tab = event.target.closest('[data-detail-tab]');
       if (tab) {
@@ -167,7 +183,7 @@ window.PWA = (() => {
   function page(name) {
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
     document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
-    document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors'].includes(name);
+    document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
     document.querySelectorAll('[data-nav-slot]').forEach(link => {
       if (link.dataset.navSlot === slot) link.setAttribute('aria-current', 'page');

@@ -53,8 +53,12 @@ def session(request):
     user = request.user
     data = None
     if user.is_authenticated:
+        from django.utils import timezone
+        subscription = user.active_subscription
+        days = max(0, (subscription.end_date - timezone.now()).days) if subscription and subscription.end_date else None
         data = {
-            'id': user.pk, 'name': user.get_full_name() or user.username,
+            'id': user.pk, 'name': user.full_name or user.get_full_name() or user.username,
+            'email': user.email, 'subscription_days': days,
             'username': user.username, 'avatar': user.avatar_src,
             'phone': str(getattr(user, 'phone', '') or ''),
             'subscribed': user.has_active_subscription or user.is_staff,
@@ -191,7 +195,7 @@ def library(request):
     for row in services.get_user_watch_history(request.user)[:100]:
         item = row.movie or (row.episode.season.series if row.episode else None)
         if item:
-            history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration})
+            history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration, 'snapshot': row.snapshot_url})
     return JsonResponse({'saved': saved_movies + saved_series, 'history': history})
 
 
@@ -251,6 +255,8 @@ def room_detail(request, code):
               if direct_url_usable(x)] if allowed else []
     return JsonResponse({'code': room.code, 'title': room.display_title,
                          'is_host': room.host_id == request.user.pk, 'can_watch': allowed,
+                         'cover': file_url(room.movie.cover), 'starts_at': room.starts_at.isoformat(),
+                         'host': room.host.full_name or room.host.username,
                          'videos': videos, 'state': room.state_dict(), 'server_ts': time.time()})
 
 

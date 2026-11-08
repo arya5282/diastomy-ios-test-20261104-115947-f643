@@ -110,7 +110,7 @@
       'local-room': ['mr-wrap','mr-room-topline'],
       'local-support': ['ar-support-main','ar-support-head']
     }[route] || ['ar-shell','ar-head'];
-    const back = ['local-settings','local-notifications','local-support','local-subscription','local-about'].includes(route) ? 'account' :
+    const back = ['local-profile','local-payments','local-settings','local-notifications','local-support','local-subscription','local-about'].includes(route) ? 'account' :
       route === 'local-room' ? 'rooms' : 'home';
     return '<section class="pwa-internal ' + layout[0] + '"><header class="pwa-internal-head ' + layout[1] + '">' +
       '<h1>' + esc(title) + '</h1><a href="#/' + back + '" aria-label="بازگشت"><svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -174,11 +174,18 @@
       try {
         const data = await api('/api/app/v1/home/', {cache:true});
         whenCurrent(seq, () => {
-          const recommended = (data.rails || []).find(rail => rail.key === 'pwa_recommended');
-          $('#catalogue').innerHTML = '<h2>ژانرها</h2><div class="dm-search-genres">' + data.genres.map(genre =>
-            '<a class="dm-search-genre reference-genre" href="#/browse/all?genre=' + enc(genre.slug) + '"><img alt="" loading="lazy" src="https://diastomy.top/pwa/genre-images/v1/' + enc(genre.slug) + '/"><span>' + esc(genre.name) + '</span></a>').join('') +
-            '</div><h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
-            ((recommended && recommended.items) || data.hero || []).map(card).join('') + '</div>';
+          const rails = data.rails || [];
+          const recommended = rails.find(rail => rail.key === 'trending_movies' && rail.items.length) ||
+            rails.find(rail => rail.key === 'pwa_recommended' && rail.items.length);
+          const featured = ['fantasy','action','drama','horror','sci-fi','comedy'];
+          const genres = featured.map(slug => ({slug,name:slug.toUpperCase()}));
+          const extra = (data.genres || []).filter(genre => !featured.includes(genre.slug));
+          const tile = genre => '<a class="dm-search-genre reference-genre" href="#/browse/all?genre=' + enc(genre.slug) +
+            '"><img alt="" loading="lazy" src="https://diastomy.top/pwa/genre-images/v1/' + enc(genre.slug) + '/"><span>' + esc(genre.name) + '</span></a>';
+          $('#catalogue').innerHTML = '<h2>ژانرها</h2><div class="dm-search-genres">' + genres.map(tile).join('') +
+            '</div>' + (extra.length ? '<details class="local-extra-genres"><summary>دیدن ژانرهای بیشتر</summary><div class="dm-search-genres">' +
+            extra.map(tile).join('') + '</div></details>' : '') + '<h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
+            (recommended?.items || data.hero || []).map(card).join('') + '</div>';
         });
       } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
       return;
@@ -259,7 +266,7 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#actors-data'), error)); }
   }
-  function library(seq) {
+  function library(seq, params) {
     const tabs = [['downloads','دانلودها'], ['saved','لیست من'], ['history','ادامه تماشا']];
     mount(PWA_SOURCE.libraryHeader + '<dialog id="delete-download-dialog"><p>فایل دانلودشده حذف شود؟</p><button type="button" data-cancel-delete>انصراف</button><button type="button" data-confirm-delete>حذف فایل</button></dialog><section class="library-shell" aria-label="لیست من"><div class="library-tabs" role="tablist">' +
       tabs.map(([id,label]) => '<button type="button" role="tab" id="library-tab-' + id + '" aria-controls="library-' + id +
@@ -319,11 +326,11 @@
         const result = await native({action:'listDownloads'});
         if (seq !== state.sequence) return;
         if (!result.ok) throw Error(result.error || 'خواندن دانلودها ممکن نشد.');
-        target.innerHTML = '<p class="dl-hint">روی همین دستگاه ذخیره می‌شود.</p>' +
+        target.innerHTML = '<p class="dl-hint">روی همین دستگاه ذخیره می‌شود. هنگام دانلود اپ را باز نگه دارید.</p>' +
           (result.files.length ? result.files.map((file,index) =>
             '<article class="local-download-card"><strong>' + esc(file.title) + '</strong><div><button data-local-play="' + index +
             '">پخش آفلاین</button><button data-local-delete="' + index + '">حذف</button></div></article>').join('') :
-            '<p class="library-empty">هنوز فایلی دانلود نکرده‌ای.</p>');
+            '<div class="local-download-empty"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v19m-5-5 5 5 5-5"/></svg><h2>هنوز دانلودی نداری</h2><p>از صفحهٔ فیلم یا قسمت سریال، دانلود را انتخاب کن.</p></div>');
         const resultFiles = result.files;
         target.querySelectorAll('[data-local-play]').forEach(button => {
           button.onclick = async () => {
@@ -352,7 +359,9 @@
       select(tab);
       if (tab === 'downloads') loadDownloads();
     });
-    select('saved');
+    const initial = tabs.some(([id]) => id === params.get('tab')) ? params.get('tab') : 'saved';
+    select(initial);
+    if (initial === 'downloads') loadDownloads();
     panel('saved').innerHTML = '<p role="status">دریافت لیست…</p>';
     loadCollection();
   }
@@ -424,17 +433,58 @@
   function account() {
     const user = state.user;
     const sequence = state.sequence;
-    function render(history) {
-      mount(PWA.account(user, history));
-      if ($('#logout')) $('#logout').onclick = async () => {
-        try { await api('/accounts/api/logout/', { body: {} }); state.user = null; state.sessionKnown = true; state.nextAfterLogin = '#/home'; location.hash = '#/login'; }
-        catch (error) { toast(error.message); }
-      };
-    }
-    render();
-    if (user) api('/api/app/v1/library/').then(library => {
-      if (state.user === user) whenCurrent(sequence, () => render(library.history));
+    mount(PWA.account(user, null, PWA.accountBack || '#/home') +
+      '<dialog id="local-logout-dialog"><p>از حساب کاربری خارج می‌شوید؟</p><button type="button" data-logout-cancel>انصراف</button>' +
+      '<button type="button" data-logout-confirm>خروج</button></dialog>');
+    const dialog = $('#local-logout-dialog');
+    $('#logout').onclick = () => dialog.showModal();
+    dialog.querySelector('[data-logout-cancel]').onclick = () => dialog.close();
+    dialog.querySelector('[data-logout-confirm]').onclick = async event => {
+      event.target.disabled = true;
+      try {
+        await api('/accounts/api/logout/', {body:{}});
+        state.user = null;
+        state.sessionKnown = true;
+        state.nextAfterLogin = '#/home';
+        location.hash = '#/login';
+      } catch (error) { dialog.close(); toast(error.message); }
+      finally { event.target.disabled = false; }
+    };
+    document.querySelectorAll('[data-social]').forEach(link => link.onclick = async event => {
+      event.preventDefault();
+      try { const result = await native({action:'openSocial', site:link.dataset.social}); if (!result.ok) throw Error(result.error); }
+      catch (error) { toast(error.message); }
+    });
+    api('/api/watch-time/').then(viewing => {
+      if (state.user !== user || sequence !== state.sequence) return;
+      const template = document.createElement('template');
+      template.innerHTML = PWA.account(user, viewing, PWA.accountBack || '#/home');
+      const summary = template.content.querySelector('.dm-viewing-summary');
+      if (summary) $('.dm-app-menu-profile').after(summary);
     }).catch(() => {});
+  }
+  function profile() {
+    const user = state.user;
+    mount(shell('اطلاعات کاربری', form('edit-profile',
+      '<label>نام و نام خانوادگی<input name="full_name" value="' + esc(user.name) + '"></label>' +
+      '<label>نام کاربری<input name="username" value="' + esc(user.username || '') + '"></label>' +
+      '<label>ایمیل<input name="email" type="email" value="' + esc(user.email || '') + '"></label>' +
+      (user.phone ? '<div class="ar-row">شماره تلفن <bdi>' + esc(user.phone) + '</bdi></div>' : ''), 'ذخیره')));
+    submit('edit-profile', async (values, output) => {
+      const result = await api('/accounts/api/update-profile/', {body:values});
+      await refreshSession();
+      output.textContent = result.message || 'ذخیره شد.';
+    });
+  }
+  async function payments(seq) {
+    mount(shell('اطلاعات پرداخت', '<div id="payment-history"><p role="status">در حال دریافت…</p></div>'));
+    try {
+      const data = await api('/accounts/api/payments/');
+      whenCurrent(seq, () => { $('#payment-history').innerHTML = (data.payments || []).map(payment =>
+        '<article class="ar-note"><strong>' + esc(payment.plan_name) + '</strong><p>' + esc(payment.amount) + ' · ' +
+        esc(payment.status_display) + '</p><small dir="ltr">' + esc(payment.created_at) + ' · ' + esc(payment.tracking_code) + '</small></article>').join('') ||
+        empty('پرداختی ثبت نشده است.'); });
+    } catch (error) { whenCurrent(seq, () => fail($('#payment-history'), error)); }
   }
   async function notifications(seq) {
     mount(shell('اعلان‌ها', '<div id="notifications">' + empty('برای دریافت اعلان‌ها به اینترنت و حساب کاربری نیاز است.') + '</div>'));
@@ -610,16 +660,149 @@
     searchMovies('');
   }
   async function room(seq, code) {
-    mount(shell('اتاق فیلم', '<div id="room-data">' + empty('اطلاعات اتاق از سرور دریافت می‌شود.') + '</div>'));
+    mount(PWA_SOURCE.libraryHeader + '<section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1><a href="#/rooms">← بازگشت</a></div>' +
+      '<div id="room-data"><p role="status">اطلاعات اتاق از سرور دریافت می‌شود…</p></div></section>');
     try {
       const data = await api('/api/app/v1/rooms/' + enc(code) + '/');
       if (state.sequence !== seq) return;
       state.roomCode = code;
-      $('#room-data').innerHTML = '<h2>' + esc(data.title) + '</h2><p>کد دعوت: <strong dir="ltr">' + esc(code) + '</strong></p><div class="chips">' + data.videos.map(v => '<button data-play="' + v.id + '" data-kind="movie" data-room="' + esc(code) + '">▶ ' + esc(v.quality) + '</button>').join('') + '</div>' + (!data.can_watch ? empty('برای تماشای این اتاق به اشتراک نیاز دارید.') : '') + '<p id="room-status">در حال اتصال…</p>' + (data.is_host ? '<div class="chips"><button data-control="start_now">شروع</button><button data-control="pause">توقف</button><button data-control="resume">ادامه</button><button data-control="close">بستن اتاق</button></div>' : '') + '<h2>گفت‌وگو</h2><div id="room-chat" class="mr-side"></div>' + form('room-chat-form', field('text', 'پیام', 'text', 'maxlength="500"'), 'ارسال');
-      await native({ action: 'roomOpen', code });
-      submit('room-chat-form', async (body, output) => { const result = await native({ action: 'roomSend', message: { type: 'chat', text: body.text } }); if (!result.ok) throw new Error('ارسال پیام ناموفق بود.'); output.textContent = ''; $('#room-chat-form input').value = ''; });
-      document.querySelectorAll('[data-control]').forEach(b => { b.onclick = async () => { const result = await native({ action: 'roomSend', message: { type: 'control', action: b.dataset.control } }); if (!result.ok) toast('کنترل اتاق ارسال نشد.'); }; });
-    } catch (error) { whenCurrent(seq, () => fail($('#room-data'), error)); }
+      const videos = data.videos || [];
+      $('#room-data').innerHTML = '<article class="local-room-card mr-room">' + image(data.cover, 'local-room-cover', '') +
+        '<div class="mr-room-body"><strong>' + esc(data.title) + '</strong><small>میزبان: ' + esc(data.is_host ? 'خودت' : data.host || '—') +
+        (data.starts_at ? ' · ' + esc(new Date(data.starts_at).toLocaleString('fa-IR')) : '') + '</small><span id="room-live-state" class="mr-status"></span>' +
+        '<div class="local-room-card-buttons"><button type="button" id="share-inside-room">دعوت</button><a href="#/rooms">اتاق‌های من</a></div></div></article>' +
+        '<h2>پنل مدیریت پخش</h2><div class="local-room-screen"><span id="room-live-badge">● پخش زنده</span><video playsinline hidden></video>' +
+        '<div class="local-room-join"><strong>پخش هم‌زمان</strong><p>برای پیوستن به پخش هم‌زمان روی دکمه بزن.</p>' +
+        (videos.length ? '<button type="button" id="room-join-play">ورود به پخش</button>' : '<p>منبع قابل پخش در دسترس نیست.</p>') + '</div></div>' +
+        '<h2>کنترل کاربر</h2><div class="local-room-controls"><div class="local-room-volume">' +
+        '<button type="button" id="room-mute" aria-label="قطع یا وصل صدا">' + PWA_PLAYER_ICONS.volume + '</button>' +
+        '<input id="room-volume" type="range" min="0" max="1" step=".01" value="1" aria-label="صدا">' +
+        '<button type="button" id="room-fullscreen" aria-label="تمام‌صفحه">' + PWA_PLAYER_ICONS.fullscreen + '</button></div><div class="local-room-selects">' +
+        '<select id="room-subtitle" aria-label="زیرنویس"><option value="-1">بدون زیرنویس</option></select>' +
+        '<select id="room-audio" aria-label="زبان صدا"><option value="">صدای اصلی</option></select>' +
+        '<select id="room-quality" aria-label="کیفیت">' + videos.map(v => '<option value="' + esc(v.id) + '">' + esc(v.quality) + '</option>').join('') + '</select></div></div>' +
+        (data.is_host ? '<h2>کنترل میزبان</h2><div class="local-host-controls"><button data-control="toggle">توقف</button>' +
+          '<button data-control="forward">۱۰ ثانیه جلو</button><button data-control="back">۱۰ ثانیه عقب</button><button data-control="close">بستن اتاق</button></div>' : '') +
+        '<h2>چت اتاق</h2><section class="local-room-chat"><header><strong>' + esc(data.title) + '</strong><small id="room-status">در حال اتصال…</small></header>' +
+        '<div id="room-chat" aria-live="polite"><p>پیام‌ها برای همهٔ حاضرین اتاق نمایش داده می‌شوند.</p></div>' +
+        '<div class="local-room-reactions">' + ['😂','😍','😱','😢','👏','🔥','🍿','❤️'].map(emoji => '<button type="button">' + emoji + '</button>').join('') +
+        '</div><form id="room-chat-form"><input name="text" aria-label="پیام" placeholder="پیامت رو بنویس…" maxlength="500" required><button type="submit">ارسال</button>' +
+        status('room-chat-form') + '</form></section>';
+
+      const player = $('.local-room-screen video');
+      const join = $('#room-join-play');
+      let roomState = data.state;
+      let clockOffset = Number.isFinite(data.server_ts) ? data.server_ts - Date.now() / 1000 : 0;
+      let connected = false;
+      let mediaRequest = 0;
+      let quality;
+      function position() {
+        return roomState?.paused_position ?? Math.max(0, Date.now() / 1000 + clockOffset - (roomState?.starts_at || Date.now() / 1000));
+      }
+      function sync() {
+        if (!roomState) return;
+        const upcoming = roomState.starts_at > Date.now() / 1000 + clockOffset;
+        const ended = roomState.duration > 0 && position() >= roomState.duration;
+        const paused = roomState.paused_position != null;
+        $('#room-live-state').textContent = roomState.closed ? 'بسته‌شده' : ended ? 'پایان‌یافته' : upcoming ? 'در انتظار شروع' : paused ? 'متوقف' : 'در حال پخش';
+        $('#room-live-badge').hidden = roomState.closed || upcoming || ended;
+        const toggle = $('[data-control=toggle]');
+        if (toggle) toggle.textContent = upcoming ? 'شروع' : paused ? 'ادامه' : 'توقف';
+        if (player.hidden) return;
+        if (connected && player.readyState && Math.abs(player.currentTime - position()) > 1.5) player.currentTime = position();
+        if (!connected || roomState.closed || upcoming || ended || paused) player.pause();
+        else if (player.paused) player.play().catch(() => {});
+      }
+      const timer = setInterval(sync, 1000);
+      state.roomCleanup = () => {
+        clearInterval(timer);
+        player.pause();
+        player.removeAttribute('src');
+        player.load();
+      };
+      function updateTracks() {
+        const audio = Array.from(player.audioTracks || []);
+        const subtitles = Array.from(player.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
+        const audioInput = $('#room-audio');
+        const subtitleInput = $('#room-subtitle');
+        audioInput.replaceChildren(...(audio.length ? audio.map((track,i) => new Option(track.label || track.language || String(i+1),i,false,track.enabled)) : [new Option('صدای اصلی','')]));
+        subtitleInput.replaceChildren(new Option('بدون زیرنویس',-1), ...subtitles.map((track,i) => new Option(track.label || track.language || String(i+1),i,false,track.mode === 'showing')));
+        audioInput.onchange = () => audio.forEach((track,i) => { track.enabled = i === Number(audioInput.value); });
+        subtitleInput.onchange = () => subtitles.forEach((track,i) => { track.mode = i === Number(subtitleInput.value) ? 'showing' : 'disabled'; });
+      }
+      async function playRoom() {
+        const selected = Number($('#room-quality').value);
+        if (!selected || !connected) { toast('اتصال اتاق هنوز برقرار نشده.'); return; }
+        const request = ++mediaRequest;
+        try {
+          const response = await native({action:'play',kind:'movie',room:code,id:selected,inline:true});
+          if (seq !== state.sequence || request !== mediaRequest) return;
+          if (response.status !== 200 || !response.data.url) throw Error(response.data.error || 'پخش ممکن نشد.');
+          quality = selected;
+          player.src = response.data.url;
+          player.hidden = false;
+          $('.local-room-join').hidden = true;
+          sync();
+        } catch (error) {
+          if (quality) $('#room-quality').value = quality;
+          toast(error.message);
+        }
+      }
+      if (join) join.onclick = playRoom;
+      $('#room-quality').onchange = () => { if (!player.hidden) playRoom(); };
+      player.addEventListener('loadedmetadata', () => { if (seq === state.sequence) { updateTracks(); sync(); } });
+      player.addEventListener('error', () => {
+        if (seq !== state.sequence || !player.isConnected) return;
+        player.hidden = true;
+        $('.local-room-join').hidden = false;
+        toast('پخش ممکن نشد. دوباره تلاش کنید.');
+      });
+      $('#room-volume').oninput = event => { player.volume = Number(event.target.value); player.muted = Number(event.target.value) === 0; };
+      $('#room-mute').onclick = () => { player.muted = !player.muted; };
+      $('#room-fullscreen').onclick = () => {
+        if (!player.hidden && player.webkitEnterFullscreen) player.webkitEnterFullscreen();
+        else if (!player.hidden && player.requestFullscreen) player.requestFullscreen().catch(() => {});
+      };
+      $('#share-inside-room').onclick = () => native({action:'shareRoom',code}).catch(error => toast(error.message));
+      document.querySelectorAll('.local-room-reactions button').forEach(button => {
+        button.onclick = () => { $('#room-chat-form input').value += button.textContent; $('#room-chat-form input').focus(); };
+      });
+      submit('room-chat-form', async body => {
+        const result = await native({action:'roomSend',message:{type:'chat',text:body.text}});
+        if (!result.ok) throw Error('ارسال پیام ناموفق بود.');
+        whenCurrent(seq, () => { $('#room-chat-form input').value = ''; });
+      });
+      document.querySelectorAll('[data-control]').forEach(button => button.onclick = async () => {
+        const control = button.dataset.control;
+        const message = {type:'control',action:control};
+        if (control === 'toggle') message.action = roomState?.starts_at > Date.now()/1000 + clockOffset ? 'start_now' :
+          roomState?.paused_position != null ? 'resume' : 'pause';
+        if (control === 'forward' || control === 'back') {
+          message.action = 'seek';
+          message.position = Math.max(0, Math.min(roomState?.duration || Infinity, position() + (control === 'forward' ? 10 : -10)));
+        }
+        try { const response = await native({action:'roomSend',message}); if (!response.ok) throw Error('فرمان اتاق ارسال نشد.'); }
+        catch (error) { toast(error.message); }
+      });
+      state.handleRoomState = event => {
+        connected = event.type !== 'error';
+        if (event.type === 'state') {
+          roomState = event.state;
+          if (Number.isFinite(event.server_ts)) clockOffset = event.server_ts - Date.now()/1000;
+        }
+        sync();
+      };
+      sync();
+      const connection = await native({action:'roomOpen',code});
+      if (!connection.ok) throw Error('اتصال اتاق برقرار نشد.');
+    } catch (error) {
+      whenCurrent(seq, () => {
+        if (state.roomCleanup) state.roomCleanup();
+        state.roomCleanup = null;
+        state.handleRoomState = null;
+        fail($('#room-data'), error);
+      });
+    }
   }
   window.addEventListener('diastomy-room', event => {
     if (!state.roomCode || !$('#room-chat')) return;
@@ -627,12 +810,15 @@
     const message = m => '<div class="message"><small>' + esc(m.name) + '</small><p>' + esc(m.text) + '</p></div>';
     if (data.type === 'history') $('#room-chat').innerHTML = data.messages.map(message).join('');
     if (data.type === 'chat') $('#room-chat').insertAdjacentHTML('beforeend', message(data.message));
-    if (data.type === 'presence') $('#room-status').textContent = number(data.users.length) + ' نفر در اتاق';
-    if (data.type === 'state' && data.state.closed) $('#room-status').textContent = 'اتاق بسته شد.';
-    if (data.type === 'error') toast(data.message);
+    if (data.type === 'presence') $('#room-status').textContent = number(data.users.length) + ' کاربر آنلاین';
+    if (data.type === 'error') { $('#room-status').textContent = 'اتصال قطع شد'; toast(data.message); }
+    if (state.handleRoomState) state.handleRoomState(data);
   });
   async function route() {
     PWAPlayer.close();
+    if (state.roomCleanup) state.roomCleanup();
+    state.roomCleanup = null;
+    state.handleRoomState = null;
     state.playGroups = [];
     const seq = ++state.sequence;
     if (state.roomCode) { state.roomCode = null; native({ action: 'roomClose' }).catch(() => {}); }
@@ -661,18 +847,20 @@
       else if (name === 'search') await browse(seq, 'all', params, true);
       else if (name === 'title') await detail(seq, parts[1], parts[2]);
       else if (name === 'actors' || name === 'actor') await actors(seq, parts[1]);
-      else if (name === 'library') await library(seq);
+      else if (name === 'library') library(seq, params);
       else if (name === 'login') login();
       else if (name === 'otp') otp(params);
       else if (name === 'forgot') forgot();
       else if (name === 'account') account();
+      else if (name === 'profile') profile();
+      else if (name === 'payments') await payments(seq);
       else if (name === 'notifications') await notifications(seq);
       else if (name === 'support') await support(seq);
       else if (name === 'subscription') await subscription(seq);
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
