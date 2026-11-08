@@ -3,6 +3,10 @@ run-name: "Diastomy iPhone - ${{ inputs.build_token || 'manual' }}"
 'on':
   workflow_dispatch:
     inputs:
+      test_startup:
+        description: Run the iOS Simulator startup test before packaging
+        type: boolean
+        default: false
       build_token:
         description: "Builder request ID"
         type: string
@@ -26,9 +30,11 @@ jobs:
           python3 tests/test_startup_report.py
           node --check Diastomy/Web/app.js
       - name: Build unsigned device IPA
+        env:
+          DIASTOMY_TEST_STARTUP: ${{ inputs.test_startup }}
         run: bash scripts/build-ipa.sh
       - name: Startup diagnostics
-        if: always()
+        if: ${{ always() && inputs.test_startup }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: Diastomy-startup-diagnostics
