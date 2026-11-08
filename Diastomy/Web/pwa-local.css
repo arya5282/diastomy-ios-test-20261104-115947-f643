@@ -368,3 +368,29 @@ html.dmf3-active body[data-page=search] #pwa-header .reference-search-form butto
 html.dmf3-active body[data-page=search] #pwa-header .reference-search-form input{
   flex:1;width:0!important;min-width:0!important;height:34px!important;min-height:0!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;
 }
+.reference-film-actions svg{width:16px;height:16px}
+.reference-series-preferences{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.reference-series-preferences button{display:flex;align-items:center;gap:6px;border:1px solid #282828;border-radius:999px;background:#080808;color:#aaa;padding:7px 10px;font-size:11px}
+.reference-series-preferences button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.4}
+.reference-series-preferences button[aria-pressed=true]{color:#fff;border-color:#9a2222;background:#240606}
+.reference-season-controls{display:flex;gap:10px;margin:12px 0 28px}
+.reference-season-controls select,.reference-season-controls button{background:#0e0e0e;border:1px solid #383838;border-radius:11px;color:#fff;height:36px;font-size:12px;padding:0 10px}
+.reference-season-controls select{flex:1;min-width:0}
+.reference-season-controls button{width:43px;display:grid;place-items:center}
+.reference-season-controls svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5}
+.reference-episode-card{border:1px solid #303030;border-radius:20px;background:#0c0c0c;padding:8px 12px;margin-bottom:12px}
+.reference-episode-head{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:9px;align-items:center}
+.reference-episode-thumb{position:relative;width:96px;height:58px;padding:0;overflow:hidden;border:0;border-radius:9px;background:#171717}
+.reference-episode-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.reference-episode-thumb span{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);display:grid;place-items:center;width:27px;height:27px;border:1px solid #999;border-radius:50%;background:#0008}
+.reference-episode-thumb svg{width:14px;height:14px}
+.reference-episode-head strong,.reference-episode-head small{display:block}
+.reference-episode-head strong{font-size:13px}
+.reference-episode-head small{color:#999;font-size:11px;margin-top:8px}
+.reference-episode-card p{font-size:11px;color:#aaa;margin:7px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.reference-episode-download{position:relative;border:0;padding:0;margin:0}
+.reference-episode-download summary{list-style:none;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#262626}
+.reference-episode-download summary::-webkit-details-marker{display:none}
+.reference-episode-download svg{width:18px;height:18px}
+.reference-episode-download .reference-download-options{position:absolute;right:0;z-index:3;padding:6px;background:#171717;border:1px solid #333;border-radius:8px}
+.spoiler-comment[hidden]{display:none!important}

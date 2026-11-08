@@ -235,7 +235,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             "/accounts/api/update-profile/", "/accounts/api/update-player-quality/",
             "/accounts/api/set-language/", "/accounts/api/plans/", "/accounts/api/payments/",
             "/accounts/api/create-payment/",
-            "/api/bookmark/toggle/", "/api/watch-progress/", "/api/watch-time/",
+            "/api/bookmark/toggle/", "/api/content-preferences/", "/api/watch-progress/", "/api/watch-time/",
             "/accounts/support/api/messages/", "/accounts/support/api/send/"
         ]
         if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") ||
@@ -347,10 +347,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                     replyHandler(["ok": false, "error": "حذف فایل ممکن نشد."], nil)
                 }
             }
-        } else if action == "downloadMovie", let slug = data["slug"] as? String,
+        } else if ["downloadMovie", "downloadSeries"].contains(action), let slug = data["slug"] as? String,
                   let id = data["id"] as? Int, id > 0,
                   slug.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil {
-            downloadMovie(slug: slug, id: id) { replyHandler($0, nil) }
+            downloadVideo(kind: action == "downloadSeries" ? "series" : "movie", slug: slug, id: id) { replyHandler($0, nil) }
         } else if action == "checkout", let plan = data["plan"] as? Int, plan > 0 {
             send("/accounts/api/create-payment/", method: "POST", body: ["plan_id": plan, "discount_code": data["discount"] as? String ?? ""]) { result in
                 guard let info = result["data"] as? [String: Any], info["success"] as? Bool == true,
@@ -431,8 +431,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         return url
     }
 
-    private func downloadMovie(slug: String, id: Int, completion: @escaping ([String: Any]) -> Void) {
-        let url = URL(string: "/movie/movie/\(slug)/download/\(id)/", relativeTo: server)!.absoluteURL
+    private func downloadVideo(kind: String, slug: String, id: Int, completion: @escaping ([String: Any]) -> Void) {
+        let url = URL(string: "/movie/\(kind)/\(slug)/download/\(id)/", relativeTo: server)!.absoluteURL
         // The existing Django download route checks the session before redirecting.
         URLSession.shared.downloadTask(with: url) { [documents] file, response, _ in
             let result: [String: Any]

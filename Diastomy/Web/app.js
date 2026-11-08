@@ -205,18 +205,67 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
   }
+  function loadSeriesPreferences(sequence) {
+    const endpoint = '/api/content-preferences/';
+    const spoiler = $('#series-spoiler');
+    function setSpoiler(enabled) {
+      spoiler.setAttribute('aria-pressed', String(enabled));
+      document.querySelectorAll('.spoiler-comment').forEach(comment => { comment.hidden = enabled; });
+    }
+    async function bind(button, query, key, payload, update) {
+      try {
+        const result = await api(endpoint + query);
+        if (sequence !== state.sequence) return;
+        update(Boolean(result[key]));
+        button.disabled = false;
+        button.onclick = async () => {
+          button.disabled = true;
+          try {
+            const enabled = button.getAttribute('aria-pressed') !== 'true';
+            const result = await api(endpoint, {body:{...payload,[key]:enabled}});
+            whenCurrent(sequence, () => update(Boolean(result[key])));
+          } catch (error) { toast(error.message); }
+          finally { button.disabled = false; }
+        };
+      } catch (_) {}
+    }
+    bind(spoiler, '', 'spoiler_mode', {}, setSpoiler);
+    document.querySelectorAll('[data-follow]').forEach(button => {
+      const kind = button.dataset.follow;
+      const id = Number(button.dataset.id);
+      bind(button, '?kind=' + kind + '&id=' + id, 'following', {kind,id}, enabled =>
+        button.setAttribute('aria-pressed', String(enabled)));
+    });
+  }
   async function detail(seq, kind, slug) {
     mount(shell('جزئیات عنوان', '<div id="detail-data" class="loading"></div>'));
     try {
       const data = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/', { cache: true });
       whenCurrent(seq, () => {
-        state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => episode.videos) : [data.videos || []];
-        let episodes = '';
-        if (kind === 'series') {
-          const seasons = new Map(); (data.episodes || []).forEach(x => { if (!seasons.has(x.season)) seasons.set(x.season, []); seasons.get(x.season).push(x); });
-          episodes = Array.from(seasons, ([season, items], index) => '<details class="reference-season"' + (index === 0 ? ' open' : '') + '><summary>فصل ' + number(season) + '</summary><div class="season">' + items.map(x => '<div class="reference-episode"><strong>قسمت ' + number(x.number) + '</strong><div class="chips">' + x.videos.map(v => '<button data-play="' + v.id + '" data-kind="series">▶ ' + esc(v.quality) + '</button>').join('') + '</div></div>').join('') + '</div></details>').join('');
-        } else { episodes = '<div class="chips">' + (data.videos || []).map(v => '<button class="primary" data-play="' + v.id + '" data-kind="movie">▶ پخش ' + esc(v.quality) + '</button>').join('') + '</div>'; }
-        mount(PWA.detail(data, episodes || empty('قسمت یا منبع قابل پخش موجود نیست.')));
+        state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => episode.videos).filter(videos => videos.length) : [data.videos || []];
+        const episodeList = data.episodes || [];
+        const seasons = [...new Set(episodeList.map(episode => episode.season))];
+        const episodes = seasons.length ? '<div class="reference-season-controls"><select id="series-season" aria-label="انتخاب فصل">' +
+          seasons.map(season => '<option value="' + esc(season) + '">فصل ' + number(season) + '</option>').join('') +
+          '</select><button type="button" id="series-sort" aria-label="تغییر ترتیب قسمت‌ها" aria-pressed="false"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></button></div><div id="series-episodes"></div>' :
+          empty('قسمت یا منبع قابل پخش موجود نیست.');
+        mount(PWA.detail({...data,type:kind}, episodes));
+        const season = $('#series-season');
+        if (season) {
+          const sort = $('#series-sort');
+          const renderEpisodes = () => {
+            const direction = sort.getAttribute('aria-pressed') === 'true' ? -1 : 1;
+            const items = episodeList.filter(episode => String(episode.season) === season.value).sort((a,b) => direction * (a.number - b.number));
+            $('#series-episodes').innerHTML = PWA.episodeCards(data, items);
+          };
+          season.onchange = renderEpisodes;
+          sort.onclick = () => {
+            sort.setAttribute('aria-pressed', String(sort.getAttribute('aria-pressed') !== 'true'));
+            renderEpisodes();
+          };
+          renderEpisodes();
+        }
+        if (kind === 'series') loadSeriesPreferences(seq);
         const trailers = (data.trailers || []).filter(trailer => imageURL(trailer.url));
         document.querySelectorAll('[data-trailer-index]').forEach(button => {
           button.onclick = () => {
@@ -232,19 +281,18 @@
           };
         });
         const downloadOptions = $('#film-download-options');
-        if (downloadOptions) {
-          $('#film-download').onclick = () => { downloadOptions.hidden = !downloadOptions.hidden; };
-          downloadOptions.querySelectorAll('[data-download]').forEach(button => {
-            button.onclick = async () => {
-              button.disabled = true;
-              try {
-                const result = await native({action:'downloadMovie', slug, id:Number(button.dataset.download)});
-                toast(result.ok ? 'فایل در برنامه Files ذخیره شد.' : result.error);
-              } catch (error) { toast(error.message); }
-              finally { button.disabled = false; }
-            };
-          });
-        }
+        if (downloadOptions) $('#film-download').onclick = () => { downloadOptions.hidden = !downloadOptions.hidden; };
+        $('.movie-detail-shell').addEventListener('click', async event => {
+          const button = event.target.closest('[data-download]');
+          if (!button || button.disabled) return;
+          button.disabled = true;
+          try {
+            const action = kind === 'series' ? 'downloadSeries' : 'downloadMovie';
+            const result = await native({action, slug, id:Number(button.dataset.download)});
+            toast(result.ok ? 'فایل در برنامه Files ذخیره شد.' : result.error);
+          } catch (error) { toast(error.message); }
+          finally { button.disabled = false; }
+        });
         if (kind === 'movie') {
           const create = document.createElement('button'); create.textContent = 'ساخت اتاق فیلم';
           document.querySelector('.actions').appendChild(create);
@@ -860,7 +908,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۱ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

@@ -111,6 +111,8 @@ def title_object(kind, slug):
 def detail(request, kind, slug):
     item = title_object(kind, slug)
     data = card(item)
+    data['description'] = item.public_persian_description or item.description
+    data['director_id'] = item.director_id
     from movie.services.detail_trailers import build_detail_trailers
     data['trailers'] = [{'url': trailer['url'], 'title': trailer.get('title', '')}
                         for trailer in build_detail_trailers(item, kind, limit=3)]
@@ -129,14 +131,20 @@ def detail(request, kind, slug):
         data['videos'] = [{'id': v.pk, 'quality': v.quality.title}
                           for v in videos if direct_url_usable(v)]
     else:
+        from movie.download_proxy import is_usable_source_url
         episodes = Episode.objects.filter(season__series=item).select_related('season').prefetch_related('videos__quality').order_by('season__season_number', 'episode_number')
         data['episodes'] = []
         for episode in episodes:
-            videos = [{'id': v.pk, 'quality': v.quality.title}
-                      for v in episode.videos.all() if direct_url_usable(v)]
-            if videos:
-                data['episodes'].append({'id': episode.pk, 'season': episode.season.season_number,
-                                         'number': episode.episode_number, 'videos': videos})
+            sources = list(episode.videos.all())
+            sources.sort(key=lambda video: video.quality.weight, reverse=True)
+            videos = [{'id': video.pk, 'quality': video.quality.title}
+                      for video in sources if direct_url_usable(video)]
+            downloads = [{'id': video.pk, 'quality': video.quality.title}
+                         for video in sources if is_usable_source_url((video.direct_download_url or '').strip())]
+            data['episodes'].append({'id': episode.pk, 'season': episode.season.season_number,
+                                     'number': episode.episode_number, 'videos': videos, 'download_options': downloads,
+                                     'cover': file_url(episode.cover), 'duration': episode.duration,
+                                     'description': getattr(episode, 'description_fa', '') or episode.description})
     return JsonResponse(data)
 
 
