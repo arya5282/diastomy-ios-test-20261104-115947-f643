@@ -1,4 +1,4 @@
-name: Build iPhone IPA
+name: Build iPhone IPA (Legacy)
 run-name: "Diastomy iPhone - ${{ inputs.build_token || 'manual' }}"
 'on':
   workflow_dispatch:
