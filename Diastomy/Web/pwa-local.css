@@ -71,3 +71,19 @@ body .dm-film-buttons{margin:24px 0}
 body .dm-film-description{font-size:14px;line-height:2;color:#aaa}
 body .dm-film-reference-info h2{font-size:16px}
 html.dmf3-active body .dmf3-root{display:block!important}
+/* Keep the local page headers independent from the original website header. */
+body .pwa-internal{width:100%;max-width:650px;margin-inline:auto}
+body .pwa-internal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:relative;inset:auto;max-width:none;border:0;background:transparent;padding:12px 0 24px}
+body .pwa-internal-head h1{margin:0;font-size:18px}
+body .pwa-internal-head a{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:#161616}
+body .pwa-internal-head svg{width:22px;height:22px}
+body #app .library-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))!important;margin-bottom:20px}
+body #app .library-tabs button[aria-pressed=true]{background:#272727;color:white}
+body #app .dm-search-genres{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+body #app .dm-search-genre{display:grid;place-items:center;min-height:64px;background:#191919;border-radius:12px}
+body #app .dm-search-recommendations{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+body #app .sub-plans{display:grid;gap:12px}
+body #app .sub-pay{margin-top:12px}
+body #app .mr-room{display:block;margin-bottom:10px;padding:15px}
+body #app .ar-note{margin-bottom:12px}
+html.dmf3-active body[data-page=local-title] #app .dm-film-reference-info{display:block!important}

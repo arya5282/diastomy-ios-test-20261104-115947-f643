@@ -71,7 +71,7 @@ with sync_playwright() as playwright:
     routes = {
         'search': 'جست‌وجو', 'account': 'پروفایل کاربری', 'login': 'ورود به دیاستومی',
         'otp': 'ورود با کد تأیید', 'forgot': 'بازیابی رمز عبور', 'settings': 'تنظیمات',
-        'support': 'پشتیبانی', 'subscription': 'اشتراک', 'library': 'لیست من',
+        'support': 'پشتیبانی', 'subscription': 'خرید یا تمدید اشتراک', 'library': 'لیست من',
         'notifications': 'اعلان‌ها', 'rooms': 'اتاق فیلم', 'about': 'دربارهٔ دیاستومی',
     }
     for route, heading in routes.items():

@@ -91,7 +91,7 @@ window.PWA = (() => {
   }
   function page(name) {
     document.body.dataset.page = name === 'home' || name === 'search' ? name : 'local-' + name;
-    document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title'].includes(name);
+    document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
     document.querySelectorAll('[data-nav-slot]').forEach(link => {
       if (link.dataset.navSlot === slot) link.setAttribute('aria-current', 'page');

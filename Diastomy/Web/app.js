@@ -88,8 +88,24 @@
   function card(x) { return PWA.card(x); }
   function empty(text) { return '<div class="empty"><p>' + esc(text) + '</p></div>'; }
   function loginPrompt() { return '<div class="panel"><p>برای دریافت اطلاعات حساب به اینترنت متصل شوید و وارد شوید.</p><a class="button primary" href="#/login">ورود به حساب</a></div>'; }
-  function back() { return '<a class="back" href="#/home">‹ بازگشت به خانه</a>'; }
-  function shell(title, body) { return back() + '<h1>' + esc(title) + '</h1>' + (body || ''); }
+  function shell(title, body) {
+    const route = document.body.dataset.page;
+    const layout = {
+      'local-browse': ['archive-reference-shell','archive-reference-header'],
+      'search': ['dm-search-discovery','dm-search-head'],
+      'local-library': ['library-shell','library-header'],
+      'local-subscription': ['sub-shell','sub-head'],
+      'local-rooms': ['mr-wrap','mr-hero'],
+      'local-room': ['mr-wrap','mr-room-topline'],
+      'local-support': ['ar-support-main','ar-support-head']
+    }[route] || ['ar-shell','ar-head'];
+    const back = ['local-settings','local-notifications','local-support','local-subscription','local-about'].includes(route) ? 'account' :
+      route === 'local-room' ? 'rooms' : 'home';
+    return '<section class="pwa-internal ' + layout[0] + '"><header class="pwa-internal-head ' + layout[1] + '">' +
+      '<h1>' + esc(title) + '</h1><a href="#/' + back + '" aria-label="بازگشت"><svg viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path d="M20 12H4m7-7-7 7 7 7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></a></header>' +
+      (body || '') + '</section>';
+  }
   function status(id) { return '<div class="status" id="' + id + '" role="status"></div>'; }
   function fail(el, error) { el.innerHTML = empty(error.message); }
   function mount(html) { app.innerHTML = html; }
@@ -125,12 +141,24 @@
     $('#search-form').addEventListener('submit', e => { e.preventDefault(); location.hash = '#/search?q=' + enc(new FormData(e.target).get('q')); });
     $('#sort').value = params.get('sort') || 'newest';
     $('#sort').addEventListener('change', e => { params.set('sort', e.target.value); location.hash = '#/browse/' + enc(kind) + '?' + params; });
-    if (isSearch && !q) { $('#catalogue').innerHTML = empty('عنوان مورد نظر را جست‌وجو کنید. نتایج قبلی در حالت آفلاین قابل مشاهده‌اند.'); return; }
+    if (isSearch && !q) {
+      try {
+        const data = await api('/api/app/v1/home/', {cache:true});
+        whenCurrent(seq, () => {
+          const recommended = (data.rails || []).find(rail => rail.key === 'pwa_recommended');
+          $('#catalogue').innerHTML = '<h2>ژانرها</h2><div class="dm-search-genres">' + data.genres.map(genre =>
+            '<a class="dm-search-genre" href="#/browse/all?genre=' + enc(genre.slug) + '">' + esc(genre.name) + '</a>').join('') +
+            '</div><h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
+            ((recommended && recommended.items) || data.hero || []).map(card).join('') + '</div>';
+        });
+      } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
+      return;
+    }
     const query = new URLSearchParams(params); query.set('type', kind || 'all');
     try {
       const data = await api('/movie/api/filter/?' + query, { cache: true });
       whenCurrent(seq, () => {
-        $('#catalogue').innerHTML = '<p>' + number(data.total_results) + ' عنوان</p><div class="grid">' + data.results.map(card).join('') + '</div>' + (!data.results.length ? empty('عنوانی پیدا نشد.') : '') + (data.has_next ? '<button class="wide" id="more">صفحهٔ بعد</button>' : '');
+        $('#catalogue').innerHTML = '<p>' + number(data.total_results) + ' عنوان</p><div class="grid archive-reference-grid">' + data.results.map(card).join('') + '</div>' + (!data.results.length ? empty('عنوانی پیدا نشد.') : '') + (data.has_next ? '<button class="wide" id="more">صفحهٔ بعد</button>' : '');
         if ($('#more')) $('#more').onclick = () => { params.set('page', String((data.current_page || 1) + 1)); location.hash = '#/browse/' + enc(kind) + '?' + params; };
       });
     } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
@@ -171,7 +199,21 @@
     mount(shell('لیست من', '<div id="library-data"><p>دریافت لیست و ادامهٔ تماشا…</p></div>'));
     try {
       const data = await api('/api/app/v1/library/');
-      whenCurrent(seq, () => { $('#library-data').innerHTML = '<h2>ذخیره‌شده‌ها</h2><div class="grid">' + data.saved.map(card).join('') + '</div>' + (!data.saved.length ? empty('هنوز عنوانی ذخیره نکرده‌اید.') : '') + '<h2>ادامهٔ تماشا</h2><div class="grid">' + data.history.map(card).join('') + '</div>'; });
+      whenCurrent(seq, () => {
+        const library = $('#library-data');
+        library.innerHTML = '<div class="library-tabs"><button data-library-tab="saved" aria-pressed="true">ذخیره‌شده‌ها</button>' +
+          '<button data-library-tab="history" aria-pressed="false">تاریخچه تماشا</button></div><div class="library-panel"></div>';
+        const panel = library.querySelector('.library-panel');
+        const buttons = library.querySelectorAll('[data-library-tab]');
+        function show(tab) {
+          buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.libraryTab === tab)));
+          const items = data[tab] || [];
+          panel.innerHTML = items.length ? '<div class="grid library-grid">' + items.map(card).join('') + '</div>' :
+            '<div class="library-empty">' + empty('هنوز عنوانی در این بخش نیست.') + '</div>';
+        }
+        buttons.forEach(button => button.onclick = () => show(button.dataset.libraryTab));
+        show('saved');
+      });
     } catch (error) { whenCurrent(seq, () => { $('#library-data').innerHTML = empty(error.message) + loginPrompt(); }); }
   }
   function login() {
@@ -218,7 +260,7 @@
     try {
       const data = await api('/accounts/api/notifications/');
       whenCurrent(seq, () => {
-        $('#notifications').innerHTML = data.notifications.map(n => '<article class="panel"><h2>' + esc(n.title) + '</h2><p>' + esc(n.message) + '</p><small>' + esc(n.created_at) + '</small></article>').join('') || empty('اعلان جدیدی ندارید.');
+        $('#notifications').innerHTML = data.notifications.map(n => '<article class="ar-note"><h2>' + esc(n.title) + '</h2><p>' + esc(n.message) + '</p><small>' + esc(n.created_at) + '</small></article>').join('') || empty('اعلان جدیدی ندارید.');
       });
     } catch (error) { whenCurrent(seq, () => fail($('#notifications'), error)); }
   }
@@ -231,18 +273,18 @@
     async function loadMessages() {
       try {
         const data = await api('/accounts/support/api/messages/');
-        whenCurrent(seq, () => { $('#messages').innerHTML = data.messages.map(m => '<div class="message ' + (m.is_operator ? 'operator' : '') + '"><small>' + esc(m.sender_name) + ' · ' + esc(m.created_at) + '</small><p>' + esc(m.content) + '</p>' + (m.attachment_name ? '<small>پیوست: ' + esc(m.attachment_name) + '</small>' : '') + '</div>').join('') || empty('پیام خود را برای پشتیبانی بفرستید.'); });
+        whenCurrent(seq, () => { $('#messages').innerHTML = data.messages.map(m => '<div class="message ar-support-bubble ' + (m.is_operator ? 'operator' : '') + '"><small>' + esc(m.sender_name) + ' · ' + esc(m.created_at) + '</small><p>' + esc(m.content) + '</p>' + (m.attachment_name ? '<small>پیوست: ' + esc(m.attachment_name) + '</small>' : '') + '</div>').join('') || empty('پیام خود را برای پشتیبانی بفرستید.'); });
       } catch (error) { whenCurrent(seq, () => fail($('#messages'), error)); }
     }
     await loadMessages();
   }
   async function subscription(seq) {
-    mount(shell('اشتراک', '<div id="plans">' + empty('اطلاعات اشتراک از سرور دریافت می‌شود.') + '</div>'));
+    mount(shell('خرید یا تمدید اشتراک', '<div id="plans" class="sub-plans">' + empty('اطلاعات اشتراک از سرور دریافت می‌شود.') + '</div>'));
     try {
       const data = await api('/accounts/api/plans/');
       whenCurrent(seq, () => {
         const plans = data.plans || [];
-        $('#plans').innerHTML = plans.map(p => '<article class="panel"><h2>' + esc(p.name || p.title) + '</h2><p>' + esc(p.description || '') + '</p><strong>' + number(p.newPriceRaw || p.oldPriceRaw) + ' تومان</strong><button class="wide primary" data-plan="' + p.id + '">خرید اشتراک</button></article>').join('') + '<label>کد تخفیف<input id="discount" autocomplete="off"></label><p>پرداخت در مرورگر امن درگاه انجام می‌شود.</p>';
+        $('#plans').innerHTML = plans.map(p => '<article class="sub-plan"><h2 class="sub-plan-name">' + esc(p.name || p.title) + '</h2><p>' + esc(p.description || '') + '</p><strong>' + number(p.newPriceRaw || p.oldPriceRaw) + ' تومان</strong><button class="sub-pay" data-plan="' + p.id + '">خرید اشتراک</button></article>').join('') + '<label>کد تخفیف<input id="discount" autocomplete="off"></label><p>پرداخت در مرورگر امن درگاه انجام می‌شود.</p>';
       });
     } catch (error) { whenCurrent(seq, () => fail($('#plans'), error)); }
   }
@@ -252,14 +294,14 @@
     if (state.user) $('#quality select').value = state.user.quality;
     submit('quality', async (data, output) => { await api('/accounts/api/update-player-quality/', { body: data }); output.textContent = 'ذخیره شد.'; });
     submit('password', async (data, output) => { await api('/accounts/api/change-password/', { body: data }); output.textContent = 'رمز تغییر کرد.'; });
-    api('/api/app/v1/settings/').then(data => whenCurrent(seq, () => { $('#devices').innerHTML = data.devices.map(d => '<div class="device">' + esc(d.name) + (d.current ? ' · این دستگاه' : '') + '</div>').join(''); })).catch(() => {});
+    api('/api/app/v1/settings/').then(data => whenCurrent(seq, () => { $('#devices').innerHTML = data.devices.map(d => '<div class="ar-note device">' + esc(d.name) + (d.current ? ' · این دستگاه' : '') + '</div>').join(''); })).catch(() => {});
   }
   async function rooms(seq) {
     mount(shell('اتاق فیلم', '<a class="button" href="#/browse/movie">انتخاب فیلم برای ساخت اتاق</a>' + form('join-room', field('code', 'کد دعوت اتاق'), 'ورود به اتاق') + '<div id="room-list">' + empty('برای دریافت اتاق‌ها وارد حساب شوید.') + '</div>'));
     submit('join-room', async data => { location.hash = '#/room/' + enc(data.code.trim()); });
     try {
       const data = await api('/api/app/v1/rooms/');
-      whenCurrent(seq, () => { $('#room-list').innerHTML = '<h2>اتاق‌های من</h2>' + data.mine.map(r => '<a class="button wide" href="#/room/' + enc(r.code) + '">' + esc(r.title) + '</a>').join('') + '<h2>اتاق‌های عمومی</h2>' + data.public.map(r => '<a class="button wide" href="#/room/' + enc(r.code) + '">' + esc(r.title) + '</a>').join(''); });
+      whenCurrent(seq, () => { $('#room-list').innerHTML = '<h2>اتاق‌های من</h2>' + data.mine.map(r => '<a class="mr-room mr-room-body" href="#/room/' + enc(r.code) + '">' + esc(r.title) + '</a>').join('') + '<h2>اتاق‌های عمومی</h2>' + data.public.map(r => '<a class="mr-room mr-room-body" href="#/room/' + enc(r.code) + '">' + esc(r.title) + '</a>').join(''); });
     } catch (error) { whenCurrent(seq, () => fail($('#room-list'), error)); }
   }
   async function room(seq, code) {
@@ -268,7 +310,7 @@
       const data = await api('/api/app/v1/rooms/' + enc(code) + '/');
       if (state.sequence !== seq) return;
       state.roomCode = code;
-      $('#room-data').innerHTML = '<h2>' + esc(data.title) + '</h2><p>کد دعوت: <strong dir="ltr">' + esc(code) + '</strong></p><div class="chips">' + data.videos.map(v => '<button data-play="' + v.id + '" data-kind="movie" data-room="' + esc(code) + '">▶ ' + esc(v.quality) + '</button>').join('') + '</div>' + (!data.can_watch ? empty('برای تماشای این اتاق به اشتراک نیاز دارید.') : '') + '<p id="room-status">در حال اتصال…</p>' + (data.is_host ? '<div class="chips"><button data-control="start_now">شروع</button><button data-control="pause">توقف</button><button data-control="resume">ادامه</button><button data-control="close">بستن اتاق</button></div>' : '') + '<h2>گفت‌وگو</h2><div id="room-chat"></div>' + form('room-chat-form', field('text', 'پیام', 'text', 'maxlength="500"'), 'ارسال');
+      $('#room-data').innerHTML = '<h2>' + esc(data.title) + '</h2><p>کد دعوت: <strong dir="ltr">' + esc(code) + '</strong></p><div class="chips">' + data.videos.map(v => '<button data-play="' + v.id + '" data-kind="movie" data-room="' + esc(code) + '">▶ ' + esc(v.quality) + '</button>').join('') + '</div>' + (!data.can_watch ? empty('برای تماشای این اتاق به اشتراک نیاز دارید.') : '') + '<p id="room-status">در حال اتصال…</p>' + (data.is_host ? '<div class="chips"><button data-control="start_now">شروع</button><button data-control="pause">توقف</button><button data-control="resume">ادامه</button><button data-control="close">بستن اتاق</button></div>' : '') + '<h2>گفت‌وگو</h2><div id="room-chat" class="mr-side"></div>' + form('room-chat-form', field('text', 'پیام', 'text', 'maxlength="500"'), 'ارسال');
       await native({ action: 'roomOpen', code });
       submit('room-chat-form', async (body, output) => { const result = await native({ action: 'roomSend', message: { type: 'chat', text: body.text } }); if (!result.ok) throw new Error('ارسال پیام ناموفق بود.'); output.textContent = ''; $('#room-chat-form input').value = ''; });
       document.querySelectorAll('[data-control]').forEach(b => { b.onclick = async () => { const result = await native({ action: 'roomSend', message: { type: 'control', action: b.dataset.control } }); if (!result.ok) toast('کنترل اتاق ارسال نشد.'); }; });
@@ -313,7 +355,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
