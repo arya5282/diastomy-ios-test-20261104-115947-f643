@@ -4,13 +4,14 @@ import AVKit
 
 // All documents, scripts, fonts and styles are shipped in Web/.
 // Only JSON APIs and explicitly authorized media use the network.
-final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate {
+final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate {
     private var webView: WKWebView!
     private let server = URL(string: "https://diastomy.top")!
     private var webRoot: URL!
     private var startupPanel: UIView?
     private var startupTimer: Timer?
     private var startupNavigation: WKNavigation?
+    private var startupDocumentCommitted = false
     private var player: AVPlayer?
     private var playerController: AVPlayerViewController?
     private var progressObserver: Any?
@@ -46,6 +47,17 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
         configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "native")
+        configuration.userContentController.add(self, name: "startupStatus")
+        configuration.userContentController.addUserScript(WKUserScript(source: """
+            document.addEventListener('DOMContentLoaded', () => {
+                const nav = document.querySelector('nav');
+                const hasStyle = nav && getComputedStyle(nav).position === 'fixed';
+                const hasContent = document.querySelector('#app')?.firstElementChild;
+                window.webkit.messageHandlers.startupStatus.postMessage(
+                    !hasStyle ? 'css' : !hasContent ? 'js' : 'ready'
+                );
+            }, { once: true });
+            """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         configuration.applicationNameForUserAgent = "DiastomyIOS/2.0"
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
@@ -66,6 +78,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     private func loadBundledInterface() {
         startupTimer?.invalidate()
+        startupNavigation = nil
+        startupDocumentCommitted = false
+        webView.stopLoading()
         showStartupPanel(message: "در حال آماده‌سازی دیاستومی…", canRetry: false)
         guard let index = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Web") else {
             startupFailed("فایل‌های رابط برنامه موجود نیستند؛ نسخهٔ کامل را دوباره نصب کنید.")
@@ -79,7 +94,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             }
         }
         startupTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: false) { [weak self] _ in
-            self?.startupFailed("رابط برنامه آماده نشد. روی تلاش دوباره بزنید.")
+            guard let self = self else { return }
+            let code = self.startupDocumentCommitted ? "UI-SIGNAL" : "UI-LOAD"
+            self.startupFailed("رابط برنامه آماده نشد. کد: \(code)")
         }
         StartupDiagnostics.record(stage: "loadingLocalDocument", localDocument: isLocal(index))
         startupNavigation = webView.loadFileURL(index, allowingReadAccessTo: webRoot)
@@ -105,28 +122,24 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         guard let navigation = navigation, startupNavigation === navigation else { return }
+        startupDocumentCommitted = true
         StartupDiagnostics.record(stage: "documentCommitted", localDocument: isLocal(webView.url))
-        checkBundledInterface(for: navigation)
     }
 
-    private func checkBundledInterface(for navigation: WKNavigation) {
-        guard startupNavigation === navigation, isLocal(webView.url) else { return }
-        // Remote images can delay didFinish even after the local interface is usable.
-        webView.evaluateJavaScript(
-            """
-            Boolean(document.querySelector('#app')?.firstElementChild &&
-                    document.querySelector('nav') &&
-                    getComputedStyle(document.querySelector('nav')).position === 'fixed');
-            """
-        ) { [weak self] value, _ in
-            guard let self = self, self.startupNavigation === navigation else { return }
-            if value as? Bool == true {
-                self.startupDidBecomeReady()
-            } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    self?.checkBundledInterface(for: navigation)
-                }
-            }
+    func userContentController(_ userContentController: WKUserContentController,
+                               didReceive message: WKScriptMessage) {
+        guard message.name == "startupStatus", startupNavigation != nil,
+              message.frameInfo.isMainFrame, isLocal(webView.url),
+              let status = message.body as? String else { return }
+        switch status {
+        case "ready":
+            startupDidBecomeReady()
+        case "css":
+            startupFailed("چیدمان رابط بارگذاری نشد. کد: UI-CSS")
+        case "js":
+            startupFailed("رابط برنامه اجرا نشد. کد: UI-JS")
+        default:
+            break
         }
     }
 
