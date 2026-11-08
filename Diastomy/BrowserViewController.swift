@@ -298,6 +298,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                       let value = info["url"] as? String, let url = URL(string: value),
                       url.scheme == "https", url.host == self.server.host,
                       url.path.hasPrefix("/movie/\(kind)-direct-hls/") else { replyHandler(result, nil); return }
+                if room.isEmpty, data["inline"] as? Bool == true {
+                    let store = self.webView.configuration.websiteDataStore.httpCookieStore
+                    let group = DispatchGroup()
+                    for cookie in HTTPCookieStorage.shared.cookies(for: url) ?? [] {
+                        group.enter()
+                        store.setCookie(cookie) { group.leave() }
+                    }
+                    group.notify(queue: .main) { replyHandler(result, nil) }
+                    return
+                }
                 self.playingRoom = room.isEmpty ? nil : code
                 self.presentPlayer(url, info: info)
                 replyHandler(["status": 200, "data": ["playing": true]], nil)

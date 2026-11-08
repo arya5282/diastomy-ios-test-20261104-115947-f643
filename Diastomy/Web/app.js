@@ -192,6 +192,7 @@
     try {
       const data = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/', { cache: true });
       whenCurrent(seq, () => {
+        state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => episode.videos) : [data.videos || []];
         let episodes = '';
         if (kind === 'series') {
           const seasons = new Map(); (data.episodes || []).forEach(x => { if (!seasons.has(x.season)) seasons.set(x.season, []); seasons.get(x.season).push(x); });
@@ -407,6 +408,8 @@
     if (data.type === 'error') toast(data.message);
   });
   async function route() {
+    PWAPlayer.close();
+    state.playGroups = [];
     const seq = ++state.sequence;
     if (state.roomCode) { state.roomCode = null; native({ action: 'roomClose' }).catch(() => {}); }
     const hash = (location.hash.slice(1) || '/home');
@@ -435,7 +438,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
@@ -452,13 +455,26 @@
     if (!button) return;
     button.disabled = true;
     try {
-      const response = await native({ action: 'play', kind: button.dataset.kind, id: Number(button.dataset.play), room: button.dataset.room || undefined });
+      const kind = button.dataset.kind;
+      const id = Number(button.dataset.play);
+      const room = button.dataset.room;
+      const sequence = state.sequence;
+      const response = await native({ action: 'play', kind, id, room, inline: !room });
       if (response.status !== 200) throw new Error(response.data.error || 'پخش ممکن نشد.');
+      if (!room && sequence === state.sequence) {
+        if (!response.data.url) throw new Error('آدرس پخش در دسترس نیست.');
+        const groups = state.playGroups || [];
+        const group = groups.findIndex(options => options.some(option => Number(option.id) === id));
+        PWAPlayer.open({
+          info:response.data, groups, group, kind, id, native, onError:toast,
+          save:body => api('/api/watch-progress/', {body}).catch(() => {})
+        });
+      }
     } catch (error) { toast(error.message); }
     finally { button.disabled = false; }
   });
   window.addEventListener('hashchange', route);
-  window.addEventListener('online', () => { connection(true); route(); });
+  window.addEventListener('online', () => { connection(true); if (!document.body.classList.contains('local-player-open')) route(); });
   window.addEventListener('offline', () => connection(false));
   // Render the initial page immediately; authentication must never gate offline UI.
   PWA.install();

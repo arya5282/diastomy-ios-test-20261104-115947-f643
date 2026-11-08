@@ -22,6 +22,7 @@ window.__offline = false;
 const title = FIXTURE;
 window.webkit = { messageHandlers: { native: { postMessage: async payload => {
   window.__calls.push(payload);
+  if (payload.action === 'play' && payload.inline) return {status:200,data:{url:'https://diastomy.top/movie/movie-direct-hls/test.m3u8',title:title.title,target:{movie_id:1},position:0}};
   if (payload.action !== 'request') return {status:200,data:{},ok:true};
   if (window.__holdRequests) return new Promise(() => {});
   if (window.__offline) return {status:0,data:{error:'offline'}};
@@ -53,6 +54,7 @@ with sync_playwright() as playwright:
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('request', lambda request: remote_documents.append(request.url)
             if request.resource_type in ('document', 'script', 'stylesheet', 'font') and request.url.startswith('http') and not request.url.startswith('http://127.0.0.1:') else None)
+    page.route('https://diastomy.top/movie/**', lambda route: route.abort())
     page.goto(local_url)
     page.wait_for_selector('.nyx-prime-card')
     print('PASS: bundled home rendered in WebKit')
@@ -61,7 +63,12 @@ with sync_playwright() as playwright:
     assert page.locator('.dm-film-description').inner_text() == fixture['description']
     page.locator('[data-play]').click()
     assert page.evaluate('window.__calls.some(x => x.action === "play" && x.id === 42)')
-    print('PASS: escaped API content and native playback dispatch')
+    page.wait_for_selector('.local-pwa-player')
+    page.locator('[data-player=settings]').click()
+    page.wait_for_selector('.local-player-settings select')
+    page.locator('[data-player=close]').click()
+    page.wait_for_selector('.local-pwa-player', state='detached')
+    print('PASS: escaped API content and local player launch and close')
     page.evaluate('window.__offline = true; window.dispatchEvent(new Event("offline"))')
     page.evaluate('location.hash = "#/home"')
     page.wait_for_selector('.nyx-prime-card')

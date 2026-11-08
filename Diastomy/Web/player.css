@@ -1,0 +1,24 @@
+.local-player-open{overflow:hidden}
+.local-pwa-player{position:fixed;inset:0;z-index:9000;background:#000;color:white;direction:ltr;overflow:hidden}
+.local-pwa-player.local-player-rotated{inset:50% auto auto 50%;width:100dvh;height:100dvw;transform:translate(-50%,-50%) rotate(90deg)}
+.local-pwa-player video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.local-pwa-player button{display:grid;place-items:center;border:0;background:none;color:#fff;padding:8px;min-width:42px;min-height:42px}
+.local-pwa-player button svg{width:24px;height:24px}
+.local-player-top,.local-player-bottom,.local-player-center{position:absolute;left:0;right:0}
+.local-player-top{top:0;padding:max(12px,env(safe-area-inset-top)) 16px 24px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(#000b,transparent)}
+.local-player-top h2{font:600 17px Inter,sans-serif;margin:0;text-align:center}
+.local-player-center{top:50%;transform:translateY(-50%);display:flex;justify-content:center;align-items:center;gap:24px;pointer-events:none}
+.local-player-center button{pointer-events:auto}
+.local-player-center button svg{width:42px;height:42px}
+.local-player-center button[data-player=toggle]{background:#0009;border-radius:50%;width:62px;height:62px}
+.local-player-center button[data-player=toggle] svg{width:30px;height:30px}
+.local-player-bottom{bottom:0;padding:20px 18px max(12px,env(safe-area-inset-bottom));background:linear-gradient(transparent,#000d)}
+.local-player-bottom input{display:block;width:100%;padding:0;accent-color:#e00000}
+.local-player-bar{display:flex;align-items:center}
+.local-player-bar output{margin-right:auto;font:12px Inter,sans-serif}
+.local-player-settings{position:absolute;right:18px;bottom:90px;max-width:calc(100% - 36px);background:#101010;border:1px solid #383838;border-radius:12px;padding:8px 14px;direction:rtl}
+.local-player-settings label{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:8px 0;font-size:13px}
+.local-player-settings select{width:auto;padding:5px}
+.local-player-error{position:absolute;inset:35% 12% auto;padding:20px;background:#111;border-radius:12px;text-align:center;direction:rtl}
+.local-player-error button{margin:auto;background:#303030;border-radius:8px}
+.local-pwa-player [hidden]{display:none!important}
