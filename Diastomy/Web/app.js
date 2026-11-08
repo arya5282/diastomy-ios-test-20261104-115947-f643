@@ -85,9 +85,7 @@
     try { const data = await api('/api/app/v1/session/'); state.user = data.user; state.sessionKnown = true; }
     catch (_) { state.sessionKnown = false; }
   }
-  function card(x) {
-    return '<a class="card" href="' + titlePath(x) + '"><div class="poster">' + image(x.cover, '', x.title) + '</div><span class="card-title">' + esc(x.title) + '</span><div class="meta"><span class="rating">★ ' + esc(x.imdb_rating || '—') + '</span> · ' + number(x.production_year) + '</div></a>';
-  }
+  function card(x) { return PWA.card(x); }
   function empty(text) { return '<div class="empty"><p>' + esc(text) + '</p></div>'; }
   function loginPrompt() { return '<div class="panel"><p>برای دریافت اطلاعات حساب به اینترنت متصل شوید و وارد شوید.</p><a class="button primary" href="#/login">ورود به حساب</a></div>'; }
   function back() { return '<a class="back" href="#/home">‹ بازگشت به خانه</a>'; }
@@ -113,11 +111,11 @@
     });
   }
   async function home(seq) {
-    mount('<h1>دنیای فیلم و سریال</h1><div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
+    mount('<div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
     try {
       const data = await api('/api/app/v1/home/', { cache: true });
       whenCurrent(seq, () => {
-        $('#home-data').innerHTML = '<div class="hero">' + data.hero.map(x => '<a class="hero-item" href="' + titlePath(x) + '">' + image(x.banner, '', x.title) + '<div class="hero-copy"><span class="badge">' + (x.type === 'series' ? 'سریال' : 'فیلم') + '</span><h2>' + esc(x.title) + '</h2><span class="button primary">تماشا و جزئیات</span></div></a>').join('') + '</div><h2>ژانرها</h2><div class="chips">' + data.genres.map(g => '<a class="chip" href="#/browse/all?genre=' + enc(g.slug) + '">' + esc(g.name) + '</a>').join('') + '</div>' + data.rails.filter(r => r.items.length).map(r => '<section><h2>' + esc(r.title) + '</h2><div class="rail">' + r.items.map(card).join('') + '</div></section>').join('');
+        $('#home-data').innerHTML = PWA.home(data);
       });
     } catch (error) { whenCurrent(seq, () => fail($('#home-data'), error)); }
   }
@@ -147,7 +145,7 @@
           const seasons = new Map(); (data.episodes || []).forEach(x => { if (!seasons.has(x.season)) seasons.set(x.season, []); seasons.get(x.season).push(x); });
           episodes = Array.from(seasons, ([season, items]) => '<details open><summary>فصل ' + number(season) + '</summary><div class="season">' + items.map(x => '<div class="panel"><strong>قسمت ' + number(x.number) + '</strong><div class="chips">' + x.videos.map(v => '<button data-play="' + v.id + '" data-kind="series">▶ ' + esc(v.quality) + '</button>').join('') + '</div></div>').join('') + '</div></details>').join('');
         } else { episodes = '<div class="chips">' + (data.videos || []).map(v => '<button class="primary" data-play="' + v.id + '" data-kind="movie">▶ پخش ' + esc(v.quality) + '</button>').join('') + '</div>'; }
-        mount(image(data.banner, 'detail-banner', data.title) + '<div class="detail-heading"><h1>' + esc(data.title) + '</h1><p><span class="rating">★ ' + esc(data.imdb_rating || '—') + '</span> · ' + number(data.production_year) + (data.is_free ? ' · تماشای رایگان' : '') + '</p></div><div class="actions"><button id="bookmark">♡ افزودن / حذف از لیست من</button><a class="button" href="#/library">لیست من</a></div><div class="chips">' + data.genres.map(g => '<a class="chip" href="#/browse/all?genre=' + enc(g.slug) + '">' + esc(g.name) + '</a>').join('') + '</div><h2>داستان</h2><p class="description">' + esc(data.description) + '</p><h2>تماشا</h2>' + (episodes || empty('قسمت یا منبع قابل پخش موجود نیست.')) + '<h2>بازیگران</h2><div class="rail">' + data.actors.map(a => '<a class="person" href="#/actor/' + enc(a.slug) + '">' + image(a.photo, '', a.name) + '<p>' + esc(a.name) + '</p></a>').join('') + '</div>');
+        mount(PWA.detail(data, episodes || empty('قسمت یا منبع قابل پخش موجود نیست.')));
         if (kind === 'movie') {
           const create = document.createElement('button'); create.textContent = 'ساخت اتاق فیلم';
           document.querySelector('.actions').appendChild(create);
@@ -177,11 +175,11 @@
     } catch (error) { whenCurrent(seq, () => { $('#library-data').innerHTML = empty(error.message) + loginPrompt(); }); }
   }
   function login() {
-    mount(shell('ورود به دیاستومی', '<div class="form-panel">' + form('login', field('identifier', 'شماره موبایل یا ایمیل', 'text', 'autocomplete="username"') + field('password', 'رمز عبور', 'password', 'autocomplete="current-password"'), 'ورود') + '<div class="chips"><a href="#/otp" class="chip">ورود با کد یک‌بارمصرف</a><a href="#/forgot" class="chip">فراموشی رمز عبور</a></div></div>'));
+    mount(PWA.auth('ورود به دیاستومی', '<div class="form-panel">' + form('login', field('identifier', 'شماره موبایل یا ایمیل', 'text', 'autocomplete="username"') + field('password', 'رمز عبور', 'password', 'autocomplete="current-password"'), 'ورود') + '<div class="chips"><a href="#/otp" class="chip">ورود با کد یک‌بارمصرف</a><a href="#/forgot" class="chip">فراموشی رمز عبور</a></div></div>'));
     submit('login', async data => { await api('/api/app/v1/session/'); await api('/accounts/api/login-password/', { body: data }); await refreshSession(); location.hash = '#/account'; });
   }
   function otp() {
-    mount(shell('ورود با کد تأیید', '<div class="form-panel">' + form('send-otp', field('phone', 'شماره موبایل', 'tel', 'autocomplete="tel"'), 'ارسال کد') + '<div id="otp-step"></div></div>'));
+    mount(PWA.auth('ورود با کد تأیید', '<div class="form-panel">' + form('send-otp', field('phone', 'شماره موبایل', 'tel', 'autocomplete="tel"'), 'ارسال کد') + '<div id="otp-step"></div></div>'));
     submit('send-otp', async (data, output) => {
       await api('/api/app/v1/session/'); await api('/accounts/api/send-otp/', { body: data }); output.textContent = 'کد ارسال شد.';
       $('#otp-step').innerHTML = form('verify-otp', field('code', 'کد تأیید', 'text', 'inputmode="numeric" autocomplete="one-time-code"'), 'تأیید');
@@ -192,24 +190,24 @@
     });
   }
   function registration() {
-    mount(shell('تکمیل ثبت‌نام', form('register', field('full_name', 'نام و نام خانوادگی') + field('username', 'نام کاربری') + field('email', 'ایمیل', 'email') + field('password', 'رمز عبور', 'password', 'autocomplete="new-password" minlength="8"'), 'ساخت حساب')));
+    mount(PWA.auth('تکمیل ثبت‌نام', form('register', field('full_name', 'نام و نام خانوادگی') + field('username', 'نام کاربری') + field('email', 'ایمیل', 'email') + field('password', 'رمز عبور', 'password', 'autocomplete="new-password" minlength="8"'), 'ساخت حساب')));
     submit('register', async data => { await api('/accounts/api/complete-registration/', { body: data }); await refreshSession(); location.hash = '#/account'; });
   }
   function forgot() {
-    mount(shell('بازیابی رمز عبور', form('reset-request', field('phone', 'شماره موبایل', 'tel'), 'دریافت کد')));
+    mount(PWA.auth('بازیابی رمز عبور', form('reset-request', field('phone', 'شماره موبایل', 'tel'), 'دریافت کد')));
     submit('reset-request', async (data, output) => {
       await api('/api/app/v1/session/'); await api('/accounts/api/forgot-password-request/', { body: data });
       output.textContent = 'کد ارسال شد.';
-      mount(shell('تأیید کد بازیابی', form('reset-verify', field('code', 'کد تأیید', 'text', 'inputmode="numeric"'), 'تأیید')));
+      mount(PWA.auth('تأیید کد بازیابی', form('reset-verify', field('code', 'کد تأیید', 'text', 'inputmode="numeric"'), 'تأیید')));
       submit('reset-verify', async code => {
         await api('/accounts/api/forgot-password-verify/', { body: { ...data, ...code } });
-        mount(shell('رمز جدید', form('reset-save', field('password', 'رمز جدید', 'password', 'minlength="8" autocomplete="new-password"'), 'ذخیره')));
+        mount(PWA.auth('رمز جدید', form('reset-save', field('password', 'رمز جدید', 'password', 'minlength="8" autocomplete="new-password"'), 'ذخیره')));
         submit('reset-save', async password => { await api('/accounts/api/forgot-password-reset/', { body: { ...data, ...password } }); toast('رمز تغییر کرد.'); location.hash = '#/login'; });
       });
     });
   }
   function account() {
-    mount(shell('حساب من', '<div class="panel" id="identity">' + (state.user ? image(state.user.avatar, 'avatar', state.user.name) + '<h2>' + esc(state.user.name) + '</h2><p>' + (state.user.subscribed ? 'اشتراک فعال' : 'بدون اشتراک فعال') + '</p>' : loginPrompt()) + '</div><div class="menu"><a href="#/library">لیست من و ادامهٔ تماشا</a><a href="#/notifications">اعلان‌ها</a><a href="#/support">پشتیبانی</a><a href="#/rooms">اتاق فیلم</a><a href="#/subscription">اشتراک</a><a href="#/settings">تنظیمات</a><a href="#/about">دربارهٔ برنامه</a></div>' + (state.user ? '<button class="wide" id="logout">خروج از حساب</button>' : '')));
+    mount(PWA.account(state.user));
     if ($('#logout')) $('#logout').onclick = async () => {
       try { await api('/accounts/api/logout/', { body: {} }); state.user = null; state.sessionKnown = true; account(); }
       catch (error) { toast(error.message); }
@@ -295,6 +293,7 @@
     const params = new URLSearchParams(split === -1 ? '' : hash.slice(split + 1));
     let parts; try { parts = path.split('/').filter(Boolean).map(decodeURIComponent); } catch (_) { parts = ['home']; }
     const name = parts[0] || 'home';
+    PWA.page(name);
     document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
     window.scrollTo(0,0);
     try {
@@ -314,7 +313,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۰٫۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
@@ -340,6 +339,7 @@
   window.addEventListener('online', () => { connection(true); route(); });
   window.addEventListener('offline', () => connection(false));
   // Render the initial page immediately; authentication must never gate offline UI.
+  PWA.install();
   route();
   refreshSession().then(() => { if ((location.hash || '#/home') === '#/account') account(); });
 })();

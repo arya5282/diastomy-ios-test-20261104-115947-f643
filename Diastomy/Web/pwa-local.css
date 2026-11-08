@@ -1,0 +1,73 @@
+@font-face{font-family:"PWA Yekan";src:url("/static/public/assets/fonts/YekanBakhFaNum-VF.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"PWA Inter";src:url("/static/public/assets/fonts/inter-variable-perf-v1.woff2") format("woff2");font-display:swap}
+:root{color-scheme:dark}
+body{background:#050506;font-family:"PWA Yekan",sans-serif}
+body .dmf3-root{padding-top:env(safe-area-inset-top);min-height:100dvh}
+body .dmf3-header{position:relative;top:auto;max-width:none;border:0;background:transparent}
+body #app{padding:0 0 calc(110px + env(safe-area-inset-bottom));max-width:none;min-height:60vh}
+body:not([data-page=home]) #app{padding:20px 20px calc(110px + env(safe-area-inset-bottom))}
+#pwa-header[hidden]{display:none}
+#pwa-header .dmf3-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:20px;padding:22px}
+#pwa-header .dmf3-logo{width:106px;height:18px}
+#pwa-header .dmf3-search-row{display:flex;width:100%;gap:10px}
+#pwa-header .dmf3-search{display:flex;align-items:center;gap:12px;flex:1;min-width:0;background:#191919;border:0;border-radius:12px;padding:14px;color:#777}
+#pwa-header .dmf3-search svg,#pwa-header .dmf3-menu svg{width:24px;height:24px}
+#pwa-header .dmf3-menu{background:none;border:none;padding:0}
+#pwa-header .dmf3-filter{background:#191919;border:0;border-radius:12px}
+#pwa-header .dmf3-search span{font-family:"PWA Inter",sans-serif;font-size:12px}
+#app .dm54-vcard{display:block;flex:0 0 130px;min-width:0;color:white}
+#app .dm54-poster{display:block;position:relative;aspect-ratio:2/3;border-radius:12px;overflow:hidden}
+#app .dm54-poster-img{width:100%;height:100%;object-fit:cover}
+#app .dm54-rating{position:absolute;top:7px;right:7px;display:flex;gap:3px;align-items:center;font-size:11px}
+#app .dm54-rating svg{width:12px;height:12px;fill:#ff5c16}
+#app .dm54-poster-brand{position:absolute;bottom:8px;right:8px}
+#app .dm54-vmeta strong{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:7px}
+#app .dm54-old-genres{font-size:10px;color:#999}
+#app .nyx-prime-rail{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding:0;list-style:none}
+#app .nyx-prime-slide{flex:0 0 100%;scroll-snap-align:center}
+#app .nyx-prime-dots button{border:0;padding:0;width:5px;height:5px;border-radius:50%;background:#aaa;margin:4px}
+#app .dm54-genre{background:linear-gradient(130deg,#352022,#17171c);display:flex;align-items:end;padding:12px;min-width:95px;min-height:65px;border-radius:12px}
+#app .dm54-genre-track{display:flex;overflow:auto;gap:10px;padding:0 20px}
+#app .dm54-head{display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+#app .dm54-head h2{font-size:16px}
+#app .dm54-head a{font-size:12px;color:#aaa}
+#connection{position:relative;top:auto;margin:8px 20px;border-radius:10px}
+body .dm-unified-nav{font-family:"PWA Inter",sans-serif}
+body .dm-unified-nav .dm-nav-filled{display:none!important}
+body .dm-unified-nav [aria-current=page] .dm-nav-filled{display:block!important}
+body .dm-unified-nav [aria-current=page]:has(.dm-nav-filled)>svg:first-child{display:none!important}
+@media(min-width:768px){body .dmf3-root{max-width:650px;margin:auto}html body .dm-unified-nav.dmf3-nav{display:flex!important;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);width:288px;border-radius:99px;background:#151515}body .dm-unified-item{width:25%;display:grid;place-items:center}body .dm-unified-item svg{width:24px;height:24px}}
+body[data-page=local-account] #app{padding:0 0 110px}
+body #dm-app-menu.dm-app-menu{display:block!important;position:relative!important;inset:auto!important;transform:none!important;opacity:1!important;width:100%!important;height:auto!important;max-height:none!important;max-width:650px!important;border:0!important;padding:0!important;margin:0!important;visibility:visible!important}
+body #dm-app-menu .dm-app-menu-shell{padding:22px;min-height:70vh}
+body #dm-app-menu .dm-app-menu-profile{display:flex;flex-direction:column;gap:14px;padding:30px 10px}
+body #dm-app-menu .dm-app-menu-row{position:relative;display:flex;align-items:center;gap:14px;min-height:58px;border-bottom:1px solid #ffffff12}
+body #dm-app-menu .dm-app-menu-row>svg{width:24px;height:24px;flex:none}
+body #dm-app-menu .dm-app-menu-chevron{margin-inline-start:auto}
+body #dm-app-menu .dm-app-menu-chevron svg{width:18px;height:18px}
+body #dm-auth-reference{min-height:75vh}
+body #dm-auth-reference .dm-auth-shell{display:flex;flex-direction:column;align-items:center;gap:40px;padding:50px 5px}
+body #dm-auth-reference .dm-auth-logo img{width:116px;height:20px}
+body #dm-auth-reference .dm-auth-step{width:100%;border:1px solid #ffffff22;border-radius:24px}
+body #dm-auth-reference .dm-auth-card{padding:28px 20px;background:#0a0a0a;border-radius:24px}
+body #dm-auth-reference form{display:flex;flex-direction:column;gap:15px}
+body #dm-auth-reference .form-panel{padding:0;background:none;border:0}
+body #dm-auth-reference input{background:#171717;border:1px solid #ffffff22;border-radius:12px;min-height:50px}
+body #dm-auth-reference button[type=submit]{width:100%;min-height:48px;border-radius:12px;background:#dd0202}
+body[data-page=local-title] #app{padding:0 0 110px}
+body .movie-detail-shell{background:#050505}
+body .dm-film-topbar{display:flex;justify-content:space-between;align-items:center;padding:15px 22px}
+body .dm-film-topbar a,body .dm-film-topbar button{display:grid;place-items:center;width:40px;height:40px;border:0;background:transparent;font-size:30px}
+body .movie-detail-hero{aspect-ratio:16/9;overflow:hidden}
+body .movie-detail-hero>img{width:100%;height:100%;object-fit:cover}
+body .dm-film-reference-info{padding:22px;text-align:start}
+body .dm-film-title-row{display:flex;justify-content:space-between;align-items:center;gap:15px;direction:ltr}
+body .dm-film-title-row h1{font-size:20px;line-height:1.4}
+body .dm-film-title-row>img{width:94px;height:auto}
+body .dm-film-meta{display:flex;gap:10px;font-size:12px;color:#aaa}
+body .dm-film-media{margin:15px 0}
+body .dm-film-media svg{width:15px;height:15px;fill:#ff5c16}
+body .dm-film-buttons{margin:24px 0}
+body .dm-film-description{font-size:14px;line-height:2;color:#aaa}
+body .dm-film-reference-info h2{font-size:16px}
+html.dmf3-active body .dmf3-root{display:block!important}

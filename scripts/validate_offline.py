@@ -1,5 +1,6 @@
 """Check bundled files, Xcode resource wiring and basic offline boundaries."""
 import ast
+import json
 import re
 from pathlib import Path
 
@@ -8,9 +9,15 @@ web = root / 'Diastomy/Web'
 html = (web / 'index.html').read_text()
 for target in re.findall(r'(?:src|href)="([^"]+)"', html):
     if not target.startswith('#'):
-        assert '://' not in target and (web / target).is_file(), target
-for target in re.findall(r"url\(['\"]?([^)'\"]+)", (web / 'app.css').read_text()):
-    assert '://' not in target and (web / target).is_file(), target
+        assert '://' not in target and (web / target.lstrip('/')).is_file(), target
+for stylesheet in web.rglob('*.css'):
+    for target in re.findall(r"url\(['\"]?([^)\'\"]+)", stylesheet.read_text()):
+        if target.startswith('data:') or target.startswith('#'):
+            continue
+        assert '://' not in target, target
+        target = target.split('?')[0].split('#')[0]
+        asset = web / target.lstrip('/') if target.startswith('/') else stylesheet.parent / target
+        assert asset.resolve().is_relative_to(web.resolve()) and asset.is_file(), target
 assert "connect-src 'none'" in html
 assert "script-src 'self'" in html
 assert "form-action 'none'" in html
@@ -29,6 +36,12 @@ assert 'WKAppBoundDomains' not in (root / 'Diastomy/Info.plist').read_text()
 assert 'let mime = resources[url.path]' in native
 assert 'func webView(_ webView: WKWebView, didFailProvisionalNavigation' in native
 assert 'test_ios_startup.py' in (root / 'scripts/build-ipa.sh').read_text()
+resources = json.loads((web / 'resources.json').read_text())
+for path in web.rglob('*'):
+    if path.is_file() and path.name != 'resources.json':
+        assert '/' + path.relative_to(web).as_posix() in resources, path
+for path in resources:
+    assert '..' not in path and (web / path.lstrip('/')).is_file(), path
 for path in list((root / 'backend').glob('*.py')) + list((root / 'scripts').glob('*.py')):
     ast.parse(path.read_text(), filename=str(path))
 print('PASS: local HTML/CSS/font resources, Xcode bundle wiring, native document boundary and backend Python syntax')

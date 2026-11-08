@@ -35,7 +35,10 @@ def card(item):
     kind = 'series' if isinstance(item, Series) else 'movie'
     return {
         'id': item.pk, 'type': kind, 'slug': item.slug,
-        'title': content_title(item), 'cover': file_url(item.cover),
+        'title': content_title(item),
+        'english_title_full': getattr(item, 'english_title_full', '') or getattr(item, 'title_en', ''),
+        'age_limit': getattr(item, 'age_limit', None),
+        'cover': file_url(item.cover),
         'banner': file_url(item.banner_mobile) or file_url(item.banner) or file_url(item.cover),
         'description': item.description, 'production_year': item.production_year,
         'imdb_rating': item.imdb_rating, 'duration': item.duration,
@@ -66,18 +69,21 @@ def home(request):
     from core.views import _home_public_context
     from django.core.cache import cache
     from django.utils.translation import get_language
-    key = 'mobile-app-home:v1:' + (get_language() or 'fa')
+    key = 'mobile-app-home:v2:' + (get_language() or 'fa')
     data = cache.get(key)
     if data is None:
         context = _home_public_context()
         names = [
-            ('pwa_latest_movies', 'تازه‌ترین فیلم‌ها'),
-            ('pwa_latest_series', 'تازه‌ترین سریال‌ها'),
-            ('pwa_dubbed_movies', 'فیلم‌های دوبله فارسی'),
+            ('trending_movies', 'ترندترین فیلم‌ها'),
             ('pwa_turkish_series', 'سریال‌های ترکی'),
-            ('pwa_free_movies', 'تماشای رایگان'),
-            ('pwa_dubbed_series', 'سریال‌های دوبله'),
-            ('pwa_recommended', 'پیشنهاد دیاستومی'),
+            ('pwa_latest_movies', 'جدیدترین فیلم‌ها'),
+            ('pwa_dubbed_movies', 'فیلم‌های دوبله فارسی'),
+            ('pwa_free_movies', 'فیلم‌های بدون نیاز به اشتراک'),
+            ('pwa_latest_series', 'جدیدترین سریال‌ها'),
+            ('pwa_dubbed_series', 'سریال‌های دوبله فارسی'),
+            ('pwa_free_series', 'سریال‌های بدون نیاز به اشتراک'),
+            ('pwa_recommended', 'پیشنهاد ما'),
+            ('animations', 'جدیدترین انیمیشن‌ها'),
         ]
         data = {
             'hero': [card(x) for x in context['hero_items']],

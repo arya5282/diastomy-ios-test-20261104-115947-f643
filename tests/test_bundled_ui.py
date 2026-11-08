@@ -2,6 +2,9 @@
 Run with a Python environment containing playwright and its WebKit browser.
 """
 import json
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -35,6 +38,10 @@ window.webkit = { messageHandlers: { native: { postMessage: async payload => {
 }}}};
 """.replace('FIXTURE', json.dumps(fixture, ensure_ascii=False))
 
+server = ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(root / 'Diastomy/Web')))
+Thread(target=server.serve_forever, daemon=True).start()
+local_url = 'http://127.0.0.1:' + str(server.server_port) + '/index.html'
+
 with sync_playwright() as playwright:
     browser = playwright.webkit.launch()
     context = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=1)
@@ -44,25 +51,25 @@ with sync_playwright() as playwright:
     remote_documents = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('request', lambda request: remote_documents.append(request.url)
-            if request.resource_type in ('document', 'script', 'stylesheet', 'font') and request.url.startswith('http') else None)
-    page.goto((root / 'Diastomy/Web/index.html').as_uri())
-    page.wait_for_selector('.hero-item')
+            if request.resource_type in ('document', 'script', 'stylesheet', 'font') and request.url.startswith('http') and not request.url.startswith('http://127.0.0.1:') else None)
+    page.goto(local_url)
+    page.wait_for_selector('.nyx-prime-card')
     print('PASS: bundled home rendered in WebKit')
-    page.locator('.hero-item').first.click()
+    page.locator('.nyx-prime-card').first.click()
     page.wait_for_selector('[data-play]')
-    assert page.locator('.description').inner_text() == fixture['description']
+    assert page.locator('.dm-film-description').inner_text() == fixture['description']
     page.locator('[data-play]').click()
     assert page.evaluate('window.__calls.some(x => x.action === "play" && x.id === 42)')
     print('PASS: escaped API content and native playback dispatch')
     page.evaluate('window.__offline = true; window.dispatchEvent(new Event("offline"))')
     page.evaluate('location.hash = "#/home"')
-    page.wait_for_selector('.hero-item')
+    page.wait_for_selector('.nyx-prime-card')
     assert page.locator('#connection').is_visible()
     page.evaluate('location.hash = "#/title/movie/test-movie"')
     page.wait_for_selector('[data-play]')
     print('PASS: offline home and detail from retained public JSON')
     routes = {
-        'search': 'جست‌وجو', 'account': 'حساب من', 'login': 'ورود به دیاستومی',
+        'search': 'جست‌وجو', 'account': 'پروفایل کاربری', 'login': 'ورود به دیاستومی',
         'otp': 'ورود با کد تأیید', 'forgot': 'بازیابی رمز عبور', 'settings': 'تنظیمات',
         'support': 'پشتیبانی', 'subscription': 'اشتراک', 'library': 'لیست من',
         'notifications': 'اعلان‌ها', 'rooms': 'اتاق فیلم', 'about': 'دربارهٔ دیاستومی',
@@ -82,7 +89,7 @@ with sync_playwright() as playwright:
     assert not errors, errors
     assert not remote_documents, remote_documents
     page.evaluate('location.hash = "#/home"')
-    page.wait_for_selector('.hero-item')
+    page.wait_for_selector('.nyx-prime-card')
     page.screenshot(path=str(root / 'tests/offline-home.png'), full_page=True)
     # Keep native API promises unresolved: cached content and footer routing must
     # still render, including navigation away from an in-flight private request.
@@ -97,21 +104,24 @@ with sync_playwright() as playwright:
       location.hash = '#/library';
     }''')
     page.wait_for_function('document.querySelector("h1").textContent === "لیست من"', timeout=1500)
-    page.locator('nav a[data-tab="home"]').click()
-    page.wait_for_selector('.hero-item', timeout=1500)
-    page.locator('nav a[data-tab="account"]').click()
-    page.wait_for_function('document.querySelector("h1").textContent === "حساب من"', timeout=1500)
-    page.locator('nav a[data-tab="home"]').click()
-    page.wait_for_selector('.hero-item', timeout=1500)
+    page.locator('nav a[data-nav-slot="home"]').click()
+    page.wait_for_selector('.nyx-prime-card', timeout=1500)
+    page.locator('[data-local-menu]').click()
+    page.wait_for_function('document.querySelector("h1").textContent === "پروفایل کاربری"', timeout=1500)
+    page.locator('nav a[data-nav-slot="home"]').click()
+    page.wait_for_selector('.nyx-prime-card', timeout=1500)
     print('PASS: footer switching and stale cached content never wait for unresolved API requests')
     # First installation must also open the UI before ever receiving catalogue data.
     clean = browser.new_context(viewport={'width':390,'height':844})
     clean.add_init_script(script + '\nwindow.__offline = true;')
     first = clean.new_page()
-    first.goto((root / 'Diastomy/Web/index.html').as_uri() + '#/settings')
+    first.goto(local_url + '#/settings')
     first.wait_for_selector('#clear')
     first.evaluate('location.hash = "#/home"')
     first.wait_for_selector('#home-data .empty')
     print('PASS: first launch offline, with no cache, still opens local pages')
     clean.close()
     browser.close()
+
+server.shutdown()
+server.server_close()

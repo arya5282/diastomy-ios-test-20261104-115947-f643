@@ -85,7 +85,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             return
         }
         webRoot = index.deletingLastPathComponent().standardizedFileURL
-        for name in ["index.html", "app.js", "app.css", "assets/Yekan.woff2", "assets/logo.svg"] {
+        for name in ["index.html", "app.js", "app.css", "pwa-ui.js", "pwa-shell.js", "pwa-source.css", "pwa-local.css", "resources.json", "assets/Yekan.woff2", "assets/logo.svg"] {
             guard FileManager.default.fileExists(atPath: webRoot.appendingPathComponent(name).path) else {
                 startupFailed("فایل‌های رابط برنامه ناقص‌اند؛ نسخهٔ کامل را دوباره نصب کنید.")
                 return
@@ -445,13 +445,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
 // Serve a fixed list of bundled resources without WebKit file URL access.
 private final class BundledInterfaceHandler: NSObject, WKURLSchemeHandler {
-    private let resources = [
-        "/index.html": "text/html",
-        "/app.js": "application/javascript",
-        "/app.css": "text/css",
-        "/assets/Yekan.woff2": "font/woff2",
-        "/assets/logo.svg": "image/svg+xml"
-    ]
+    private let resources: [String: String] = {
+        guard let url = Bundle.main.url(forResource: "resources", withExtension: "json", subdirectory: "Web"),
+              let data = try? Data(contentsOf: url),
+              let manifest = try? JSONDecoder().decode([String: String].self, from: data) else { return [:] }
+        return manifest
+    }()
 
     func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
         guard let url = urlSchemeTask.request.url,
