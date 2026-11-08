@@ -312,6 +312,36 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 self.presentPlayer(url, info: info)
                 replyHandler(["status": 200, "data": ["playing": true]], nil)
             }
+        } else if action == "listDownloads" {
+            do {
+                let names = try FileManager.default.contentsOfDirectory(atPath: documents.path)
+                let files = names.sorted().compactMap { name -> [String: String]? in
+                    guard localDownload(named: name) != nil,
+                          let separator = name.lastIndex(of: "-"),
+                          let idSeparator = name[..<separator].lastIndex(of: "-") else { return nil }
+                    return ["name": name, "title": name[..<idSeparator].replacingOccurrences(of: "-", with: " ")]
+                }
+                replyHandler(["ok": true, "files": files], nil)
+            } catch {
+                replyHandler(["ok": false, "error": "خواندن دانلودها ممکن نشد."], nil)
+            }
+        } else if ["playDownload", "deleteDownload"].contains(action), let name = data["name"] as? String {
+            guard let file = localDownload(named: name) else {
+                replyHandler(["ok": false, "error": "فایل دانلودشده پیدا نشد."], nil)
+                return
+            }
+            if action == "playDownload" {
+                playingRoom = nil
+                presentPlayer(file, info: [:])
+                replyHandler(["ok": true], nil)
+            } else {
+                do {
+                    try FileManager.default.removeItem(at: file)
+                    replyHandler(["ok": true], nil)
+                } catch {
+                    replyHandler(["ok": false, "error": "حذف فایل ممکن نشد."], nil)
+                }
+            }
         } else if action == "downloadMovie", let slug = data["slug"] as? String,
                   let id = data["id"] as? Int, id > 0,
                   slug.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil {
@@ -372,6 +402,15 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         writeStartupReport(ready: true)
     }
 
+    private func localDownload(named name: String) -> URL? {
+        guard name.range(of: #"^[A-Za-z0-9_-]+-[0-9]+-[A-Fa-f0-9]{8}\.(mp4|mkv|mov|webm|m4v)$"#,
+                         options: .regularExpression) != nil else { return nil }
+        let url = documents.appendingPathComponent(name, isDirectory: false)
+        guard let properties = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              properties.isRegularFile == true, properties.isSymbolicLink == false else { return nil }
+        return url
+    }
+
     private func downloadMovie(slug: String, id: Int, completion: @escaping ([String: Any]) -> Void) {
         let url = URL(string: "/movie/movie/\(slug)/download/\(id)/", relativeTo: server)!.absoluteURL
         // The existing Django download route checks the session before redirecting.
@@ -414,7 +453,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let position = info["position"] as? Double ?? 0
         if position > 0 { next.seek(to: CMTime(seconds: position, preferredTimescale: 600)) }
         progressObserver = next.addPeriodicTimeObserver(forInterval: CMTime(seconds: 15, preferredTimescale: 1), queue: .main) { [weak self, weak controller] time in
-            guard let self = self, controller?.presentingViewController != nil,
+            guard let self = self, !self.progressTarget.isEmpty, controller?.presentingViewController != nil,
                   time.seconds.isFinite, let total = self.player?.currentItem?.duration.seconds,
                   total.isFinite, total > 0 else { return }
             var body = self.progressTarget

@@ -60,6 +60,13 @@ window.PWA = (() => {
           r.items.map(wide ? landscape : card).join('') + '</div></section>' + (r.key === 'trending_movies' ? genreHTML + continueHTML : '');
       }).join('') + (!rails.some(r => r.key === 'trending_movies' && r.items.length) ? genreHTML + continueHTML : '') + '</div>';
   }
+  function historyCard(item) {
+    const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
+    return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '" aria-label="ادامه تماشا">' +
+      '<img src="' + media(item.banner || item.cover) + '" alt="' + esc(item.title) + '" loading="lazy">' +
+      '<progress class="local-library-progress" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><strong>' +
+      name(item) + '</strong><small>' + Math.max(0, Math.ceil((item.total - item.position) / 60)) + ' دقیقه باقی مانده</small></div></article>';
+  }
   function detail(item, episodes) {
     const series = item.type === 'series';
     const trailers = (item.trailers || []).filter(trailer => trailer.url && media(trailer.url));
@@ -113,7 +120,7 @@ window.PWA = (() => {
   }
   function auth(title, body) {
     return '<div id="dm-auth-reference"><div class="dm-auth-shell"><div class="dm-auth-logo"><img src="' + logo +
-      '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="#/home">→ Back</a><h1>' + esc(title) + '</h1>' + body +
+      '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="#/home">' + PWA_SOURCE.authBack + '<span>Back</span></a><h1>' + esc(title) + '</h1>' + body +
       '</div></div></div></div>';
   }
   function searchInput(query) {
@@ -159,7 +166,7 @@ window.PWA = (() => {
   }
   function page(name) {
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
-    document.body.dataset.page = name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
+    document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
     document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
     document.querySelectorAll('[data-nav-slot]').forEach(link => {
@@ -167,5 +174,5 @@ window.PWA = (() => {
       else link.removeAttribute('aria-current');
     });
   }
-  return {card, home, detail, account, auth, searchInput, install, page};
+  return {card, home, historyCard, detail, account, auth, searchInput, install, page};
 })();

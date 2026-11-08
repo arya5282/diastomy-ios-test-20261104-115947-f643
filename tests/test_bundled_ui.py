@@ -116,7 +116,7 @@ with sync_playwright() as playwright:
       window.__holdRequests = true;
       location.hash = '#/library';
     }''')
-    page.wait_for_function('document.querySelector("h1").textContent === "لیست من"', timeout=1500)
+    page.wait_for_selector('#library-tab-saved', timeout=1500)
     page.locator('nav a[data-nav-slot="home"]').click()
     page.wait_for_selector('.nyx-prime-card', timeout=1500)
     page.locator('[data-local-menu]').click()

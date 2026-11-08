@@ -182,3 +182,42 @@ body .reference-cast .person img{width:100%;height:auto;aspect-ratio:1}
 body .reference-cast .person p{font-size:10px;line-height:1.25;margin:7px 0 0;color:#bbb}
 
 body:is([data-page=local-otp],[data-page=local-forgot]) #pwa-nav{display:none}
+body[data-page=my-library] #app{padding:0 16px calc(105px + env(safe-area-inset-bottom))}
+body #app .library-tabs{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+body #app .library-tabs button[aria-selected=true]{color:#fff;border-bottom:2px solid #e20000}
+body #app .library-header{position:relative;inset:auto;width:100%;padding:16px 0;background:transparent;border:0}
+body #app .library-panel[hidden]{display:none!important}
+.local-library-saved{position:relative;min-width:0}
+.local-library-saved .library-heart{position:absolute;inset:5px 5px auto auto;z-index:2;background:#0009;padding:5px}
+.local-library-saved .library-heart svg{width:18px;height:18px}
+body #app .library-history-thumb{display:block;position:relative;aspect-ratio:16/9;overflow:hidden}
+body #app .library-history-thumb img{width:100%;height:100%;object-fit:cover}
+.local-library-progress{position:absolute;inset:auto 5px 5px;width:calc(100% - 10px);height:3px;accent-color:#e20000}
+.local-download-card{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #333}
+.local-download-card button{font-size:12px;margin-inline-start:5px}
+html body[data-page=local-login]{margin:0;width:100%;background:radial-gradient(ellipse at 0 0,#260606,transparent 34%),radial-gradient(ellipse at 100% 80%,#240404,transparent 35%),#000}
+html body[data-page=local-login] .dmf3-root{width:100%;margin:0;max-width:none}
+html body[data-page=local-login] #app{padding:0!important;margin:0!important;min-height:0;max-width:none}
+html body[data-page=local-login] #dm-auth-reference{display:block!important;position:relative!important;inset:auto!important;width:100%;min-height:calc(100dvh - env(safe-area-inset-top));height:auto!important;overflow:visible!important;background:transparent!important;padding:clamp(48px,18dvh,154px) 16px 40px;box-sizing:border-box}
+html body #dm-auth-reference .dm-auth-shell{position:relative!important;inset:auto!important;transform:none!important;display:flex!important;width:min(100%,298px)!important;margin:0 auto!important;padding:0!important;gap:32px!important;box-sizing:border-box}
+html body #dm-auth-reference .dm-auth-logo{margin:0!important}
+html body #dm-auth-reference .dm-auth-step{padding:0!important;margin:0!important;box-sizing:border-box}
+html body #dm-auth-reference .dm-auth-card{box-sizing:border-box;position:relative!important;padding:86px clamp(24px,11vw,45px) 38px!important;min-height:344px;width:100%;background:#0e0e0e!important}
+html body #dm-auth-reference .dm-auth-card h1{text-align:center;margin:0 0 26px!important}
+html body #dm-auth-reference .reference-auth-back{position:absolute!important;inset:22px auto auto 27px!important;display:inline-flex!important;align-items:center;gap:5px;width:auto!important;min-height:0!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important;font-size:11px;color:#aaa;direction:ltr}
+.reference-auth-back svg{width:17px;height:17px}
+html body #dm-auth-reference #identify{gap:10px!important}
+html body #dm-auth-reference #identify input,html body #dm-auth-reference #identify button{min-height:34px!important;height:34px!important;margin:0!important}
+html body #dm-auth-reference #identify input{width:100%;padding-inline:8px 45px!important;font-size:12px}
+html body #dm-auth-reference #identify .dm-auth-phone-field{position:relative;margin:0}
+html body #dm-auth-reference #identify .dm-auth-phone-icon{position:absolute;inset:0 9px 0 auto;display:flex;align-items:center;pointer-events:none}
+html body #dm-auth-reference #identify .dm-auth-phone-icon svg{width:18px;height:18px}
+html body #dm-auth-reference #identify-status{font-size:10px;min-height:13px;margin:0;text-align:center}
+html body #dm-auth-reference .reference-auth-alternatives{margin-top:14px;border:0;padding:0;display:grid;gap:16px}
+.reference-auth-divider{display:flex;align-items:center;gap:9px;color:#777}
+.reference-auth-divider::before,.reference-auth-divider::after{content:"";height:1px;background:#292929;flex:1}
+html body #dm-auth-reference .reference-auth-alternatives a{display:grid;place-items:center;border:1px solid #383838;border-radius:12px;background:#181818;min-height:34px;padding:4px;text-align:center}
+#delete-download-dialog{color:white;background:#181818;border:1px solid #444;border-radius:15px;padding:18px}
+#delete-download-dialog::backdrop{background:#000a}
+html body #dm-auth-reference .reference-auth-alternatives{display:grid!important;grid-template-columns:minmax(0,1fr)!important;justify-items:stretch!important;width:100%!important;gap:16px!important}
+html body #dm-auth-reference .reference-auth-alternatives a{width:100%!important;color:#bbb!important}
