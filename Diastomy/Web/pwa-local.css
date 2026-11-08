@@ -87,3 +87,43 @@ body #app .sub-pay{margin-top:12px}
 body #app .mr-room{display:block;margin-bottom:10px;padding:15px}
 body #app .ar-note{margin-bottom:12px}
 html.dmf3-active body[data-page=local-title] #app .dm-film-reference-info{display:block!important}
+body[data-page=local-login],body[data-page=local-account]{background:radial-gradient(ellipse at 0 0,#220606,transparent 35%),radial-gradient(ellipse at 100% 90%,#250505,transparent 40%),#000}
+body[data-page=local-login] #app{padding-top:clamp(48px,17vh,145px)}
+body #dm-auth-reference .dm-auth-shell{padding:0;max-width:298px;margin:auto;gap:32px}
+body #dm-auth-reference .dm-auth-card{position:relative;padding:84px 45px 36px;border-radius:18px}
+body #dm-auth-reference .dm-auth-step{border-radius:18px}
+body #dm-auth-reference .reference-auth-back{position:absolute;top:23px;left:26px;color:#aaa;font-size:12px;direction:ltr}
+body #dm-auth-reference .reference-auth-alternatives{margin-top:26px;border-top:1px solid #292929;padding-top:18px;text-align:center;font-size:12px;color:#aaa}
+body[data-page=local-login] #pwa-nav,body[data-page=local-account] #pwa-nav,body[data-page=local-title] #pwa-nav{display:none}
+body #dm-app-menu .dm-app-menu-shell{padding:26px 16px;background:transparent}
+body #dm-app-menu .dm-app-menu-profile{flex-direction:row;align-items:center;gap:14px;padding:32px 0 55px}
+.reference-profile-avatar{width:60px;height:60px;border-radius:50%;border:1px solid #444;object-fit:cover}
+.dm-app-menu-profile strong,.dm-app-menu-profile small{display:block}
+.reference-subscription-badge{display:inline-block;margin-top:5px;padding:2px 9px;border:1px solid #6c3219;border-radius:20px;color:#ff7134;background:#261208;font-size:10px}
+body #dm-app-menu .dm-app-menu-row,.reference-watch-time{border:1px solid #303030;border-radius:15px;background:#0e0e0e;padding:10px 17px;min-height:42px;margin-bottom:10px}
+.reference-watch-time{display:flex;align-items:center;gap:12px;min-height:63px;margin-bottom:16px}
+.reference-watch-time small,.reference-watch-time strong{display:block}
+.reference-watch-time small{color:#888}
+.reference-watch-time>span:last-child{margin-inline-start:auto}
+.reference-profile-footer{text-align:center;color:#aaa;font-size:12px;padding:28px 40px}
+.reference-profile-footer img{width:150px}
+body .movie-detail-hero{border-radius:24px}
+body .dm-film-reference-info{padding:24px 16px}
+body .dm-film-buttons .chips{width:100%}
+body .dm-film-buttons [data-play]{flex:1;justify-content:center;border-radius:999px;background:#d90000;border:0}
+.reference-age{padding:2px 6px;background:#292929;border-radius:5px}
+.reference-cast{gap:8px}
+.reference-cast .person{flex:0 0 55px;text-align:center}
+.reference-cast img{width:55px;height:55px;border-radius:50%;border:1px solid #555;object-fit:cover}
+.reference-detail-tabs{display:flex;margin-top:30px;border-bottom:1px solid #333}
+.reference-detail-tabs button{flex:1;border:0;border-radius:0;background:none;padding:12px 0;color:#777}
+.reference-detail-tabs button[aria-pressed=true]{border-bottom:3px solid #f21919;color:white}
+[data-detail-panel]{padding-top:22px}
+#app .reference-genre{position:relative;min-width:112px;overflow:hidden;justify-content:center;align-items:center}
+#app .reference-genre img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#app .reference-genre span{position:relative;color:white;font-weight:bold}
+.reference-continue{display:flex;overflow-x:auto;gap:9px}
+.reference-continue>div{flex:0 0 185px;min-width:0}
+.reference-continue progress{width:100%;height:4px;accent-color:#e20000}
+.reference-continue small{color:#aaa}
+#app .nyx-prime-dots button[aria-pressed=true]{width:16px;border-radius:9px;background:white}

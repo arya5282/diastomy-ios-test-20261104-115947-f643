@@ -132,6 +132,9 @@
       const data = await api('/api/app/v1/home/', { cache: true });
       whenCurrent(seq, () => {
         $('#home-data').innerHTML = PWA.home(data);
+        if (state.user) api('/api/app/v1/library/').then(library => {
+          whenCurrent(seq, () => { $('#home-data').innerHTML = PWA.home(data, library.history); });
+        }).catch(() => {});
       });
     } catch (error) { whenCurrent(seq, () => fail($('#home-data'), error)); }
   }
@@ -217,11 +220,31 @@
     } catch (error) { whenCurrent(seq, () => { $('#library-data').innerHTML = empty(error.message) + loginPrompt(); }); }
   }
   function login() {
-    mount(PWA.auth('ورود به دیاستومی', '<div class="form-panel">' + form('login', field('identifier', 'شماره موبایل یا ایمیل', 'text', 'autocomplete="username"') + field('password', 'رمز عبور', 'password', 'autocomplete="current-password"'), 'ورود') + '<div class="chips"><a href="#/otp" class="chip">ورود با کد یک‌بارمصرف</a><a href="#/forgot" class="chip">فراموشی رمز عبور</a></div></div>'));
-    submit('login', async data => { await api('/api/app/v1/session/'); await api('/accounts/api/login-password/', { body: data }); await refreshSession(); location.hash = '#/account'; });
+    mount(PWA.auth('Sign in or register', form('identify', field('identifier', 'شماره موبایل یا ایمیل', 'text', 'autocomplete="username"'), 'Continue') +
+      '<div class="reference-auth-alternatives"><a href="#/otp">ورود با کد یک‌بارمصرف</a></div>'));
+    submit('identify', async ({identifier}) => {
+      const sequence = state.sequence;
+      await api('/api/app/v1/session/');
+      const status = await api('/accounts/api/check-phone/', {body:{identifier}});
+      whenCurrent(sequence, () => {
+        if (!status.has_password && status.identifier_type === 'phone') {
+          location.hash = '#/otp?phone=' + enc(identifier);
+          return;
+        }
+        mount(PWA.auth('رمز عبور', form('login', '<input type="hidden" name="identifier" value="' + esc(identifier) + '">' +
+          field('password', 'رمز عبور', 'password', 'autocomplete="current-password"'), 'ورود') +
+          '<div class="reference-auth-alternatives"><a href="#/forgot">فراموشی رمز عبور</a></div>'));
+        submit('login', async data => {
+          await api('/accounts/api/login-password/', {body:data});
+          await refreshSession();
+          if (sequence === state.sequence) location.hash = '#/account';
+        });
+      });
+    });
   }
-  function otp() {
+  function otp(params) {
     mount(PWA.auth('ورود با کد تأیید', '<div class="form-panel">' + form('send-otp', field('phone', 'شماره موبایل', 'tel', 'autocomplete="tel"'), 'ارسال کد') + '<div id="otp-step"></div></div>'));
+    $('#send-otp input').value = params.get('phone') || '';
     submit('send-otp', async (data, output) => {
       await api('/api/app/v1/session/'); await api('/accounts/api/send-otp/', { body: data }); output.textContent = 'کد ارسال شد.';
       $('#otp-step').innerHTML = form('verify-otp', field('code', 'کد تأیید', 'text', 'inputmode="numeric" autocomplete="one-time-code"'), 'تأیید');
@@ -249,11 +272,19 @@
     });
   }
   function account() {
-    mount(PWA.account(state.user));
-    if ($('#logout')) $('#logout').onclick = async () => {
-      try { await api('/accounts/api/logout/', { body: {} }); state.user = null; state.sessionKnown = true; account(); }
-      catch (error) { toast(error.message); }
-    };
+    const user = state.user;
+    const sequence = state.sequence;
+    function render(history) {
+      mount(PWA.account(user, history));
+      if ($('#logout')) $('#logout').onclick = async () => {
+        try { await api('/accounts/api/logout/', { body: {} }); state.user = null; state.sessionKnown = true; if (sequence === state.sequence) account(); }
+        catch (error) { toast(error.message); }
+      };
+    }
+    render();
+    if (user) api('/api/app/v1/library/').then(library => {
+      if (state.user === user) whenCurrent(sequence, () => render(library.history));
+    }).catch(() => {});
   }
   async function notifications(seq) {
     mount(shell('اعلان‌ها', '<div id="notifications">' + empty('برای دریافت اعلان‌ها به اینترنت و حساب کاربری نیاز است.') + '</div>'));
@@ -346,7 +377,7 @@
       else if (name === 'actors' || name === 'actor') await actors(seq, parts[1]);
       else if (name === 'library') await library(seq);
       else if (name === 'login') login();
-      else if (name === 'otp') otp();
+      else if (name === 'otp') otp(params);
       else if (name === 'forgot') forgot();
       else if (name === 'account') account();
       else if (name === 'notifications') await notifications(seq);
@@ -355,7 +386,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
@@ -383,5 +414,9 @@
   // Render the initial page immediately; authentication must never gate offline UI.
   PWA.install();
   route();
-  refreshSession().then(() => { if ((location.hash || '#/home') === '#/account') account(); });
+  refreshSession().then(() => {
+    const current = location.hash || '#/home';
+    if (current === '#/account') account();
+    else if (current === '#/home' && state.user) route();
+  });
 })();

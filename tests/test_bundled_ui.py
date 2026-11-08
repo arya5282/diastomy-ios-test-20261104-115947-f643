@@ -33,6 +33,7 @@ window.webkit = { messageHandlers: { native: { postMessage: async payload => {
   if (path.includes('/actor/')) return {status:200,data:{actor:{name:'بازیگر',photo:'',bio:''},filmography:[title]}};
   if (path.includes('/actors/')) return {status:200,data:{actors:[]}};
   if (path.includes('/plans/')) return {status:200,data:{plans:[{id:1,name:'یک ماهه',newPriceRaw:100000}]}};
+  if (path.includes('check-phone')) return {status:200,data:{has_password:true,identifier_type:'email'}};
   if (path.includes('login-password')) return {status:400,data:{error:'رمز اشتباه است'}};
   return {status:401,data:{error:'وارد حساب شوید'}};
 }}}};
@@ -69,7 +70,7 @@ with sync_playwright() as playwright:
     page.wait_for_selector('[data-play]')
     print('PASS: offline home and detail from retained public JSON')
     routes = {
-        'search': 'جست‌وجو', 'account': 'پروفایل کاربری', 'login': 'ورود به دیاستومی',
+        'search': 'جست‌وجو', 'account': 'پروفایل کاربری', 'login': 'Sign in or register',
         'otp': 'ورود با کد تأیید', 'forgot': 'بازیابی رمز عبور', 'settings': 'تنظیمات',
         'support': 'پشتیبانی', 'subscription': 'خرید یا تمدید اشتراک', 'library': 'لیست من',
         'notifications': 'اعلان‌ها', 'rooms': 'اتاق فیلم', 'about': 'دربارهٔ دیاستومی',
@@ -79,8 +80,9 @@ with sync_playwright() as playwright:
         page.wait_for_function('(text) => document.querySelector("h1")?.textContent === text', arg=heading)
     print('PASS: every local screen opens with the server unavailable')
     page.evaluate('window.__offline = false; location.hash = "#/login"')
+    page.fill('#identify [name=identifier]', 'invalid@example.test')
+    page.locator('#identify button').click()
     page.wait_for_selector('#login')
-    page.fill('[name=identifier]', 'invalid@example.test')
     page.fill('[name=password]', 'not-a-real-password')
     page.locator('#login button').click()
     page.wait_for_function('document.querySelector("#login-status").textContent.includes("رمز اشتباه")')

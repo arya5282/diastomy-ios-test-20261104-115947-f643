@@ -56,6 +56,7 @@ def session(request):
         data = {
             'id': user.pk, 'name': user.get_full_name() or user.username,
             'username': user.username, 'avatar': user.avatar_src,
+            'phone': str(getattr(user, 'phone', '') or ''),
             'subscribed': user.has_active_subscription or user.is_staff,
             'language': user.preferred_language,
             'quality': user.preferred_quality,
@@ -108,6 +109,10 @@ def detail(request, kind, slug):
     data = card(item)
     data['actors'] = [{'slug': a.slug, 'name': a.name, 'photo': file_url(a.photo)}
                       for a in item.actors.all()[:30]]
+    data['comments'] = [
+        {'text': comment.text, 'spoiler': comment.is_spoiler}
+        for comment in item.comments.filter(is_approved=True, parent__isnull=True).order_by('-pk')[:30]
+    ]
     # Only public metadata here: this response can be retained offline.
     # Media links and entitlement are always obtained afresh from playback().
     if kind == 'movie':
