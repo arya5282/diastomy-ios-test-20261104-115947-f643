@@ -7,7 +7,8 @@ import xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parents[1]
 info = plistlib.loads((root / 'Diastomy/Info.plist').read_bytes())
-assert info['WKAppBoundDomains'] == ['diastomy.top', 'www.diastomy.top']
+# The bundled interface uses the app-owned diastomy scheme.
+assert 'WKAppBoundDomains' not in info, 'App-bound domains conflict with the bundled URL scheme'
 assert info['UILaunchStoryboardName'] == 'LaunchScreen'
 # The window is owned by SceneDelegate; reject partially uploaded lifecycle files.
 config = info['UIApplicationSceneManifest']['UISceneConfigurations']['UIWindowSceneSessionRoleApplication'][0]
