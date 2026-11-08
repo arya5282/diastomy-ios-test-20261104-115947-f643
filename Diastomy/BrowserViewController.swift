@@ -109,16 +109,20 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         StartupDiagnostics.record(stage: "checkingNativeBridge", localDocument: isLocal(webView.url))
         guard isLocal(webView.url) else { return }
-        // Keep this startup probe synchronous. Awaiting the reply-style native
-        // message handler from callAsyncJavaScript can leave the completion
-        // pending on device WebKit even after the page itself has loaded.
+        // Rendering the bundled UI does not require a native API round trip.
         webView.evaluateJavaScript(
-            "if (!document.querySelector('#app')?.firstElementChild || getComputedStyle(document.querySelector('nav')).position !== 'fixed') { throw new Error('UI not initialized'); } window.webkit.messageHandlers.native.postMessage({action:'startupCheck'}); true;"
+            """
+            Boolean(document.querySelector('#app')?.firstElementChild &&
+                    document.querySelector('nav') &&
+                    getComputedStyle(document.querySelector('nav')).position === 'fixed');
+            """
         ) { [weak self] value, error in
             guard let self = self else { return }
             if let error = error {
                 self.startupFailed("رابط برنامه اجرا نشد. کد خطا: \((error as NSError).code)")
-            } else if value as? Bool != true {
+            } else if value as? Bool == true {
+                self.startupDidBecomeReady()
+            } else {
                 self.startupFailed("بررسی رابط برنامه ناموفق بود.")
             }
         }
@@ -265,10 +269,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
               let data = message.body as? [String: Any], let action = data["action"] as? String else {
             replyHandler(nil, "Untrusted document"); return
         }
-        if action == "startupCheck" {
-            replyHandler(["ok": true], nil)
-            DispatchQueue.main.async { [weak self] in self?.startupDidBecomeReady() }
-        } else if action == "request", let path = data["path"] as? String {
+        if action == "request", let path = data["path"] as? String {
             send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
         } else if action == "play", let kind = data["kind"] as? String,
                   ["movie", "series"].contains(kind), let id = data["id"] as? Int, id > 0 {

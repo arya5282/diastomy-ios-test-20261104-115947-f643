@@ -79,9 +79,9 @@ def main():
         report = container / 'Documents/startup-report.json'
         data = wait_for_report(report)
         print('STARTUP_TEST: terminal native report: ' + json.dumps(data, ensure_ascii=False), flush=True)
-        assert data.get('ready') is True and data.get('localDocument') is True, 'Offline UI/bridge failed: ' + str(data)
+        assert data.get('ready') is True and data.get('localDocument') is True, 'Offline UI failed: ' + str(data)
         passed = True
-        print('PASS: local iOS page, CSS and native reply bridge initialized with server APIs disabled.', flush=True)
+        print('PASS: local iOS page rendered with bundled CSS with server APIs disabled.', flush=True)
     finally:
         if container is not None:
             report = container / 'Documents/startup-report.json'
