@@ -340,3 +340,31 @@ body .local-room-detail .mr-room-topline h1{font-size:22px;margin:0}
 #room-chat-form-status:empty{display:none}
 html body #dm-app-menu #logout{margin-inline:0 auto!important;text-align:right!important}
 html body #dm-app-menu .dm-app-menu-row>span:not(.dm-app-menu-chevron){font-weight:400!important}
+/* Share the same grid for the home button and the editable search form. */
+html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-header{
+  display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;direction:ltr!important;
+  box-sizing:border-box!important;width:100%!important;max-width:100%!important;margin-inline:0!important;padding-inline:16px!important;
+}
+html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search-row{
+  display:grid!important;grid-template-columns:minmax(0,1fr) 51px!important;align-items:center!important;gap:8px!important;
+  grid-column:1 / -1!important;justify-self:stretch!important;position:static!important;transform:none!important;
+  box-sizing:border-box!important;width:auto!important;max-width:100%!important;min-width:0!important;margin-inline:0!important;padding-inline:0!important;direction:ltr!important;
+}
+html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search-row>.dmf3-search,
+html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search-row>.dmf3-filter{
+  box-sizing:border-box!important;position:relative!important;inset:auto!important;transform:none!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;height:36px!important;min-height:36px!important;margin:0!important;align-self:center!important;
+}
+html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search-row>.dmf3-search{
+  display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;padding:0 14px!important;
+}
+html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search-row>.dmf3-filter{
+  display:grid!important;place-items:center!important;padding:0!important;
+}
+html.dmf3-active body[data-page=search] #pwa-header .reference-search-form button{
+  display:grid!important;place-items:center!important;flex:0 0 21px;width:21px!important;height:24px!important;min-height:0!important;padding:0!important;margin:0!important;
+  border:0!important;background:none!important;
+}
+html.dmf3-active body[data-page=search] #pwa-header .reference-search-form input{
+  flex:1;width:0!important;min-width:0!important;height:34px!important;min-height:0!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;
+}

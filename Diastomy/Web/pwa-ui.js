@@ -134,7 +134,8 @@ window.PWA = (() => {
     const button = header.querySelector('.dmf3-search');
     const form = document.createElement('form');
     form.className = 'dmf3-search reference-search-form';
-    form.innerHTML = '<input type="search" name="q" placeholder="Search titles, genres…" aria-label="جست‌وجو"><button type="submit" aria-label="جست‌وجو">⌕</button>';
+    form.innerHTML = '<button type="submit" aria-label="جست‌وجو"></button><input type="search" name="q" placeholder="Search titles, genres…" aria-label="جست‌وجو">';
+    form.querySelector('button').append(button.querySelector('svg').cloneNode(true));
     form.elements.q.value = query;
     form.onsubmit = event => {
       event.preventDefault();
