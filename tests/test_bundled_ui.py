@@ -70,7 +70,7 @@ with sync_playwright() as playwright:
     page.wait_for_selector('[data-play]')
     print('PASS: offline home and detail from retained public JSON')
     routes = {
-        'search': 'جست‌وجو', 'account': 'پروفایل کاربری', 'login': 'Sign in or register',
+        'account': 'پروفایل کاربری', 'login': 'Sign in or register',
         'otp': 'ورود با کد تأیید', 'forgot': 'بازیابی رمز عبور', 'settings': 'تنظیمات',
         'support': 'پشتیبانی', 'subscription': 'خرید یا تمدید اشتراک', 'library': 'لیست من',
         'notifications': 'اعلان‌ها', 'rooms': 'اتاق فیلم', 'about': 'دربارهٔ دیاستومی',
@@ -78,6 +78,10 @@ with sync_playwright() as playwright:
     for route, heading in routes.items():
         page.evaluate('(hash) => { location.hash = hash; }', '#/' + route)
         page.wait_for_function('(text) => document.querySelector("h1")?.textContent === text', arg=heading)
+    page.evaluate('location.hash = "#/search"')
+    page.wait_for_selector('.reference-search-form input')
+    page.evaluate('location.hash = "#/browse/movie"')
+    page.wait_for_selector('.archive-reference-header h1')
     print('PASS: every local screen opens with the server unavailable')
     page.evaluate('window.__offline = false; location.hash = "#/login"')
     page.fill('#identify [name=identifier]', 'invalid@example.test')

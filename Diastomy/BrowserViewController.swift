@@ -223,7 +223,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
               !path.contains("\\"), let url = URL(string: path, relativeTo: server)?.absoluteURL,
               url.scheme == "https", url.host == server.host, url.user == nil,
               url.fragment == nil, url.port == nil else { return nil }
-        let p = url.path
+        // URL.path can drop the terminal slash on device. Match the path sent to Django.
+        guard let p = URLComponents(url: url, resolvingAgainstBaseURL: true)?.percentEncodedPath else { return nil }
         let exact: Set<String> = [
             "/movie/api/filter/", "/movie/api/actors/", "/accounts/api/login-password/",
             "/accounts/api/check-phone/", "/accounts/api/send-otp/", "/accounts/api/verify-otp/",

@@ -140,17 +140,32 @@
   }
   async function browse(seq, kind, params, isSearch) {
     const q = params.get('q') || '';
-    mount(shell(isSearch ? 'جست‌وجو' : 'فیلم و سریال', '<div class="chips"><a class="chip" href="#/browse/movie">فیلم</a><a class="chip" href="#/browse/series">سریال</a><a class="chip" href="#/browse/all">همه</a><a class="chip" href="#/actors">بازیگران</a></div><form id="search-form" class="search-form"><input name="q" placeholder="نام فیلم، سریال یا بازیگر…" aria-label="عبارت جست‌وجو" value="' + esc(q) + '"><button type="submit">جست‌وجو</button></form><div class="row"><label>مرتب‌سازی<select id="sort"><option value="newest">تازه‌ترین</option><option value="imdb">امتیاز IMDb</option></select></label></div><div id="catalogue"><div class="loading"></div></div>'));
-    $('#search-form').addEventListener('submit', e => { e.preventDefault(); location.hash = '#/search?q=' + enc(new FormData(e.target).get('q')); });
-    $('#sort').value = params.get('sort') || 'newest';
-    $('#sort').addEventListener('change', e => { params.set('sort', e.target.value); location.hash = '#/browse/' + enc(kind) + '?' + params; });
+    const route = isSearch ? '#/search' : '#/browse/' + enc(kind);
+    const results = '<div id="catalogue"><div class="loading"></div></div>';
+    if (isSearch) {
+      PWA.searchInput(q);
+      mount('<section class="dmf3-search-discovery" aria-label="جست‌وجو">' + results + '</section>');
+    } else {
+      const title = kind === 'movie' ? 'Movies Archive' : kind === 'series' ? 'Series Archive' : 'آرشیو فیلم و سریال';
+      mount('<section class="archive-reference-shell"><header class="archive-reference-header"><a href="#/home" aria-label="بازگشت">←</a><h1 data-dm-archive-title dir="auto">' +
+        title + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">☰</button></header>' +
+        '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><select id="sort">' +
+        '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="most_viewed">پربازدیدترین</option>' +
+        '<option value="highest_rating">بالاترین امتیاز</option></select></div>' + results + '</section>');
+      $('#sort').value = params.get('sort') || 'newest';
+      $('#sort').onchange = event => {
+        params.set('sort', event.target.value);
+        params.delete('page');
+        location.hash = route + '?' + params;
+      };
+    }
     if (isSearch && !q) {
       try {
         const data = await api('/api/app/v1/home/', {cache:true});
         whenCurrent(seq, () => {
           const recommended = (data.rails || []).find(rail => rail.key === 'pwa_recommended');
           $('#catalogue').innerHTML = '<h2>ژانرها</h2><div class="dm-search-genres">' + data.genres.map(genre =>
-            '<a class="dm-search-genre" href="#/browse/all?genre=' + enc(genre.slug) + '">' + esc(genre.name) + '</a>').join('') +
+            '<a class="dm-search-genre reference-genre" href="#/browse/all?genre=' + enc(genre.slug) + '"><img alt="" loading="lazy" src="https://diastomy.top/pwa/genre-images/v1/' + enc(genre.slug) + '/"><span>' + esc(genre.name) + '</span></a>').join('') +
             '</div><h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
             ((recommended && recommended.items) || data.hero || []).map(card).join('') + '</div>';
         });
@@ -161,8 +176,14 @@
     try {
       const data = await api('/movie/api/filter/?' + query, { cache: true });
       whenCurrent(seq, () => {
-        $('#catalogue').innerHTML = '<p>' + number(data.total_results) + ' عنوان</p><div class="grid archive-reference-grid">' + data.results.map(card).join('') + '</div>' + (!data.results.length ? empty('عنوانی پیدا نشد.') : '') + (data.has_next ? '<button class="wide" id="more">صفحهٔ بعد</button>' : '');
-        if ($('#more')) $('#more').onclick = () => { params.set('page', String((data.current_page || 1) + 1)); location.hash = '#/browse/' + enc(kind) + '?' + params; };
+        $('#catalogue').innerHTML = '<div class="archive-reference-grid">' + data.results.map(item =>
+          '<article class="archive-reference-card">' + card(item) + '</article>').join('') + '</div>' +
+          (!data.results.length ? empty('عنوانی پیدا نشد.') : '') +
+          (data.has_next ? '<div class="archive-reference-pagination"><button id="more">بعدی</button></div>' : '');
+        if ($('#more')) $('#more').onclick = () => {
+          params.set('page', String((data.current_page || 1) + 1));
+          location.hash = route + '?' + params;
+        };
       });
     } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
   }
@@ -174,7 +195,7 @@
         let episodes = '';
         if (kind === 'series') {
           const seasons = new Map(); (data.episodes || []).forEach(x => { if (!seasons.has(x.season)) seasons.set(x.season, []); seasons.get(x.season).push(x); });
-          episodes = Array.from(seasons, ([season, items]) => '<details open><summary>فصل ' + number(season) + '</summary><div class="season">' + items.map(x => '<div class="panel"><strong>قسمت ' + number(x.number) + '</strong><div class="chips">' + x.videos.map(v => '<button data-play="' + v.id + '" data-kind="series">▶ ' + esc(v.quality) + '</button>').join('') + '</div></div>').join('') + '</div></details>').join('');
+          episodes = Array.from(seasons, ([season, items], index) => '<details class="reference-season"' + (index === 0 ? ' open' : '') + '><summary>فصل ' + number(season) + '</summary><div class="season">' + items.map(x => '<div class="reference-episode"><strong>قسمت ' + number(x.number) + '</strong><div class="chips">' + x.videos.map(v => '<button data-play="' + v.id + '" data-kind="series">▶ ' + esc(v.quality) + '</button>').join('') + '</div></div>').join('') + '</div></details>').join('');
         } else { episodes = '<div class="chips">' + (data.videos || []).map(v => '<button class="primary" data-play="' + v.id + '" data-kind="movie">▶ پخش ' + esc(v.quality) + '</button>').join('') + '</div>'; }
         mount(PWA.detail(data, episodes || empty('قسمت یا منبع قابل پخش موجود نیست.')));
         if (kind === 'movie') {
@@ -386,7 +407,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

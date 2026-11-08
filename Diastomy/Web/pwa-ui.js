@@ -61,18 +61,19 @@ window.PWA = (() => {
       }).join('') + (!rails.some(r => r.key === 'trending_movies' && r.items.length) ? genreHTML + continueHTML : '') + '</div>';
   }
   function detail(item, episodes) {
-    return '<article class="movie-detail-shell"><div class="dm-film-topbar"><a href="#/home" aria-label="بازگشت">‹</a><button id="bookmark" aria-label="ذخیره در لیست من">♡</button></div>' +
+    return '<article class="movie-detail-shell"><div class="dm-film-topbar" dir="ltr"><a href="#/home" aria-label="بازگشت">←</a><button id="bookmark" aria-label="ذخیره در لیست من">♡</button></div>' +
       '<div class="movie-detail-hero"><img src="' + media(item.banner || item.cover) + '" alt="' + esc(item.title) + '"></div>' +
       '<div class="dm-film-reference-info"><div class="dm-film-title-row"><h1>' + name(item) + '</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<div class="dm-film-meta" dir="ltr"><span>' + esc(item.duration || '') + '</span><span>' + esc(item.production_year) + '</span><span>' + genres(item) + '</span></div>' +
-      '<div class="dm-film-media">' + (item.age_limit != null ? '<span class="reference-age">' + esc(item.age_limit) + '</span>' : '') + '<span class="rating">' + star + esc(item.imdb_rating || '—') + '</span></div><div class="actions dm-film-buttons">' + episodes + '</div>' +
+      '<div class="dm-film-media">' + (item.age_limit != null ? '<span class="reference-age">' + esc(item.age_limit) + '</span>' : '') + '<span class="rating">' + star + esc(item.imdb_rating || '—') + '</span></div><div class="actions dm-film-buttons">' + (item.type === 'series' ? '' : episodes) + '</div>' +
       '<h2>خلاصه فیلم</h2><p class="dm-film-description">' + esc(item.description) + '</p><h2>بازیگران</h2><div class="rail reference-cast">' +
       (item.actors || []).map(a => '<a class="person" href="#/actor/' + encodeURIComponent(a.slug) + '"><img src="' + media(a.photo) + '" alt="' + esc(a.name) + '"><p>' + esc(a.name) + '</p></a>').join('') +
       '</div><div class="reference-detail-tabs" aria-label="بخش‌های جزئیات">' +
-      '<button type="button" data-detail-tab="comments" aria-pressed="true">دیدگاه‌ها</button>' +
+      '' + (item.type === 'series' ? '<button type="button" data-detail-tab="episodes" aria-pressed="true">قسمت‌ها</button>' : '') + '<button type="button" data-detail-tab="comments" aria-pressed="' + (item.type !== 'series') + '">دیدگاه‌ها</button>' +
       '<button type="button" data-detail-tab="trailers" aria-pressed="false">تریلرها</button>' +
       '<button type="button" data-detail-tab="similar" aria-pressed="false">مشابه</button></div>' +
-      '<div data-detail-panel="comments"><h2>دیدگاه‌های ' + name(item) + '</h2>' +
+      (item.type === 'series' ? '<div data-detail-panel="episodes">' + episodes + '</div>' : '') +
+      '<div data-detail-panel="comments"' + (item.type === 'series' ? ' hidden' : '') + '><h2>دیدگاه‌های ' + name(item) + '</h2>' +
       (item.comments || []).map(comment => comment.spoiler
         ? '<details><summary>دیدگاه حاوی اسپویل</summary><p>' + esc(comment.text) + '</p></details>'
         : '<p>' + esc(comment.text) + '</p>').join('') +
@@ -88,7 +89,7 @@ window.PWA = (() => {
       ? (user.avatar ? '<img class="reference-profile-avatar" src="' + media(user.avatar) + '" alt="">' : '') + '<div><strong>' + esc(user.name) + '</strong><small dir="ltr">' + esc(user.phone || user.username) + '</small><span class="reference-subscription-badge">' + (user.subscribed ? 'اشتراک فعال' : 'بدون اشتراک فعال') + '</span></div>'
       : '<strong class="dm-app-menu-guest-title">به دیاستومی خوش آمدید</strong><span class="dm-app-menu-guest-caption">وارد دنیای فیلم و سریال شوید</span><a class="dm-app-menu-login" href="#/login">ورود یا ثبت‌نام</a>';
     return '<div id="dm-app-menu" class="dm-app-menu" open><div class="dm-app-menu-shell"><div class="dm-app-menu-top"><div class="ar-menu-heading"><h1>پروفایل کاربری</h1><img src="' +
-      logo + '" alt="Diastomy"></div><a class="dm-app-menu-close" href="#/home" aria-label="بازگشت">‹</a></div><div class="dm-app-menu-profile">' + identity +
+      logo + '" alt="Diastomy"></div><a class="dm-app-menu-close" href="#/home" aria-label="بازگشت">‹</a></div><div class="dm-app-menu-profile' + (user ? '' : ' reference-guest') + '">' + identity +
       '</div>' + watchTime + '<div class="dm-app-menu-nav">' + PWA_SOURCE.accountRows + '<a class="dm-app-menu-row" href="#/about">دربارهٔ برنامه</a></div>' +
       (user ? '<button id="logout" class="wide">خروج از حساب کاربری ↗</button>' : '') + '<footer class="reference-profile-footer"><img src="' + logo + '" alt="Diastomy"><p>برای مطلع شدن از آخرین اخبار و به‌روزرسانی‌ها، دیاستومی را در شبکه‌های اجتماعی دنبال کنید.</p></footer></div></div>';
   }
@@ -96,6 +97,20 @@ window.PWA = (() => {
     return '<div id="dm-auth-reference"><div class="dm-auth-shell"><div class="dm-auth-logo"><img src="' + logo +
       '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="#/home">→ Back</a><h1>' + esc(title) + '</h1>' + body +
       '</div></div></div></div>';
+  }
+  function searchInput(query) {
+    const header = document.getElementById('pwa-header');
+    const button = header.querySelector('.dmf3-search');
+    const form = document.createElement('form');
+    form.className = 'dmf3-search reference-search-form';
+    form.innerHTML = '<input type="search" name="q" placeholder="Search titles, genres…" aria-label="جست‌وجو"><button type="submit" aria-label="جست‌وجو">⌕</button>';
+    form.elements.q.value = query;
+    form.onsubmit = event => {
+      event.preventDefault();
+      const term = form.elements.q.value.trim();
+      location.hash = term ? '#/search?q=' + encodeURIComponent(term) : '#/search';
+    };
+    button.replaceWith(form);
   }
   function install() {
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
@@ -125,7 +140,8 @@ window.PWA = (() => {
     });
   }
   function page(name) {
-    document.body.dataset.page = name === 'home' || name === 'search' ? name : 'local-' + name;
+    document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
+    document.body.dataset.page = name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
     document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
     document.querySelectorAll('[data-nav-slot]').forEach(link => {
@@ -133,5 +149,5 @@ window.PWA = (() => {
       else link.removeAttribute('aria-current');
     });
   }
-  return {card, home, detail, account, auth, install, page};
+  return {card, home, detail, account, auth, searchInput, install, page};
 })();
