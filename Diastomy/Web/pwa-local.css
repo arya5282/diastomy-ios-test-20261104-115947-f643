@@ -221,3 +221,46 @@ html body #dm-auth-reference .reference-auth-alternatives a{display:grid;place-i
 #delete-download-dialog::backdrop{background:#000a}
 html body #dm-auth-reference .reference-auth-alternatives{display:grid!important;grid-template-columns:minmax(0,1fr)!important;justify-items:stretch!important;width:100%!important;gap:16px!important}
 html body #dm-auth-reference .reference-auth-alternatives a{width:100%!important;color:#bbb!important}
+body[data-page=local-rooms] #app{padding:0 16px calc(100px + env(safe-area-inset-bottom))}
+body #app .local-room-landing{max-width:620px;width:100%;margin:auto;padding:0}
+body #app .local-room-landing h1,body #app .local-room-landing h2{font-size:15px;font-weight:500;margin:16px 0}
+body #app .local-room-landing .mr-section{margin:42px 0}
+body #app .local-room-landing .mr-exact-viewport{position:relative;aspect-ratio:540/190;height:auto;overflow:hidden;border-radius:20px}
+body #app .local-room-landing .mr-exact-slide{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:transparent;padding:0}
+body #app .local-room-landing .mr-exact-slide[hidden]{display:none!important}
+body #app .local-room-landing .mr-exact-image{position:absolute;inset:0;background-size:cover;background-position:center}
+.mr-exact-image-0{background-image:url('/static/public/assets/img/room-slide-0-610dd008bbb4.webp')}
+.mr-exact-image-1{background-image:url('/static/public/assets/img/room-slide-1-0ff3f26b8200.webp')}
+.mr-exact-image-2{background-image:url('/static/public/assets/img/room-slide-2-45f7a35d19c4.webp')}
+body #app .local-room-landing .mr-slide-action{position:absolute;left:6%;bottom:15%;font-size:10px;padding:3px 10px;background:#f65a04;color:white;border-radius:999px;border:1px solid #ffa65f}
+body #app .local-room-landing .mr-exact-dots{display:flex;justify-content:center;gap:6px;margin:10px 0}
+body #app .local-room-landing .mr-exact-dots button{width:5px;height:5px;min-width:0;min-height:0;border-radius:9px;border:0;padding:0;background:#666}
+body #app .local-room-landing .mr-exact-dots button[aria-pressed=true]{width:18px;background:#fff}
+.local-room-section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.local-room-section-head p,.local-room-empty p,.local-room-card small,.mr-visibility small{color:#999;font-size:12px}
+.local-room-section-head button,.local-room-empty button{border-radius:999px;white-space:nowrap;background:#0d0d0d;font-size:12px}
+body #app #room-search,body #app #join-room{display:flex;gap:8px;margin:14px 0}
+body #app #room-search input,body #app #join-room input,body #app .mr-form input:not([type=radio]):not([type=checkbox]){width:100%;min-width:0;min-height:40px;border:1px solid #333;border-radius:99px;background:#0d0d0d;color:#ddd;font-size:13px;padding:8px 14px}
+body #app #room-search button,body #app #join-room button,body #app .mr-create-action{background:#d00;color:white;border:1px solid #ee4444;border-radius:999px;white-space:nowrap;font-size:12px}
+.local-room-empty{padding:30px 16px;text-align:center;border:1px dashed #333;border-radius:20px}
+.local-room-empty>span{color:#a33;font-size:26px}
+body #app .local-room-card{display:flex;gap:10px;align-items:center;border:1px solid #333;border-radius:20px;padding:9px;background:#0c0c0c}
+.local-room-cover{width:48px;height:66px;object-fit:cover;border-radius:10px}
+body #app .local-room-card .mr-room-body{flex:1;min-width:0;padding:0}
+.local-room-card small{display:block;margin:5px 0}
+.local-room-actions{display:grid;gap:5px}
+.local-room-actions :is(button,a){padding:5px 9px;font-size:11px;text-align:center;border-radius:9px}
+.local-room-actions a{background:#d00;color:white}
+body #app .local-room-landing .mr-form{display:grid;gap:16px;padding:0;background:transparent;border:0}
+body #app .local-room-landing .mr-form label{font-size:12px}
+body #app .mr-visibility{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:0;border:0}
+body #app .mr-visibility label{border:1px solid #333;border-radius:15px;padding:10px}
+body #app .mr-visibility label:has(:checked){border-color:#d33;background:#130303}
+.mr-visibility small{display:block;margin-top:6px}
+body #app .mr-form input[type=radio],body #app .mr-form input[type=checkbox]{width:15px;height:15px;accent-color:#e00000}
+body #app .local-start-now{display:flex;align-items:center;gap:6px}
+body #app .mr-create-action{justify-self:center;padding:10px 20px}
+.local-room-movies{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 12px}
+.local-room-movies a[aria-current=true] .dm54-poster{outline:2px solid #ec4c4c}
+#room-delete-dialog{color:white;background:#181818;border:1px solid #444;border-radius:15px;padding:18px}
+#room-delete-dialog::backdrop{background:#000a}

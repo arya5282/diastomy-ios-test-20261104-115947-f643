@@ -477,13 +477,137 @@
     submit('password', async (data, output) => { await api('/accounts/api/change-password/', { body: data }); output.textContent = 'رمز تغییر کرد.'; });
     api('/api/app/v1/settings/').then(data => whenCurrent(seq, () => { $('#devices').innerHTML = data.devices.map(d => '<div class="ar-note device">' + esc(d.name) + (d.current ? ' · این دستگاه' : '') + '</div>').join(''); })).catch(() => {});
   }
-  async function rooms(seq) {
-    mount(shell('اتاق فیلم', '<a class="button" href="#/browse/movie">انتخاب فیلم برای ساخت اتاق</a>' + form('join-room', field('code', 'کد دعوت اتاق'), 'ورود به اتاق') + '<div id="room-list">' + empty('برای دریافت اتاق‌ها وارد حساب شوید.') + '</div>'));
-    submit('join-room', async data => { location.hash = '#/room/' + enc(data.code.trim()); });
-    try {
-      const data = await api('/api/app/v1/rooms/');
-      whenCurrent(seq, () => { $('#room-list').innerHTML = '<h2>اتاق‌های من</h2>' + data.mine.map(r => '<a class="mr-room mr-room-body" href="#/room/' + enc(r.code) + '">' + esc(r.title) + '</a>').join('') + '<h2>اتاق‌های عمومی</h2>' + data.public.map(r => '<a class="mr-room mr-room-body" href="#/room/' + enc(r.code) + '">' + esc(r.title) + '</a>').join(''); });
-    } catch (error) { whenCurrent(seq, () => fail($('#room-list'), error)); }
+  function rooms(seq) {
+    const slides = ['ساخت اتاق', 'تنظیم ساعت پخش', 'دعوت'];
+    mount(PWA_SOURCE.libraryHeader + '<section class="mr-wrap local-room-landing"><h1>به اتاق فیلم دیاستومی خوش آمدید!</h1>' +
+      '<section class="mr-exact-slider" aria-label="معرفی اتاق فیلم"><div class="mr-exact-viewport">' + slides.map((label,index) =>
+        '<button type="button" class="mr-exact-slide" data-room-slide="' + index + '" aria-hidden="' + Boolean(index) + '"' + (index ? ' hidden' : '') +
+        '><span class="mr-exact-image mr-exact-image-' + index + '"></span><span class="mr-slide-action">' + label + '</span></button>').join('') +
+      '</div><div class="mr-exact-dots">' + slides.map((_,index) => '<button type="button" data-room-dot="' + index +
+        '" aria-label="اسلاید ' + (index + 1) + '" aria-pressed="' + (index === 0) + '"></button>').join('') +
+      '</div></section><section class="mr-section"><div class="local-room-section-head"><div><h2>اکسپلور اتاق‌ها</h2>' +
+      '<p>یک اتاق پیدا کن و با بقیه فیلم ببین.</p></div><button type="button" data-room-create>+ ساخت اتاق</button></div>' +
+      '<form id="room-search"><input name="q" type="search" aria-label="جستجوی اتاق" placeholder="جستجوی اتاق، فیلم یا میزبان"><button type="submit">جستجو</button></form>' +
+      '<div id="public-rooms" role="status">در حال دریافت اتاق‌ها…</div>' +
+      '<form id="join-room"><input name="code" required placeholder="کد دعوت اتاق" aria-label="کد دعوت اتاق"><button type="submit">ورود</button></form></section>' +
+      '<section class="mr-section"><h2>اتاق‌های من</h2><div id="my-rooms" role="status"></div></section>' +
+      '<section class="mr-section" id="local-room-create"><h2>ساخت اتاق جدید</h2><form id="mr-create-form" class="mr-form">' +
+      '<fieldset class="mr-visibility"><legend>نوع اتاق</legend><label><input type="radio" name="visibility" value="public" checked> عمومی<small>همه کاربران می‌توانند اتاقت را در اکسپلور پیدا کنند.</small></label>' +
+      '<label><input type="radio" name="visibility" value="private"> خصوصی<small>فقط با لینک دعوت وارد می‌شوند.</small></label></fieldset>' +
+      '<label>عنوان اتاق (اختیاری)<input name="title" maxlength="120" placeholder="مثلاً: شب فیلم جمعه"></label>' +
+      '<label>زمان شروع<input name="start" type="datetime-local"></label><label class="local-start-now"><input type="checkbox" name="now"> همین الان شروع شود</label>' +
+      '<label>انتخاب فیلم<input name="movie" type="search" placeholder="جستجوی نام فیلم ..."></label>' +
+      '<button type="submit" class="mr-create-action">ساخت اتاق</button>' + status('mr-create-form') + '</form>' +
+      '<h2 id="room-movie-heading">پیشنهادی</h2><div class="local-room-movies" id="room-movies"></div></section></section>' +
+      '<dialog id="room-delete-dialog"><p>اتاق و پیام‌های آن حذف شوند؟</p><button type="button" data-room-cancel>انصراف</button>' +
+      '<button type="button" data-room-confirm>حذف اتاق</button></dialog>');
+
+    const form = $('#mr-create-form');
+    let roomData;
+    let selectedMovie;
+    let requestNumber = 0;
+    let searchTimer;
+    const date = new Date(Date.now() + 10 * 60000);
+    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+    form.elements.start.value = date.toISOString().slice(0,16);
+    form.elements.now.onchange = () => { form.elements.start.disabled = form.elements.now.checked; };
+    const jump = () => $('#local-room-create').scrollIntoView({behavior:'smooth'});
+    function openRoom(code) { location.hash = '#/room/' + enc(code); }
+    document.querySelectorAll('[data-room-slide]').forEach(button => button.onclick = jump);
+    document.querySelectorAll('[data-room-dot]').forEach(dot => {
+      dot.onclick = () => {
+        document.querySelectorAll('[data-room-slide]').forEach(slide => { slide.hidden = slide.dataset.roomSlide !== dot.dataset.roomDot; slide.setAttribute('aria-hidden', String(slide.hidden)); });
+        document.querySelectorAll('[data-room-dot]').forEach(button => button.setAttribute('aria-pressed', String(button === dot)));
+      };
+    });
+    $('#join-room').onsubmit = event => { event.preventDefault(); const code = new FormData(event.target).get('code').trim(); if (code) openRoom(code); };
+    function roomCards(items, owned) {
+      return items.map((item,index) => '<article class="mr-room local-room-card">' + image(item.cover, 'local-room-cover', '') +
+        '<div class="mr-room-body"><strong>' + esc(item.title) + '</strong><small>' +
+        [item.host, item.starts_at ? new Date(item.starts_at).toLocaleString() : '', item.public == null ? '' : item.public ? 'عمومی' : 'خصوصی'].filter(Boolean).map(esc).join(' · ') +
+        '</small><span class="mr-status">' + esc(({live:'در حال پخش',upcoming:'برنامه‌ریزی‌شده',paused:'متوقف',ended:'پایان‌یافته'})[item.status] || '') +
+        '</span></div><div class="local-room-actions"><a class="mr-btn" href="#/room/' + enc(item.code) + '">ورود</a><button type="button" data-room-share="' +
+        esc(item.code) + '">دعوت</button>' + (owned && item.is_host ? '<button type="button" data-room-delete="' + index + '">حذف اتاق</button>' : '') +
+        '</div></article>').join('');
+    }
+    function renderRooms(query = '') {
+      const results = roomData.public.filter(item => (item.title + ' ' + (item.host || '')).toLowerCase().includes(query.toLowerCase()));
+      $('#public-rooms').innerHTML = results.length ? roomCards(results, false) : '<div class="local-room-empty"><span aria-hidden="true">◉</span><h3>' +
+        (query ? 'اتاقی پیدا نشد.' : 'اولین اتاق عمومی را بساز!') + '</h3><p>اتاق‌های عمومی فعال و برنامه‌ریزی‌شده اینجا نمایش داده می‌شوند.</p>' +
+        '<button type="button" data-room-create>+ ساخت اتاق عمومی</button></div>';
+      $('#my-rooms').innerHTML = roomCards(roomData.mine, true) || '<p>هنوز اتاقی نداری.</p>';
+    }
+    async function refreshRooms() {
+      try {
+        const data = await api('/api/app/v1/rooms/');
+        whenCurrent(seq, () => { roomData = data; renderRooms($('#room-search input').value.trim()); });
+      } catch (error) { whenCurrent(seq, () => fail($('#public-rooms'), error)); }
+    }
+    $('#room-search').onsubmit = event => { event.preventDefault(); if (roomData) renderRooms(new FormData(event.target).get('q').trim()); };
+    $('.local-room-landing').onclick = async event => {
+      if (event.target.closest('[data-room-create]')) { jump(); return; }
+      const share = event.target.closest('[data-room-share]');
+      if (share) {
+        try { const result = await native({action:'shareRoom',code:share.dataset.roomShare}); if (!result.ok) throw Error(result.error); }
+        catch (error) { toast(error.message); }
+        return;
+      }
+      const button = event.target.closest('[data-room-delete]');
+      if (!button) return;
+      const item = roomData.mine[Number(button.dataset.roomDelete)];
+      const dialog = $('#room-delete-dialog');
+      dialog.querySelector('[data-room-cancel]').onclick = () => dialog.close();
+      dialog.querySelector('[data-room-confirm]').onclick = async () => {
+        dialog.close();
+        button.disabled = true;
+        try { await api('/movie-room/r/' + enc(item.code) + '/delete/', {body:{}}); await refreshRooms(); }
+        catch (error) { toast(error.message); }
+        finally { button.disabled = false; }
+      };
+      dialog.showModal();
+    };
+    function renderMovies(items, query) {
+      $('#room-movie-heading').textContent = query ? 'نتایج جستجو' : 'پیشنهادی';
+      $('#room-movies').innerHTML = items.length ? items.map(item => card(item)).join('') : empty('فیلمی پیدا نشد.');
+      $('#room-movies').querySelectorAll('a').forEach((link,index) => {
+        link.onclick = event => {
+          event.preventDefault();
+          clearTimeout(searchTimer);
+          requestNumber++;
+          selectedMovie = items[index];
+          form.elements.movie.value = selectedMovie.english_title_full || selectedMovie.title;
+          $('#room-movies').querySelectorAll('a').forEach(card => card.removeAttribute('aria-current'));
+          link.setAttribute('aria-current','true');
+        };
+      });
+    }
+    async function searchMovies(query) {
+      const request = ++requestNumber;
+      try {
+        const data = await api('/movie/api/filter/?type=movie&q=' + enc(query), {cache:true});
+        if (request === requestNumber) whenCurrent(seq, () => renderMovies(data.results.slice(0,12), query));
+      } catch (error) { if (request === requestNumber) whenCurrent(seq, () => fail($('#room-movies'), error)); }
+    }
+    form.elements.movie.oninput = () => {
+      selectedMovie = null;
+      requestNumber++;
+      clearTimeout(searchTimer);
+      const query = form.elements.movie.value.trim();
+      searchTimer = setTimeout(() => { if (seq === state.sequence) searchMovies(query); }, 250);
+    };
+    submit('mr-create-form', async values => {
+      if (!selectedMovie) throw Error('یک فیلم از کارت‌های پایین انتخاب کنید.');
+      if (!values.now && !roomData?.supports_scheduling) throw Error('زمان‌بندی اتاق به به‌روزرسانی API سرور نیاز دارد. برای شروع فوری گزینهٔ همین الان را بزنید.');
+      const starts = values.now ? null : new Date(values.start);
+      if (starts && (!Number.isFinite(starts.getTime()) || starts <= new Date())) throw Error('زمان شروع باید در آینده باشد.');
+      const result = await api('/api/app/v1/rooms/', {body:{
+        movie_id:selectedMovie.id, title:values.title, public:values.visibility === 'public',
+        starts_at:starts ? starts.toISOString() : null
+      }});
+      if (seq === state.sequence) openRoom(result.code);
+    });
+    refreshRooms();
+    searchMovies('');
   }
   async function room(seq, code) {
     mount(shell('اتاق فیلم', '<div id="room-data">' + empty('اطلاعات اتاق از سرور دریافت می‌شود.') + '</div>'));
@@ -548,7 +672,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۷ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

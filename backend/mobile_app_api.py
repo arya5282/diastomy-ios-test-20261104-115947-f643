@@ -212,17 +212,27 @@ def rooms(request):
     if request.method == 'POST':
         import json
         from django.utils import timezone
+        from django.utils.dateparse import parse_datetime
         try:
             body = json.loads(request.body)
+            starts_at = timezone.now()
+            if body.get('starts_at'):
+                starts_at = parse_datetime(body['starts_at'])
+                if starts_at is None or timezone.is_naive(starts_at) or starts_at <= timezone.now():
+                    raise ValueError('زمان شروع باید در آینده باشد.')
             room = services.create_room(request.user, body.get('movie_id'), body.get('title'),
-                                        timezone.now(), is_public=body.get('public') is True)
+                                        starts_at, is_public=body.get('public') is True)
         except (ValueError, TypeError, AttributeError) as error:
             return JsonResponse({'error': str(error)}, status=400)
         return JsonResponse({'code': room.code})
     def row(room):
-        return {'code': room.code, 'title': room.display_title, 'status': room.status()}
+        return {'code': room.code, 'title': room.display_title, 'status': room.status(),
+                'cover': file_url(room.movie.cover), 'public': room.is_public,
+                'starts_at': room.starts_at.isoformat(), 'is_host': room.host_id == request.user.pk,
+                'host': room.host.get_full_name() or room.host.username}
     return JsonResponse({'mine': [row(x) for x in services.user_rooms(request.user)[:30]],
-                         'public': [row(x) for x in services.public_rooms()[:30]]})
+                         'public': [row(x) for x in services.public_rooms()[:30]],
+                         'supports_scheduling': True})
 
 
 @private

@@ -238,7 +238,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             "/api/bookmark/toggle/", "/api/watch-progress/", "/api/watch-time/",
             "/accounts/support/api/messages/", "/accounts/support/api/send/"
         ]
-        if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") {
+        if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") ||
+            p.range(of: #"^/movie-room/r/[A-Za-z0-9_-]+/delete/$"#, options: .regularExpression) != nil {
             return url
         }
         return nil
@@ -356,6 +357,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 }
                 UIApplication.shared.open(url) { opened in replyHandler(["status": opened ? 200 : 502, "data": ["opened": opened]], nil) }
             }
+        } else if action == "shareRoom", let code = data["code"] as? String,
+                  code.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil,
+                  let url = URL(string: "/movie-room/r/\(code)/", relativeTo: server)?.absoluteURL {
+            let activity = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            activity.popoverPresentationController?.sourceView = view
+            activity.popoverPresentationController?.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+            present(activity, animated: true)
+            replyHandler(["ok": true], nil)
         } else if action == "roomOpen", let code = data["code"] as? String,
                   code.range(of: "^[A-Za-z0-9_-]{1,16}$", options: .regularExpression) != nil {
             socket?.cancel(with: .goingAway, reason: nil)
