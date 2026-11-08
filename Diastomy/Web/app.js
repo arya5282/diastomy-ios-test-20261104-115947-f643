@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const app = document.getElementById('app');
-  const state = { user: null, sessionKnown: false, sequence: 0, online: true };
+  const state = { user: null, sessionKnown: false, checkingSession: true, nextAfterLogin: '#/home', sequence: 0, online: true };
   const SERVER = 'https://diastomy.top';
   const $ = (s) => document.querySelector(s);
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -76,7 +76,10 @@
       }
     }
     if (response.status === 401 || response.status === 302) {
-      state.user = null;
+      if (state.user) {
+        state.user = null;
+        route();
+      }
       throw new Error('برای این بخش وارد حساب شوید.');
     }
     throw new Error(response.data.error || response.data.message || 'دریافت اطلاعات ممکن نشد.');
@@ -84,6 +87,14 @@
   async function refreshSession() {
     try { const data = await api('/api/app/v1/session/'); state.user = data.user; state.sessionKnown = true; }
     catch (_) { state.sessionKnown = false; }
+  }
+  async function finishLogin(sequence) {
+    await refreshSession();
+    if (!state.user) throw new Error('ورود تأیید نشد. اتصال اینترنت را بررسی کنید.');
+    if (sequence !== state.sequence) return;
+    history.replaceState(null, '', state.nextAfterLogin);
+    state.nextAfterLogin = '#/home';
+    route();
   }
   function card(x) { return PWA.card(x); }
   function empty(text) { return '<div class="empty"><p>' + esc(text) + '</p></div>'; }
@@ -270,7 +281,8 @@
     } catch (error) { whenCurrent(seq, () => { $('#library-data').innerHTML = empty(error.message) + loginPrompt(); }); }
   }
   function login() {
-    mount(PWA.auth('Sign in or register', form('identify', field('identifier', 'شماره موبایل یا ایمیل', 'text', 'autocomplete="username"'), 'Continue') +
+    const connectionNotice = state.sessionKnown ? '' : '<p role="status">برای بررسی ورود به اینترنت وصل شوید.</p>';
+    mount(PWA.auth('Sign in or register', connectionNotice + form('identify', field('identifier', 'شماره موبایل یا ایمیل', 'text', 'autocomplete="username"'), 'Continue') +
       '<div class="reference-auth-alternatives"><a href="#/otp">ورود با کد یک‌بارمصرف</a></div>'));
     submit('identify', async ({identifier}) => {
       const sequence = state.sequence;
@@ -286,8 +298,7 @@
           '<div class="reference-auth-alternatives"><a href="#/forgot">فراموشی رمز عبور</a></div>'));
         submit('login', async data => {
           await api('/accounts/api/login-password/', {body:data});
-          await refreshSession();
-          if (sequence === state.sequence) location.hash = '#/account';
+          await finishLogin(sequence);
         });
       });
     });
@@ -299,14 +310,20 @@
       await api('/api/app/v1/session/'); await api('/accounts/api/send-otp/', { body: data }); output.textContent = 'کد ارسال شد.';
       $('#otp-step').innerHTML = form('verify-otp', field('code', 'کد تأیید', 'text', 'inputmode="numeric" autocomplete="one-time-code"'), 'تأیید');
       submit('verify-otp', async value => {
+        const sequence = state.sequence;
         const result = await api('/accounts/api/verify-otp/', { body: { phone: data.phone, code: value.code } });
-        if (result.needs_registration) { registration(); } else { await refreshSession(); location.hash = '#/account'; }
+        if (result.needs_registration) whenCurrent(sequence, registration);
+        else await finishLogin(sequence);
       });
     });
   }
   function registration() {
     mount(PWA.auth('تکمیل ثبت‌نام', form('register', field('full_name', 'نام و نام خانوادگی') + field('username', 'نام کاربری') + field('email', 'ایمیل', 'email') + field('password', 'رمز عبور', 'password', 'autocomplete="new-password" minlength="8"'), 'ساخت حساب')));
-    submit('register', async data => { await api('/accounts/api/complete-registration/', { body: data }); await refreshSession(); location.hash = '#/account'; });
+    submit('register', async data => {
+      const sequence = state.sequence;
+      await api('/accounts/api/complete-registration/', {body:data});
+      await finishLogin(sequence);
+    });
   }
   function forgot() {
     mount(PWA.auth('بازیابی رمز عبور', form('reset-request', field('phone', 'شماره موبایل', 'tel'), 'دریافت کد')));
@@ -327,7 +344,7 @@
     function render(history) {
       mount(PWA.account(user, history));
       if ($('#logout')) $('#logout').onclick = async () => {
-        try { await api('/accounts/api/logout/', { body: {} }); state.user = null; state.sessionKnown = true; if (sequence === state.sequence) account(); }
+        try { await api('/accounts/api/logout/', { body: {} }); state.user = null; state.sessionKnown = true; state.nextAfterLogin = '#/home'; location.hash = '#/login'; }
         catch (error) { toast(error.message); }
       };
     }
@@ -418,6 +435,16 @@
     const params = new URLSearchParams(split === -1 ? '' : hash.slice(split + 1));
     let parts; try { parts = path.split('/').filter(Boolean).map(decodeURIComponent); } catch (_) { parts = ['home']; }
     const name = parts[0] || 'home';
+    if (state.checkingSession) {
+      PWA.page('login');
+      mount(PWA.auth('در حال بررسی ورود…', '<p role="status">چند لحظه صبر کنید.</p>'));
+      return;
+    }
+    if (!state.user && !['login','otp','forgot'].includes(name)) {
+      state.nextAfterLogin = '#/' + hash.replace(/^\//, '');
+      history.replaceState(null, '', '#/login');
+      return route();
+    }
     PWA.page(name);
     document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
     window.scrollTo(0,0);
@@ -438,7 +465,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
@@ -476,12 +503,11 @@
   window.addEventListener('hashchange', route);
   window.addEventListener('online', () => { connection(true); if (!document.body.classList.contains('local-player-open')) route(); });
   window.addEventListener('offline', () => connection(false));
-  // Render the initial page immediately; authentication must never gate offline UI.
   PWA.install();
   route();
-  refreshSession().then(() => {
-    const current = location.hash || '#/home';
-    if (current === '#/account') account();
-    else if (current === '#/home' && state.user) route();
+  refreshSession().finally(() => {
+    state.checkingSession = false;
+    if (state.user && (!location.hash || location.hash === '#/login')) history.replaceState(null, '', '#/home');
+    route();
   });
 })();

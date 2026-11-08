@@ -180,3 +180,5 @@ body .reference-film-summary .dm-film-description{font-weight:400;line-height:1.
 body .reference-cast .person{flex:0 0 calc((100% - 40px)/6);min-width:0}
 body .reference-cast .person img{width:100%;height:auto;aspect-ratio:1}
 body .reference-cast .person p{font-size:10px;line-height:1.25;margin:7px 0 0;color:#bbb}
+
+body:is([data-page=local-otp],[data-page=local-forgot]) #pwa-nav{display:none}

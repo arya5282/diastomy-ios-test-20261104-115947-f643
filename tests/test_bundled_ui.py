@@ -27,7 +27,7 @@ window.webkit = { messageHandlers: { native: { postMessage: async payload => {
   if (window.__holdRequests) return new Promise(() => {});
   if (window.__offline) return {status:0,data:{error:'offline'}};
   const path = payload.path;
-  if (path.includes('/session/')) return {status:200,data:{user:null,csrf:'test'}};
+  if (path.includes('/session/')) return {status:200,data:{user:window.__guest ? null : {name:'Test'},csrf:'test'}};
   if (path.includes('/home/')) return {status:200,data:{hero:[title],genres:title.genres,rails:[{title:'تازه‌ترین فیلم‌ها',items:[title]}]}};
   if (path.includes('/title/')) return {status:200,data:title};
   if (path.includes('/filter/')) return {status:200,data:{results:[title],total_results:1,current_page:1,has_next:false}};
@@ -36,7 +36,7 @@ window.webkit = { messageHandlers: { native: { postMessage: async payload => {
   if (path.includes('/plans/')) return {status:200,data:{plans:[{id:1,name:'یک ماهه',newPriceRaw:100000}]}};
   if (path.includes('check-phone')) return {status:200,data:{has_password:true,identifier_type:'email'}};
   if (path.includes('login-password')) return {status:400,data:{error:'رمز اشتباه است'}};
-  return {status:401,data:{error:'وارد حساب شوید'}};
+  return {status:503,data:{error:'سرویس در دسترس نیست'}};
 }}}};
 """.replace('FIXTURE', json.dumps(fixture, ensure_ascii=False))
 
@@ -124,15 +124,17 @@ with sync_playwright() as playwright:
     page.locator('nav a[data-nav-slot="home"]').click()
     page.wait_for_selector('.nyx-prime-card', timeout=1500)
     print('PASS: footer switching and stale cached content never wait for unresolved API requests')
-    # First installation must also open the UI before ever receiving catalogue data.
+    # A signed-out or unverified installation must render sign-in, including on a deep link.
     clean = browser.new_context(viewport={'width':390,'height':844})
-    clean.add_init_script(script + '\nwindow.__offline = true;')
+    clean.add_init_script(script + '\nwindow.__guest = true;')
     first = clean.new_page()
     first.goto(local_url + '#/settings')
-    first.wait_for_selector('#clear')
-    first.evaluate('location.hash = "#/home"')
-    first.wait_for_selector('#home-data .empty')
-    print('PASS: first launch offline, with no cache, still opens local pages')
+    first.wait_for_selector('#identify')
+    assert first.evaluate('location.hash') == '#/login'
+    assert not first.locator('#clear').count()
+    first.evaluate('window.__offline = true; location.hash = "#/home"')
+    first.wait_for_function('location.hash === "#/login"')
+    print('PASS: signed-out navigation is gated by login')
     clean.close()
     browser.close()
 
