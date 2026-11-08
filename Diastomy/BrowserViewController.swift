@@ -10,6 +10,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var webRoot: URL!
     private var startupPanel: UIView?
     private var startupTimer: Timer?
+    private var startupNavigation: WKNavigation?
     private var player: AVPlayer?
     private var playerController: AVPlayerViewController?
     private var progressObserver: Any?
@@ -81,7 +82,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             self?.startupFailed("رابط برنامه آماده نشد. روی تلاش دوباره بزنید.")
         }
         StartupDiagnostics.record(stage: "loadingLocalDocument", localDocument: isLocal(index))
-        webView.loadFileURL(index, allowingReadAccessTo: webRoot)
+        startupNavigation = webView.loadFileURL(index, allowingReadAccessTo: webRoot)
     }
 
     private func isLocal(_ url: URL?) -> Bool {
@@ -103,27 +104,28 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        guard let navigation = navigation, startupNavigation === navigation else { return }
         StartupDiagnostics.record(stage: "documentCommitted", localDocument: isLocal(webView.url))
+        checkBundledInterface(for: navigation)
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-        StartupDiagnostics.record(stage: "checkingNativeBridge", localDocument: isLocal(webView.url))
-        guard isLocal(webView.url) else { return }
-        // Rendering the bundled UI does not require a native API round trip.
+    private func checkBundledInterface(for navigation: WKNavigation) {
+        guard startupNavigation === navigation, isLocal(webView.url) else { return }
+        // Remote images can delay didFinish even after the local interface is usable.
         webView.evaluateJavaScript(
             """
             Boolean(document.querySelector('#app')?.firstElementChild &&
                     document.querySelector('nav') &&
                     getComputedStyle(document.querySelector('nav')).position === 'fixed');
             """
-        ) { [weak self] value, error in
-            guard let self = self else { return }
-            if let error = error {
-                self.startupFailed("رابط برنامه اجرا نشد. کد خطا: \((error as NSError).code)")
-            } else if value as? Bool == true {
+        ) { [weak self] value, _ in
+            guard let self = self, self.startupNavigation === navigation else { return }
+            if value as? Bool == true {
                 self.startupDidBecomeReady()
             } else {
-                self.startupFailed("بررسی رابط برنامه ناموفق بود.")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.checkBundledInterface(for: navigation)
+                }
             }
         }
     }
@@ -184,6 +186,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     @objc private func retryStartup() { loadBundledInterface() }
 
     private func startupFailed(_ message: String) {
+        startupNavigation = nil
         startupTimer?.invalidate()
         showStartupPanel(message: message, canRetry: true)
         writeStartupReport(ready: false, message: message)
@@ -333,6 +336,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     private func startupDidBecomeReady() {
+        startupNavigation = nil
         startupTimer?.invalidate()
         startupPanel?.removeFromSuperview()
         startupPanel = nil
