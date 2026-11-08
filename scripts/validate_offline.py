@@ -21,12 +21,12 @@ assert re.search(r'AAAAAAAAAAAAAAAAAAAAAA02\s*=\s*\{[^}]*fileRef = AAAAAAAAAAAAA
 assert project.count('AAAAAAAAAAAAAAAAAAAAAA01') == 3
 assert project.count('AAAAAAAAAAAAAAAAAAAAAA02') == 2
 native = (root / 'Diastomy/BrowserViewController.swift').read_text()
-assert 'webView.loadFileURL(index, allowingReadAccessTo: webRoot)' in native
-assert 'webView.load(URLRequest' not in native
+assert 'configuration.setURLSchemeHandler(BundledInterfaceHandler(), forURLScheme: "diastomy")' in native
+assert 'diastomy://app/index.html' in native
 assert 'message.frameInfo.isMainFrame, isLocal' in native
 assert 'AVURLAssetHTTPCookiesKey' in native
-assert 'configuration.limitsNavigationsToAppBoundDomains = true' in native
-assert 'resolvingSymlinksInPath()' in native
+assert 'WKAppBoundDomains' not in (root / 'Diastomy/Info.plist').read_text()
+assert 'let mime = resources[url.path]' in native
 assert 'func webView(_ webView: WKWebView, didFailProvisionalNavigation' in native
 assert 'test_ios_startup.py' in (root / 'scripts/build-ipa.sh').read_text()
 for path in list((root / 'backend').glob('*.py')) + list((root / 'scripts').glob('*.py')):

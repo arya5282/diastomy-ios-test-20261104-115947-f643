@@ -40,9 +40,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         api = URLSession(configuration: session, delegate: self, delegateQueue: .main)
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
-        // Info.plist opts into app-bound domains. Local files also need this
-        // flag to use message handlers and JavaScript evaluation on iOS.
-        configuration.limitsNavigationsToAppBoundDomains = true
+        configuration.setURLSchemeHandler(BundledInterfaceHandler(), forURLScheme: "diastomy")
         configuration.allowsInlineMediaPlayback = true
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
@@ -99,16 +97,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             self.startupFailed("رابط برنامه آماده نشد. کد: \(code)")
         }
         StartupDiagnostics.record(stage: "loadingLocalDocument", localDocument: isLocal(index))
-        startupNavigation = webView.loadFileURL(index, allowingReadAccessTo: webRoot)
+        startupNavigation = webView.load(URLRequest(url: URL(string: "diastomy://app/index.html")!))
     }
 
     private func isLocal(_ url: URL?) -> Bool {
-        guard let url = url, url.isFileURL, let root = webRoot else { return false }
-        // /var and /private/var can identify the same iOS bundle. Compare
-        // canonical path components, without a fragile trailing-slash prefix.
-        let base = root.resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        let target = url.resolvingSymlinksInPath().standardizedFileURL.pathComponents
-        return target.count > base.count && Array(target.prefix(base.count)) == base
+        guard let url = url else { return false }
+        return url.scheme == "diastomy" && url.host == "app" && url.path == "/index.html"
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
@@ -121,7 +115,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-        guard let navigation = navigation, startupNavigation === navigation else { return }
+        guard startupNavigation != nil, isLocal(webView.url) else { return }
         startupDocumentCommitted = true
         StartupDiagnostics.record(stage: "documentCommitted", localDocument: isLocal(webView.url))
     }
@@ -446,4 +440,41 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         if paused != nil { player.pause() } else { player.play() }
     }
 
+}
+
+
+// Serve a fixed list of bundled resources without WebKit file URL access.
+private final class BundledInterfaceHandler: NSObject, WKURLSchemeHandler {
+    private let resources = [
+        "/index.html": "text/html",
+        "/app.js": "application/javascript",
+        "/app.css": "text/css",
+        "/assets/Yekan.woff2": "font/woff2",
+        "/assets/logo.svg": "image/svg+xml"
+    ]
+
+    func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+        guard let url = urlSchemeTask.request.url,
+              url.scheme == "diastomy", url.host == "app",
+              let mime = resources[url.path],
+              let root = Bundle.main.resourceURL?.appendingPathComponent("Web") else {
+            urlSchemeTask.didFailWithError(URLError(.unsupportedURL))
+            return
+        }
+        do {
+            let data = try Data(contentsOf: root.appendingPathComponent(String(url.path.dropFirst())))
+            let response = URLResponse(url: url, mimeType: mime,
+                                       expectedContentLength: data.count,
+                                       textEncodingName: mime.hasPrefix("text/") || mime == "application/javascript" ? "utf-8" : nil)
+            urlSchemeTask.didReceive(response)
+            urlSchemeTask.didReceive(data)
+            urlSchemeTask.didFinish()
+        } catch {
+            urlSchemeTask.didFailWithError(error)
+        }
+    }
+
+    func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
+        // Resource reads finish synchronously on the calling thread.
+    }
 }

@@ -17,7 +17,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.0.4</string>
+	<string>2.0.5</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -42,11 +42,6 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>WKAppBoundDomains</key>
-	<array>
-		<string>diastomy.top</string>
-		<string>www.diastomy.top</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>برای قابلیت‌های صوتی اتاق فیلم، در صورت درخواست شما، دسترسی به میکروفون لازم است.</string>
