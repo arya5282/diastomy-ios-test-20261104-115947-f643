@@ -107,6 +107,10 @@ def title_object(kind, slug):
 def detail(request, kind, slug):
     item = title_object(kind, slug)
     data = card(item)
+    from movie.services.detail_trailers import build_detail_trailers
+    data['trailers'] = [{'url': trailer['url'], 'title': trailer.get('title', '')}
+                        for trailer in build_detail_trailers(item, kind, limit=3)]
+    data['hero_cover'] = file_url(getattr(item, 'trailer_cover', None)) or data['banner']
     data['actors'] = [{'slug': a.slug, 'name': a.name, 'photo': file_url(a.photo)}
                       for a in item.actors.all()[:30]]
     data['comments'] = [
@@ -117,6 +121,7 @@ def detail(request, kind, slug):
     # Media links and entitlement are always obtained afresh from playback().
     if kind == 'movie':
         videos = item.videos.select_related('quality').order_by('-quality__weight')
+        data['download_options'] = [{'id': v.pk, 'quality': v.quality.title} for v in videos if v.download_url]
         data['videos'] = [{'id': v.pk, 'quality': v.quality.title}
                           for v in videos if direct_url_usable(v)]
     else:

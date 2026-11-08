@@ -302,6 +302,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 self.presentPlayer(url, info: info)
                 replyHandler(["status": 200, "data": ["playing": true]], nil)
             }
+        } else if action == "downloadMovie", let slug = data["slug"] as? String,
+                  let id = data["id"] as? Int, id > 0,
+                  slug.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil {
+            downloadMovie(slug: slug, id: id) { replyHandler($0, nil) }
         } else if action == "checkout", let plan = data["plan"] as? Int, plan > 0 {
             send("/accounts/api/create-payment/", method: "POST", body: ["plan_id": plan, "discount_code": data["discount"] as? String ?? ""]) { result in
                 guard let info = result["data"] as? [String: Any], info["success"] as? Bool == true,
@@ -356,6 +360,30 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         startupPanel?.removeFromSuperview()
         startupPanel = nil
         writeStartupReport(ready: true)
+    }
+
+    private func downloadMovie(slug: String, id: Int, completion: @escaping ([String: Any]) -> Void) {
+        let url = URL(string: "/movie/movie/\(slug)/download/\(id)/", relativeTo: server)!.absoluteURL
+        // The existing Django download route checks the session before redirecting.
+        URLSession.shared.downloadTask(with: url) { [documents] file, response, _ in
+            let result: [String: Any]
+            if let file = file, let http = response as? HTTPURLResponse,
+               http.statusCode == 200, http.url?.scheme == "https",
+               let mime = http.mimeType, mime.hasPrefix("video/") || mime == "application/octet-stream" {
+                let suggestedExtension = ((http.suggestedFilename ?? "") as NSString).pathExtension.lowercased()
+                let suffix = ["mp4", "mkv", "mov", "webm", "m4v"].contains(suggestedExtension) ? suggestedExtension : "mp4"
+                let name = "\(slug)-\(id)-\(UUID().uuidString.prefix(8)).\(suffix)"
+                do {
+                    try FileManager.default.moveItem(at: file, to: documents.appendingPathComponent(name))
+                    result = ["ok": true]
+                } catch {
+                    result = ["ok": false, "error": "ذخیرهٔ فایل ناموفق بود."]
+                }
+            } else {
+                result = ["ok": false, "error": "دانلود در دسترس نیست. وضعیت حساب و اشتراک را بررسی کنید."]
+            }
+            DispatchQueue.main.async { completion(result) }
+        }.resume()
     }
 
     private func presentPlayer(_ url: URL, info: [String: Any]) {

@@ -198,6 +198,34 @@
           episodes = Array.from(seasons, ([season, items], index) => '<details class="reference-season"' + (index === 0 ? ' open' : '') + '><summary>فصل ' + number(season) + '</summary><div class="season">' + items.map(x => '<div class="reference-episode"><strong>قسمت ' + number(x.number) + '</strong><div class="chips">' + x.videos.map(v => '<button data-play="' + v.id + '" data-kind="series">▶ ' + esc(v.quality) + '</button>').join('') + '</div></div>').join('') + '</div></details>').join('');
         } else { episodes = '<div class="chips">' + (data.videos || []).map(v => '<button class="primary" data-play="' + v.id + '" data-kind="movie">▶ پخش ' + esc(v.quality) + '</button>').join('') + '</div>'; }
         mount(PWA.detail(data, episodes || empty('قسمت یا منبع قابل پخش موجود نیست.')));
+        const trailers = (data.trailers || []).filter(trailer => imageURL(trailer.url));
+        document.querySelectorAll('[data-trailer-index]').forEach(button => {
+          button.onclick = () => {
+            const trailer = trailers[Number(button.dataset.trailerIndex)];
+            if (!trailer) return;
+            const player = document.createElement('video');
+            player.controls = true;
+            player.playsInline = true;
+            player.src = imageURL(trailer.url);
+            $('.movie-detail-hero').replaceChildren(player);
+            player.scrollIntoView({block:'nearest'});
+            player.play().catch(() => {});
+          };
+        });
+        const downloadOptions = $('#film-download-options');
+        if (downloadOptions) {
+          $('#film-download').onclick = () => { downloadOptions.hidden = !downloadOptions.hidden; };
+          downloadOptions.querySelectorAll('[data-download]').forEach(button => {
+            button.onclick = async () => {
+              button.disabled = true;
+              try {
+                const result = await native({action:'downloadMovie', slug, id:Number(button.dataset.download)});
+                toast(result.ok ? 'فایل در برنامه Files ذخیره شد.' : result.error);
+              } catch (error) { toast(error.message); }
+              finally { button.disabled = false; }
+            };
+          });
+        }
         if (kind === 'movie') {
           const create = document.createElement('button'); create.textContent = 'ساخت اتاق فیلم';
           document.querySelector('.actions').appendChild(create);
@@ -407,7 +435,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

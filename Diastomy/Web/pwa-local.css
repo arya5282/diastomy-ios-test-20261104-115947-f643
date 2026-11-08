@@ -153,3 +153,30 @@ body #app .archive-reference-sort select{width:auto}
 .reference-episode{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #222}
 .reference-episode [data-play]{border-radius:20px;color:#fff;background:#dc0000;border:0}
 body .dm-film-buttons [data-play]{color:#fff}
+body[data-page=local-title] .movie-detail-shell{background:#000}
+body[data-page=local-title] .dm-film-topbar{height:58px;padding:0 16px;background:linear-gradient(#080201,#160301)}
+body .dm-film-topbar svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+body .movie-detail-hero{position:relative;aspect-ratio:588/320;border-radius:22px;background:#0c0c0c}
+body .movie-detail-hero video{width:100%;height:100%;object-fit:contain}
+.reference-trailer-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:32px;height:32px;display:grid;place-items:center;padding:0;border:1px solid #aaa;border-radius:50%;background:#0009;color:white}
+body .dm-film-reference-info{padding:26px 16px 0}
+body .dm-film-title-row h1{margin:0;font-size:17px;font-weight:700}
+body .dm-film-title-row>img{width:76px}
+body .dm-film-meta{margin-top:8px;font-size:10px;gap:6px}
+body .dm-film-media{direction:ltr;min-height:20px;margin:8px 0 0}
+.reference-quality{border:1px solid #555;border-radius:3px;padding:2px 4px}
+body .reference-film-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:30px 0 0}
+body .reference-film-actions button{display:flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:999px;min-height:33px;padding:6px;color:#fff;background:#dc0000;font-size:12px;font-weight:700}
+body .reference-film-actions .reference-download{color:#0a0a0a;background:#fff}
+body .reference-film-actions button:disabled{opacity:.5}
+.reference-download-options{margin-top:10px;display:flex;flex-wrap:wrap;gap:8px}
+.reference-download-options[hidden]{display:none}
+.reference-film-summary{margin-top:32px}
+body .reference-film-summary h2,body .reference-film-cast h2{font-weight:500;font-size:14px;margin:0 0 14px}
+body .reference-film-summary .dm-film-description{font-weight:400;line-height:1.8;color:#aaa;margin:0}
+.reference-summary-actions{margin:14px 0 0}
+.reference-summary-actions button{border-radius:999px;color:#aaa;background:#080808;font-size:11px}
+.reference-film-cast{margin-top:50px}
+body .reference-cast .person{flex:0 0 calc((100% - 40px)/6);min-width:0}
+body .reference-cast .person img{width:100%;height:auto;aspect-ratio:1}
+body .reference-cast .person p{font-size:10px;line-height:1.25;margin:7px 0 0;color:#bbb}
