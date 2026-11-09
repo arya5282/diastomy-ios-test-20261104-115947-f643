@@ -245,18 +245,19 @@
         state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => episode.videos).filter(videos => videos.length) : [data.videos || []];
         const episodeList = data.episodes || [];
         const seasons = [...new Set(episodeList.map(episode => episode.season))];
-        const episodes = seasons.length ? '<div class="reference-season-controls"><select id="series-season" aria-label="انتخاب فصل">' +
+        const episodes = seasons.length ? '<div class="reference-season-controls"><div class="reference-season-picker"><select id="series-season" aria-label="انتخاب فصل">' +
           seasons.map(season => '<option value="' + esc(season) + '">فصل ' + number(season) + '</option>').join('') +
-          '</select><button type="button" id="series-sort" aria-label="تغییر ترتیب قسمت‌ها" aria-pressed="false"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></button></div><div id="series-episodes"></div>' :
+          '</select><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"/></svg></div><button type="button" id="series-sort" aria-label="تغییر ترتیب قسمت‌ها" aria-pressed="false"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></button></div><div id="series-episodes"></div>' :
           empty('قسمت یا منبع قابل پخش موجود نیست.');
         mount(PWA.detail({...data,type:kind}, episodes));
         const season = $('#series-season');
         if (season) {
           const sort = $('#series-sort');
+          let watchState = {};
           const renderEpisodes = () => {
             const direction = sort.getAttribute('aria-pressed') === 'true' ? -1 : 1;
             const items = episodeList.filter(episode => String(episode.season) === season.value).sort((a,b) => direction * (a.number - b.number));
-            $('#series-episodes').innerHTML = PWA.episodeCards(data, items);
+            $('#series-episodes').innerHTML = PWA.episodeCards(data, items, watchState, slug);
           };
           season.onchange = renderEpisodes;
           sort.onclick = () => {
@@ -264,6 +265,9 @@
             renderEpisodes();
           };
           renderEpisodes();
+          api('/movie/api/watch-state/series/' + enc(slug) + '/').then(result => {
+            whenCurrent(seq, () => { watchState = result.items || {}; renderEpisodes(); });
+          }).catch(() => {});
         }
         if (kind === 'series') loadSeriesPreferences(seq);
         const trailers = (data.trailers || []).filter(trailer => imageURL(trailer.url));
@@ -935,7 +939,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

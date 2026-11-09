@@ -430,3 +430,8 @@ html body #dm-auth-reference .reference-sms{
   box-sizing:border-box;background:#191919!important;border:1px solid #414141!important;border-radius:12px;color:#bbb!important;font-size:9px;
 }
 .reference-sms svg:last-child{width:12px;margin-left:auto}
+.reference-season-picker{position:relative;flex:1;min-width:0}
+.reference-season-picker select{width:100%;appearance:none;-webkit-appearance:none;padding-inline:12px 35px}
+.reference-season-picker svg{position:absolute;inset:50% auto auto 11px;transform:translateY(-50%);pointer-events:none}
+.reference-episode-head strong{font-family:"PWA Inter",Arial,sans-serif;font-weight:600}
+.reference-episode-seen{vertical-align:middle;margin-left:6px;color:#bbb}

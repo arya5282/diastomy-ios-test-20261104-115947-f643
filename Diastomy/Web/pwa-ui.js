@@ -72,18 +72,20 @@ window.PWA = (() => {
   function downloadOptions(options) {
     return options.map(option => '<button type="button" data-download="' + esc(option.id) + '">' + esc(option.quality) + '</button>').join('');
   }
-  function episodeCards(item, episodes) {
+  function episodeCards(item, episodes, watchState, slug) {
     return episodes.map(episode => {
       const video = (episode.videos || [])[0];
       const downloads = episode.download_options || [];
       const title = 'Season ' + esc(episode.season) + ' · Episode ' + esc(episode.number);
+      const watchPath = '/movie/series/' + slug + '/season/' + episode.season + '/episode/' + episode.number + '/watch/';
+      const seen = watchState[watchPath]?.seen ? '<svg class="reference-episode-seen" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" role="img" aria-label="دیده‌شده"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>' : '';
       const duration = Number(episode.duration);
       const time = duration > 0 ? [Math.floor(duration / 3600), Math.floor(duration / 60) % 60, duration % 60]
         .map((part,index) => index ? String(part).padStart(2,'0') : part).join(':') : '';
       return '<article class="reference-episode-card"><div class="reference-episode-head" dir="ltr"><button type="button" class="reference-episode-thumb"' +
         (video ? ' data-play="' + esc(video.id) + '" data-kind="series"' : ' disabled') + ' aria-label="' + title + '"><img src="' +
         media(episode.cover || item.banner || item.cover) + '" alt="" loading="lazy">' +
-        (video ? '<span>' + PWA_SOURCE.detailPlay + '</span>' : '') + '</button><div><strong>' + title + '</strong>' +
+        (video ? '<span>' + PWA_SOURCE.detailPlay + '</span>' : '') + '</button><div><strong>' + title + seen + '</strong>' +
         (time ? '<small>' + time + '</small>' : '') + '</div>' +
         (downloads.length ? '<details class="reference-episode-download"><summary aria-label="دانلود قسمت">' + PWA_SOURCE.detailDownload +
           '</summary><div class="reference-download-options">' + downloadOptions(downloads) + '</div></details>' : '') +
