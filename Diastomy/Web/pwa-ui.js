@@ -236,6 +236,41 @@ window.PWA = (() => {
       '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="#/home">' + PWA_SOURCE.authBack + '<span>Back</span></a><h1 dir="auto">' + esc(title) + '</h1>' + body +
       '</div></div></div></div>';
   }
+  function searchDiscovery(catalog, recommendations) {
+    const art = {
+      "action": "/static/public/assets/images/genre-user-v2/action-a19b0e17be35.jpg",
+      "adventure": "/static/public/assets/images/genre-user-v2/adventure-e5e740adcace.jpg",
+      "animation": "/static/public/assets/images/genre-user-v2/animation-c2cb2d2855a5.jpg",
+      "art": "/static/public/assets/images/genre-user-v2/art-0f0365e59ca8.jpg",
+      "comedy": "/static/public/assets/images/genre-user-v2/comedy-8e465b276750.jpg",
+      "documentary": "/static/public/assets/images/genre-user-v2/documentary-ded24d0ef9f5.jpg",
+      "drama": "/static/public/assets/images/genre-user-v2/drama-6ae1ebd9b57f.jpg",
+      "family": "/static/public/assets/images/genre-user-v2/family-8e76541212b3.jpg",
+      "fantasy": "/static/public/assets/images/genre-user-v2/fantasy-1bf48d576722.jpg",
+      "horror": "/static/public/assets/images/genre-user-v2/horror-fc0c39db6ffe.jpg",
+      "kids": "/static/public/assets/images/genre-user-v2/kids-11828d48ba9d.jpg",
+      "musical": "/static/public/assets/images/genre-user-v2/musical-b707ff1dd80d.jpg",
+      "romance": "/static/public/assets/images/genre-user-v2/romance-0c130a671b81.jpg",
+      "sci-fi": "/static/public/assets/images/genre-user-v2/sci-fi-a837508e6156.jpg"
+    };
+    const definitions = [
+      ['drama','درام'], ['action','اکشن'], ['fantasy','فانتزی'], ['comedy','کمدی'],
+      ['sci-fi','علمی تخیلی'], ['horror','ترسناک'], ['adventure','ماجراجویی'], ['romance','عاشقانه'],
+      ['family','خانوادگی'], ['musical','موزیکال'], ['documentary','مستند'], ['animation','انیمیشن'],
+      ['art','هنری'], ['kids','کودک']
+    ];
+    const tiles = definitions.map(([key, label]) => {
+      const genre = catalog.find(item => item.slug.toLowerCase() === key || [key,label].includes(item.name.toLowerCase()));
+      const query = genre ? 'genre=' + encodeURIComponent(genre.slug) : 'q=' + encodeURIComponent(label);
+      return '<a class="dm-search-genre reference-genre" href="#/browse/all?' + query +
+        '"><img alt="" src="' + art[key] + '"><span>' + key.toUpperCase() + '</span></a>';
+    });
+    return '<h2>ژانرها</h2><div class="dm-search-genres" dir="ltr">' + tiles.slice(0,6).join('') +
+      '</div><div id="search-genres-extra" aria-hidden="true" inert><div class="dm-search-genres" dir="ltr">' +
+      tiles.slice(6).join('') + '</div></div><button id="search-genres-toggle" type="button" aria-controls="search-genres-extra" aria-expanded="false">' +
+      '── دیدن ژانرهای بیشتر ──</button><h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
+      recommendations.map(card).join('') + '</div>';
+  }
   function searchInput(query) {
     const header = document.getElementById('pwa-header');
     const button = header.querySelector('.dmf3-search');
@@ -362,5 +397,5 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchInput, install, page};
+  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchDiscovery, searchInput, install, page};
 })();

@@ -560,3 +560,14 @@ body[data-page=local-startup] #app{padding:0 20px}
 @keyframes startup-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.startup-spinner{animation:none}}
 .local-startup p{margin:0;color:#bbb}
+body[data-page=search] #app .dm-search-genres{direction:ltr}
+body[data-page=search] #app .dm-search-genre{min-width:0;border:1px solid #444;border-radius:7px}
+body[data-page=search] #app .dm-search-genre span{font:700 10px Arial,sans-serif;letter-spacing:.3px;text-shadow:0 1px 3px #000}
+#search-genres-extra{display:grid;grid-template-rows:0fr;opacity:0;transition:grid-template-rows 440ms cubic-bezier(.4,0,.2,1),opacity 230ms ease}
+#search-genres-extra>.dm-search-genres{min-height:0;overflow:hidden}
+#search-genres-extra>.dm-search-genres::before{content:"";grid-column:1/-1;height:0}
+#search-genres-extra[aria-hidden=false]{grid-template-rows:1fr;opacity:1;transition-duration:540ms,360ms}
+#app #search-genres-toggle{display:block;width:100%;min-height:0;margin:12px 0 40px;padding:4px 0;border:0;background:transparent;color:#888;font-size:9px;line-height:20px;text-align:center}
+body[data-page=search] #app .dm-search-recommendations{gap:20px clamp(14px,7vw,28px)}
+body[data-page=search] #app .dm-search-recommendations .dm54-poster{aspect-ratio:3/4;border-radius:7px}
+@media(prefers-reduced-motion:reduce){#search-genres-extra{transition:none}}

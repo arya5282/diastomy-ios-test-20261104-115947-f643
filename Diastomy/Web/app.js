@@ -177,15 +177,16 @@
           const rails = data.rails || [];
           const recommended = rails.find(rail => rail.key === 'trending_movies' && rail.items.length) ||
             rails.find(rail => rail.key === 'pwa_recommended' && rail.items.length);
-          const featured = ['fantasy','action','drama','horror','sci-fi','comedy'];
-          const genres = featured.map(slug => ({slug,name:slug.toUpperCase()}));
-          const extra = (data.genres || []).filter(genre => !featured.includes(genre.slug));
-          const tile = genre => '<a class="dm-search-genre reference-genre" href="#/browse/all?genre=' + enc(genre.slug) +
-            '"><img alt="" loading="lazy" src="https://diastomy.top/pwa/genre-images/v1/' + enc(genre.slug) + '/"><span>' + esc(genre.name) + '</span></a>';
-          $('#catalogue').innerHTML = '<h2>ژانرها</h2><div class="dm-search-genres">' + genres.map(tile).join('') +
-            '</div>' + (extra.length ? '<details class="local-extra-genres"><summary>دیدن ژانرهای بیشتر</summary><div class="dm-search-genres">' +
-            extra.map(tile).join('') + '</div></details>' : '') + '<h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
-            (recommended?.items || data.hero || []).map(card).join('') + '</div>';
+          $('#catalogue').innerHTML = PWA.searchDiscovery(data.genres || [], recommended?.items || data.hero || []);
+          const toggle = $('#search-genres-toggle');
+          const extra = $('#search-genres-extra');
+          toggle.onclick = () => {
+            const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+            toggle.setAttribute('aria-expanded', String(expanded));
+            toggle.textContent = expanded ? '── دیدن ژانرهای کمتر ──' : '── دیدن ژانرهای بیشتر ──';
+            extra.inert = !expanded;
+            extra.setAttribute('aria-hidden', String(!expanded));
+          };
         });
       } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
       return;
@@ -1002,7 +1003,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
