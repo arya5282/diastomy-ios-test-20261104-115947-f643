@@ -33,6 +33,13 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window = next
         next.makeKeyAndVisible()
     }
+
+    func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
+        guard let controller = window?.rootViewController as? BrowserViewController else { return }
+        for context in contexts {
+            controller.completeBrowserSignIn(context.url)
+        }
+    }
 }
 
 // Only the Debug simulator smoke test writes reports. No account/API data is

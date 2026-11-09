@@ -65,7 +65,98 @@ def session(request):
             'language': user.preferred_language,
             'quality': user.preferred_quality,
         }
-    return JsonResponse({'csrf': get_token(request), 'user': data, 'api_version': 1})
+    from django.conf import settings
+    google_client = getattr(settings, 'GOOGLE_CLIENT_ID', '')
+    return JsonResponse({'csrf': get_token(request), 'user': data, 'api_version': 1,
+                         'browser_sign_in': bool(google_client and google_client != 'YOUR_GOOGLE_CLIENT_ID_HERE')})
+
+
+@never_cache
+@require_GET
+def browser_sign_in(request):
+    import re
+    import time
+    from urllib.parse import urlencode
+    from django.shortcuts import redirect
+
+    challenge = request.GET.get('challenge', '')
+    if not re.fullmatch(r'[a-f0-9]{64}', challenge):
+        raise Http404
+    request.session['ios_sign_in'] = {'challenge': challenge, 'expires': int(time.time()) + 600}
+    finish = reverse('ios_browser_sign_in_finish')
+    if request.user.is_authenticated:
+        return redirect(finish)
+    return redirect(reverse('accounts:login') + '?' + urlencode({'next': finish}))
+
+
+@never_cache
+@require_GET
+def browser_sign_in_finish(request):
+    import secrets
+    import time
+    from datetime import timedelta
+    from django.contrib.sessions.backends.db import SessionStore
+    from django.contrib.sessions.models import Session
+    from django.http import HttpResponse
+    from django.utils import timezone
+    from django.utils.html import format_html
+
+    pending = request.session.get('ios_sign_in')
+    if not request.user.is_authenticated or not pending or pending['expires'] < time.time():
+        raise Http404
+    request.session.pop('ios_sign_in', None)
+    code = secrets.token_hex(20)
+    Session.objects.create(
+        session_key=code,
+        session_data=SessionStore().encode({'ios_grant_user': request.user.pk, 'challenge': pending['challenge']}),
+        expire_date=timezone.now() + timedelta(minutes=2),
+    )
+    response = HttpResponse(format_html(
+        '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<main dir="rtl"><h1>ورود انجام شد</h1><a href="{}">بازگشت به اپ دیاستومی</a></main>',
+        'top.diastomy.ios.auth://login?code=' + code,
+    ))
+    response['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
+@never_cache
+@require_http_methods(['POST'])
+def browser_sign_in_redeem(request):
+    import hashlib
+    import hmac
+    import json
+    import re
+    from django.contrib.auth import get_user_model, login
+    from django.contrib.sessions.models import Session
+    from django.db import transaction
+    from django.utils import timezone
+
+    error = {'error': 'این درخواست ورود معتبر نیست یا منقضی شده است.'}
+    try:
+        body = json.loads(request.body)
+        code, verifier = body['code'], body['verifier']
+        if not re.fullmatch(r'[a-f0-9]{40}', code) or not re.fullmatch(r'[a-f0-9]{64}', verifier):
+            raise ValueError
+    except (ValueError, TypeError, KeyError):
+        return JsonResponse(error, status=400)
+    challenge = hashlib.sha256(verifier.encode('ascii')).hexdigest()
+    with transaction.atomic():
+        grant = Session.objects.filter(session_key=code, expire_date__gt=timezone.now()).first()
+        if grant is None:
+            return JsonResponse(error, status=400)
+        data = grant.get_decoded()
+        if not data.get('ios_grant_user') or not hmac.compare_digest(data.get('challenge', ''), challenge):
+            return JsonResponse(error, status=400)
+        # Conditional deletion consumes the grant exactly once across workers.
+        removed, _ = Session.objects.filter(session_key=code, session_data=grant.session_data).delete()
+        if not removed:
+            return JsonResponse(error, status=400)
+        user = get_user_model().objects.filter(pk=data['ios_grant_user'], is_active=True).first()
+        if user is None:
+            return JsonResponse(error, status=400)
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+    return JsonResponse({'ok': True})
 
 
 @require_GET
@@ -270,6 +361,9 @@ def room_detail(request, code):
 
 urlpatterns = [
     path('session/', session), path('home/', home),
+    path('browser-sign-in/', browser_sign_in),
+    path('browser-sign-in/finish/', browser_sign_in_finish, name='ios_browser_sign_in_finish'),
+    path('browser-sign-in/redeem/', browser_sign_in_redeem),
     path('title/<str:kind>/<slug:slug>/', detail),
     path('playback/<str:kind>/<int:video_id>/', playback),
     path('library/', library), path('settings/', settings),

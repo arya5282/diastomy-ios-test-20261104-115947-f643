@@ -1,6 +1,7 @@
 import UIKit
 import WebKit
 import AVKit
+import CryptoKit
 
 // All documents, scripts, fonts and styles are shipped in Web/.
 // Only JSON APIs and explicitly authorized media use the network.
@@ -23,6 +24,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var playingRoom: String?
     private var roomState: [String: Any]?
     private var serverOffset = 0.0
+    private var browserSignInVerifier: String?
+    private var redeemingBrowserSignIn = false
     private let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
@@ -361,6 +364,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 }
                 UIApplication.shared.open(url) { opened in replyHandler(["status": opened ? 200 : 502, "data": ["opened": opened]], nil) }
             }
+        } else if action == "browserSignIn" {
+            guard !redeemingBrowserSignIn else { replyHandler(["ok": false], nil); return }
+            let verifier = (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "").lowercased()
+            let challenge = SHA256.hash(data: Data(verifier.utf8)).map { String(format: "%02x", $0) }.joined()
+            browserSignInVerifier = verifier
+            let url = URL(string: "/api/app/v1/browser-sign-in/?challenge=\(challenge)", relativeTo: server)!.absoluteURL
+            UIApplication.shared.open(url) { opened in
+                if !opened, self.browserSignInVerifier == verifier { self.browserSignInVerifier = nil }
+                replyHandler(["ok": opened], nil)
+            }
         } else if action == "openSocial", let site = data["site"] as? String,
                   let address = ["instagram": "https://instagram.com/diastomyplus",
                                  "telegram": "https://t.me/diastomyplus"][site],
@@ -420,6 +433,30 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         startupPanel?.removeFromSuperview()
         startupPanel = nil
         writeStartupReport(ready: true)
+    }
+
+    func completeBrowserSignIn(_ url: URL) {
+        guard !redeemingBrowserSignIn, let verifier = browserSignInVerifier,
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme == "top.diastomy.ios.auth", components.host == "login",
+              components.path.isEmpty, components.fragment == nil,
+              let items = components.queryItems, items.count == 1,
+              items[0].name == "code", let code = items[0].value,
+              code.range(of: #"^[a-f0-9]{40}$"#, options: .regularExpression) != nil else { return }
+        redeemingBrowserSignIn = true
+        send("/api/app/v1/session/") { [weak self] session in
+            guard let self = self, self.browserSignInVerifier == verifier else { return }
+            let finished: (Bool) -> Void = { ok in
+                guard self.browserSignInVerifier == verifier else { return }
+                self.browserSignInVerifier = nil
+                self.redeemingBrowserSignIn = false
+                self.webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('diastomy-browser-sign-in', {detail: \(ok)}))")
+            }
+            guard session["status"] as? Int == 200 else { finished(false); return }
+            self.send("/api/app/v1/browser-sign-in/redeem/", method: "POST", body: ["code": code, "verifier": verifier]) { result in
+                finished(result["status"] as? Int == 200)
+            }
+        }
     }
 
     private func localDownload(named name: String) -> URL? {

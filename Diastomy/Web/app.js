@@ -85,7 +85,7 @@
     throw new Error(response.data.error || response.data.message || 'دریافت اطلاعات ممکن نشد.');
   }
   async function refreshSession() {
-    try { const data = await api('/api/app/v1/session/'); state.user = data.user; state.sessionKnown = true; }
+    try { const data = await api('/api/app/v1/session/'); state.user = data.user; state.browserSignIn = data.browser_sign_in === true; state.sessionKnown = true; }
     catch (_) { state.sessionKnown = false; }
   }
   async function finishLogin(sequence) {
@@ -418,7 +418,18 @@
       'aria-label="شماره موبایل یا ایمیل" placeholder="شماره موبایل یا ایمیل"><span class="dm-auth-phone-icon" aria-hidden="true">' +
       PWA_SOURCE.authPhone + '<i class="dm-auth-phone-separator"></i></span></div>';
     mount(PWA.auth('Sign in or register', form('identify', identifierField, 'Continue') +
-      '<div class="reference-auth-alternatives"><span class="reference-auth-divider">or</span><a href="#/otp">ورود با کد یک‌بارمصرف</a></div>'));
+      '<div class="reference-auth-alternatives"><span class="reference-auth-divider">or</span>' +
+      (state.browserSignIn ? '<button type="button" id="dm-google-id-button" class="dm-google-custom"><img src="/static/public/assets/icons/auth/google-g.svg" alt="">Continue with Google</button>' :
+        '<a href="#/otp">ورود با کد یک‌بارمصرف</a>') + '</div>'));
+    const google = $('#dm-google-id-button');
+    if (google) google.onclick = async () => {
+      google.disabled = true;
+      try {
+        const result = await native({action:'browserSignIn'});
+        if (!result.ok) throw Error('باز کردن ورود با گوگل ممکن نشد.');
+      } catch (error) { toast(error.message); }
+      finally { google.disabled = false; }
+    };
     $('#identify [name=identifier]').value = previousIdentifier;
     $('.reference-auth-back').onclick = event => { event.preventDefault(); login(); };
     const output = $('#identify-status');
@@ -924,7 +935,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
@@ -958,6 +969,10 @@
       }
     } catch (error) { toast(error.message); }
     finally { button.disabled = false; }
+  });
+  window.addEventListener('diastomy-browser-sign-in', async event => {
+    if (!event.detail) { toast('ورود کامل نشد. دوباره تلاش کنید.'); return; }
+    try { await finishLogin(state.sequence); } catch (error) { toast(error.message); }
   });
   window.addEventListener('hashchange', route);
   window.addEventListener('online', () => { connection(true); if (!document.body.classList.contains('local-player-open')) route(); });

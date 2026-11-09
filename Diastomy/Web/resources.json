@@ -18,6 +18,7 @@
   "/static/public/assets/fonts/inter-variable-perf-v1.woff2": "font/woff2",
   "/static/public/assets/fonts/sf/SFArabic-Bold.ttf": "font/ttf",
   "/static/public/assets/fonts/sf/SFArabic-Medium.ttf": "font/ttf",
+  "/static/public/assets/icons/auth/google-g.svg": "image/svg+xml",
   "/static/public/assets/icons/diastomy-logo.svg": "image/svg+xml",
   "/static/public/assets/img/poster-unavailable-v1.svg": "image/svg+xml",
   "/static/public/assets/img/room-slide-0-610dd008bbb4.webp": "image/webp",
