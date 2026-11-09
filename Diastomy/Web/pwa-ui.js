@@ -299,35 +299,59 @@ window.PWA = (() => {
     document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
     document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
-    document.querySelectorAll('[data-nav-slot]').forEach(link => {
+    const nav = document.getElementById('dm-app-bottom-nav');
+    const links = [...nav.querySelectorAll('[data-nav-slot]')];
+    links.forEach(link => {
       if (link.dataset.navSlot === slot) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
+    const current = links.findIndex(link => link.dataset.navSlot === slot);
+    if (current >= 0) nav.style.setProperty('--footer-position', current);
+    nav.toggleAttribute('data-footer-selected', current >= 0);
   }
   function installFooterSwipe(nav) {
+    const links = [...nav.querySelectorAll('[data-nav-slot]')];
     let start;
     let suppressClick = false;
+    function position(value) {
+      nav.style.setProperty('--footer-position', value);
+    }
+    function finish(event, commit) {
+      if (start?.id !== event.pointerId) return;
+      const {origin, preview, dragging} = start;
+      start = undefined;
+      if (!dragging) return;
+      nav.removeAttribute('data-footer-dragging');
+      suppressClick = true;
+      const next = commit ? Math.round(preview) : origin;
+      position(next);
+      const link = links[next];
+      if (commit && link.getAttribute('aria-current') !== 'page') location.hash = link.hash;
+    }
     nav.addEventListener('pointerdown', event => {
       if (!event.isPrimary || event.button !== 0) return;
       suppressClick = false;
-      start = event.pointerType === 'touch' ? {id:event.pointerId, x:event.clientX, y:event.clientY} : undefined;
+      if (event.pointerType !== 'touch') return;
+      const current = links.findIndex(link => link.getAttribute('aria-current') === 'page');
+      const touched = links.indexOf(event.target.closest('[data-nav-slot]'));
+      const origin = current >= 0 ? current : Math.max(0, touched);
+      start = {id:event.pointerId, x:event.clientX, y:event.clientY, origin, preview:origin};
     });
-    nav.addEventListener('pointercancel', event => {
-      if (start?.id === event.pointerId) start = undefined;
-    });
-    nav.addEventListener('pointerup', event => {
+    nav.addEventListener('pointermove', event => {
       if (start?.id !== event.pointerId) return;
       const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
-      start = undefined;
-      if (Math.abs(dx) < 28 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
-      suppressClick = true;
-      const links = [...nav.querySelectorAll('[data-nav-slot]')];
-      const current = links.findIndex(link => link.getAttribute('aria-current') === 'page');
-      const next = current < 0 ? (dx > 0 ? 0 : links.length - 1) : current + Math.sign(dx);
-      const link = links[next];
-      if (link) location.hash = link.hash;
+      if (!start.dragging) {
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+        start.dragging = true;
+        start.step = links[0].getBoundingClientRect().width;
+        nav.setAttribute('data-footer-dragging', '');
+      }
+      start.preview = Math.max(0, Math.min(links.length - 1, start.origin + dx / start.step));
+      position(start.preview);
     });
+    nav.addEventListener('pointerup', event => finish(event, true));
+    nav.addEventListener('pointercancel', event => finish(event, false));
     nav.addEventListener('click', event => {
       if (!suppressClick || event.detail === 0) return;
       suppressClick = false;
