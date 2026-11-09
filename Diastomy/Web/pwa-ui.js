@@ -79,8 +79,12 @@ window.PWA = (() => {
         '" aria-label="اسلاید ' + (i + 1) + '"></button>').join('') + '</div></section>';
   }
   function home(data, history = []) {
-    const order = ['trending_movies','pwa_turkish_series','pwa_latest_movies','pwa_dubbed_movies','pwa_free_movies','pwa_latest_series','pwa_dubbed_series','pwa_free_series','pwa_recommended','animations'];
-    const rails = (data.rails || []).map(r => ({...r, key: r.key || 'pwa_latest_movies'})).sort((a,b) => order.indexOf(a.key) - order.indexOf(b.key));
+    const order = [
+      'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series',
+      'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies', 'pwa_free_movies',
+      'pwa_dubbed_series', 'pwa_free_series', 'pwa_recommended', 'animations'
+    ];
+    const sections = new Map();
     const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'documentary', 'animation'];
     const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
       illustratedGenres.map(slug => '<a class="dm54-genre reference-genre" href="#/browse/all?genre=' + slug +
@@ -88,14 +92,21 @@ window.PWA = (() => {
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
     const continueHTML = history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
       '<div class="reference-continue">' + history.slice(0, 12).map(item => historyCard(item)).join('') + '</div></section>' : '';
+    sections.set('genres', genreHTML);
+    sections.set('continue_watching', continueHTML);
+    for (const rail of data.rails || []) {
+      if (!rail.items.length) continue;
+      const key = rail.key || 'pwa_latest_movies';
+      const wide = key === 'pwa_free_movies';
+      const link = '#/browse/' + (key.includes('series') ? 'series' : 'movie');
+      sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
+        '"><div class="dm54-head"><h2>' + esc(rail.title) + '</h2><a href="' + link +
+        '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
+        rail.items.map(wide ? landscape : card).join('') + '</div></section>');
+    }
     return hero(data.hero || []) + '<div class="dm-pwa-home-v54 dm-figma-home-v2">' +
-      rails.filter(r => r.items.length).map(r => {
-        const wide = r.key === 'pwa_free_movies';
-        const link = '#/browse/' + (r.key.includes('series') ? 'series' : 'movie');
-        return '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') + '"><div class="dm54-head"><h2>' +
-          esc(r.title) + '</h2><a href="' + link + '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
-          r.items.map(wide ? landscape : card).join('') + '</div></section>' + (r.key === 'trending_movies' ? genreHTML + continueHTML : '');
-      }).join('') + (!rails.some(r => r.key === 'trending_movies' && r.items.length) ? genreHTML + continueHTML : '') + '</div>';
+      order.map(key => sections.get(key) || '').join('') +
+      [...sections].filter(([key]) => !order.includes(key)).map(([, html]) => html).join('') + '</div>';
   }
   function historyCard(item) {
     const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
@@ -252,6 +263,7 @@ window.PWA = (() => {
     }, true);
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
     document.getElementById('pwa-nav').innerHTML = PWA_SOURCE.nav;
+    installFooterSwipe(document.getElementById('dm-app-bottom-nav'));
     document.getElementById('pwa-sprite').innerHTML = PWA_SOURCE.sprite;
     document.addEventListener('scroll', event => {
       const rail = event.target;
@@ -292,18 +304,39 @@ window.PWA = (() => {
       else link.removeAttribute('aria-current');
     });
   }
-  function stepFooter(direction) {
-    const nav = document.querySelector('#dm-app-bottom-nav');
-    if (!nav?.getClientRects().length || document.hidden ||
-        document.querySelector('dialog[open], .local-pwa-player') || document.fullscreenElement ||
-        document.activeElement?.matches('input, select, textarea, [contenteditable=true]')) return;
-    const links = [...nav.querySelectorAll('[data-nav-slot]')];
-    const current = links.findIndex(link => link.getAttribute('aria-current') === 'page');
-    if (current < 0) {
-      links[direction > 0 ? 0 : links.length - 1]?.click();
-      return;
-    }
-    links[current + direction]?.click();
+  function installFooterSwipe(nav) {
+    let start;
+    let suppressClick = false;
+    nav.addEventListener('pointerdown', event => {
+      if (!event.isPrimary || event.button !== 0) return;
+      suppressClick = false;
+      start = event.pointerType === 'touch' ? {id:event.pointerId, x:event.clientX, y:event.clientY} : undefined;
+    });
+    nav.addEventListener('pointercancel', event => {
+      if (start?.id === event.pointerId) start = undefined;
+    });
+    nav.addEventListener('pointerup', event => {
+      if (start?.id !== event.pointerId) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      start = undefined;
+      if (Math.abs(dx) < 28 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
+      suppressClick = true;
+      const links = [...nav.querySelectorAll('[data-nav-slot]')];
+      const current = links.findIndex(link => link.getAttribute('aria-current') === 'page');
+      const next = current < 0 ? (dx > 0 ? 0 : links.length - 1) : current + Math.sign(dx);
+      const link = links[next];
+      if (link) location.hash = link.hash;
+    });
+    nav.addEventListener('click', event => {
+      if (!suppressClick || event.detail === 0) return;
+      suppressClick = false;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+    nav.addEventListener('contextmenu', event => {
+      if (start) event.preventDefault();
+    });
   }
-  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchInput, install, page, stepFooter};
+  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchInput, install, page};
 })();
