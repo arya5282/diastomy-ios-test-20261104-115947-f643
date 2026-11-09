@@ -152,7 +152,7 @@ window.PWA = (() => {
   }
   function auth(title, body) {
     return '<div id="dm-auth-reference"><div class="dm-auth-shell"><div class="dm-auth-logo"><img src="' + logo +
-      '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="#/home">' + PWA_SOURCE.authBack + '<span>Back</span></a><h1>' + esc(title) + '</h1>' + body +
+      '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="#/home">' + PWA_SOURCE.authBack + '<span>Back</span></a><h1 dir="auto">' + esc(title) + '</h1>' + body +
       '</div></div></div></div>';
   }
   function searchInput(query) {

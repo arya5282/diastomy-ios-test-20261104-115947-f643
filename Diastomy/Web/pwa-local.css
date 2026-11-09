@@ -394,3 +394,39 @@ html.dmf3-active body[data-page=search] #pwa-header .reference-search-form input
 .reference-episode-download svg{width:18px;height:18px}
 .reference-episode-download .reference-download-options{position:absolute;right:0;z-index:3;padding:6px;background:#171717;border:1px solid #333;border-radius:8px}
 .spoiler-comment[hidden]{display:none!important}
+html body[data-page=local-login] #dm-auth-reference{
+  isolation:isolate;padding-top:clamp(40px,calc(18dvh - 14px),140px);
+}
+html body[data-page=local-login] #dm-auth-reference::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse at -5% -5%,#260505,transparent 38%),radial-gradient(ellipse at 103% 77%,#240303,transparent 42%),#000;
+}
+html body[data-page=local-login] #dm-auth-reference .dm-auth-card{
+  padding:86px clamp(24px,11vw,45px) 37px!important;min-height:0;
+}
+html body[data-page=local-login] #dm-auth-reference .dm-auth-card h1{
+  font-family:"PWA Inter",Arial,sans-serif!important;font-size:12px!important;line-height:18px!important;font-weight:600!important;margin:0 0 25px!important;
+}
+html body[data-page=local-login] #dm-auth-reference .dm-auth-step{border-color:#373737!important}
+html body #dm-auth-reference #identify,html body #dm-auth-reference #login{position:relative;gap:10px!important}
+html body #dm-auth-reference #identify-status,html body #dm-auth-reference #login-status{
+  position:absolute;inset:100% 0 auto;min-height:0!important;margin:4px 0 0!important;padding:0!important;font-size:10px;text-align:center;
+}
+html body #dm-auth-reference .reference-auth-alternatives{margin-top:29px!important;gap:20px!important}
+html body #dm-auth-reference .reference-auth-divider{font-size:13px;line-height:15px}
+html body #dm-auth-reference .reference-password-field{position:relative}
+html body #dm-auth-reference #login [name=password]{
+  box-sizing:border-box;width:100%;height:34px!important;min-height:34px!important;padding:0 12px 0 36px!important;margin:0!important;font-size:12px;text-align:right;
+}
+html body #dm-auth-reference #login [type=submit]{height:34px!important;min-height:34px!important;padding:0!important;margin:0!important}
+html body #dm-auth-reference #toggle-password{
+  position:absolute;inset:0 auto 0 8px;display:grid;place-items:center;width:21px;min-height:0!important;margin:0!important;padding:0!important;background:none!important;border:0!important;color:#aaa;
+}
+html body #dm-auth-reference #toggle-password svg,.reference-sms svg{width:16px;height:16px;flex:none}
+.reference-password-alternatives{display:grid;gap:8px;margin-top:23px;direction:ltr;font-family:"PWA Inter",Arial,sans-serif}
+html body #dm-auth-reference .reference-forgot{display:block;width:auto!important;text-align:right;background:none!important;border:0!important;padding:0!important;color:#888!important;font-size:9px}
+html body #dm-auth-reference .reference-sms{
+  display:flex!important;justify-content:space-between;align-items:center;gap:5px;width:100%!important;min-height:47px;padding:7px 10px!important;
+  box-sizing:border-box;background:#191919!important;border:1px solid #414141!important;border-radius:12px;color:#bbb!important;font-size:9px;
+}
+.reference-sms svg:last-child{width:12px;margin-left:auto}

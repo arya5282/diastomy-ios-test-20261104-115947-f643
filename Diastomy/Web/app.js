@@ -413,12 +413,14 @@
     panel('saved').innerHTML = '<p role="status">دریافت لیست…</p>';
     loadCollection();
   }
-  function login() {
+  function login(previousIdentifier = '') {
     const identifierField = '<div class="dm-auth-phone-field"><input name="identifier" type="text" dir="ltr" autocomplete="username" inputmode="email" required ' +
       'aria-label="شماره موبایل یا ایمیل" placeholder="شماره موبایل یا ایمیل"><span class="dm-auth-phone-icon" aria-hidden="true">' +
       PWA_SOURCE.authPhone + '<i class="dm-auth-phone-separator"></i></span></div>';
     mount(PWA.auth('Sign in or register', form('identify', identifierField, 'Continue') +
       '<div class="reference-auth-alternatives"><span class="reference-auth-divider">or</span><a href="#/otp">ورود با کد یک‌بارمصرف</a></div>'));
+    $('#identify [name=identifier]').value = previousIdentifier;
+    $('.reference-auth-back').onclick = event => { event.preventDefault(); login(); };
     const output = $('#identify-status');
     if (state.checkingSession) {
       $('#identify button').disabled = true;
@@ -433,9 +435,23 @@
           location.hash = '#/otp?phone=' + enc(identifier);
           return;
         }
-        mount(PWA.auth('رمز عبور', form('login', '<input type="hidden" name="identifier" value="' + esc(identifier) + '">' +
-          field('password', 'رمز عبور', 'password', 'autocomplete="current-password"'), 'ورود') +
-          '<div class="reference-auth-alternatives"><a href="#/forgot">فراموشی رمز عبور</a></div>'));
+        const phone = status.identifier_type === 'phone' ? '?phone=' + enc(identifier) : '';
+        mount(PWA.auth('Enter your password.', form('login', '<input type="hidden" name="identifier" value="' + esc(identifier) + '">' +
+          '<div class="reference-password-field"><input type="password" name="password" autocomplete="current-password" aria-label="Password" placeholder="Password" required>' +
+          '<button type="button" id="toggle-password" aria-label="نمایش رمز عبور" aria-pressed="false">' + PWA_SOURCE.passwordHidden + '</button></div>', 'Continue') +
+          '<div class="reference-password-alternatives"><a class="reference-forgot" href="#/forgot">Forgot password</a>' +
+          '<a class="reference-sms" href="#/otp' + phone + '">' + PWA_SOURCE.smsIcon + '<span>Get a sign-in code by SMS</span>' +
+          PWA_SOURCE.smsChevron + '</a></div>'));
+        $('.reference-auth-back').onclick = event => { event.preventDefault(); login(identifier); };
+        const toggle = $('#toggle-password');
+        toggle.onclick = () => {
+          const input = $('#login [name=password]');
+          const visible = input.type === 'password';
+          input.type = visible ? 'text' : 'password';
+          toggle.innerHTML = visible ? PWA_SOURCE.passwordVisible : PWA_SOURCE.passwordHidden;
+          toggle.setAttribute('aria-pressed', String(visible));
+          toggle.setAttribute('aria-label', visible ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور');
+        };
         submit('login', async data => {
           await api('/accounts/api/login-password/', {body:data});
           await finishLogin(sequence);
@@ -908,7 +924,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۱ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۱۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

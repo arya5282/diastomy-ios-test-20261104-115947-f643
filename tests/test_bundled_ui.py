@@ -95,7 +95,7 @@ with sync_playwright() as playwright:
     page.locator('#identify button').click()
     page.wait_for_selector('#login')
     page.fill('[name=password]', 'not-a-real-password')
-    page.locator('#login button').click()
+    page.locator('#login [type=submit]').click()
     page.wait_for_function('document.querySelector("#login-status").textContent.includes("رمز اشتباه")')
     assert page.evaluate('window.__calls.some(x => x.path === "/accounts/api/login-password/" && x.body.identifier === "invalid@example.test")')
     print('PASS: login sends JSON and displays API error')
