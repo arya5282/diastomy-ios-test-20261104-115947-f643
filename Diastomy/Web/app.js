@@ -968,7 +968,7 @@
     if (state.checkingSession || (!state.sessionKnown && !state.user)) {
       PWA.page('startup');
       const content = state.checkingSession
-        ? '<div class="loading" aria-hidden="true"></div><p role="status">در حال آماده‌سازی دیاستومی…</p>'
+        ? '<div class="startup-spinner" aria-hidden="true"></div><p role="status">در حال آماده‌سازی دیاستومی…</p>'
         : '<p role="status">وضعیت ورود بررسی نشد. اتصال اینترنت را بررسی کنید.</p><button id="retry-session" type="button">تلاش دوباره</button>';
       mount('<section class="local-startup"><img src="assets/logo.svg" alt="دیاستومی">' + content + '</section>');
       const retry = $('#retry-session');
