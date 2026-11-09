@@ -165,7 +165,9 @@ def home(request):
     from core.views import _home_public_context
     from django.core.cache import cache
     from django.utils.translation import get_language
-    key = 'mobile-app-home:v2:' + (get_language() or 'fa')
+    from movie.templatetags.image_perf import hero_artwork
+    from movie.templatetags.pwa_ui import pwa_hero_age_rating, pwa_hero_duration
+    key = 'mobile-app-home:v3:' + (get_language() or 'fa')
     data = cache.get(key)
     if data is None:
         context = _home_public_context()
@@ -182,7 +184,11 @@ def home(request):
             ('animations', 'جدیدترین انیمیشن‌ها'),
         ]
         data = {
-            'hero': [card(x) for x in context['hero_items']],
+            'hero': [{**card(x), 'hero_artwork': hero_artwork(x),
+                      'hero_age': pwa_hero_age_rating(x.age_limit) if x.age_limit is not None else '',
+                      'hero_duration': pwa_hero_duration(x.duration) if x.duration else '',
+                      'hero_trending': x in context.get('trending_movies', [])}
+                     for x in context['hero_items']],
             'rails': [{'key': key, 'title': title, 'items': [card(x) for x in context.get(key, [])]}
                       for key, title in names],
             'genres': [{'slug': x.slug, 'name': genre_name(x)} for x in context['genres']],

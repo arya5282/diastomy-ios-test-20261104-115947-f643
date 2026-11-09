@@ -27,15 +27,30 @@ window.PWA = (() => {
   }
   function hero(items) {
     if (!items.length) return '';
+    const dot = '<i class="nyx-prime-genre-dot" aria-hidden="true"></i>';
     return '<section class="nyx-prime-hero" aria-label="فیلم‌ها و سریال‌های ویژه" dir="ltr"><ul class="nyx-prime-rail" tabindex="0">' +
-      items.map((item, i) => '<li class="nyx-prime-slide"><a class="nyx-prime-card" href="' + titleURL(item) +
-        '"><picture class="nyx-prime-picture"><img src="' + media(item.banner || item.cover) + '" alt="' + esc(item.title) +
-        '" loading="' + (i < 2 ? 'eager' : 'lazy') + '" draggable="false"></picture><div class="nyx-prime-shade"></div><img class="nyx-prime-brand" src="' + logo +
-        '" alt="Diastomy"><div class="nyx-prime-copy"><h2 dir="auto">' + name(item) + '</h2><div class="nyx-prime-meta">' + (item.age_limit != null ? '<span class="nyx-prime-age">+' + esc(item.age_limit) + '</span>' : '') + '<span class="nyx-prime-year">' +
-        esc(item.production_year) + '</span><span class="nyx-prime-genres">' + genres(item) + '</span></div><div class="nyx-prime-trend"><b>' +
-        (item.type === 'series' ? 'NEW SERIES' : 'NEW MOVIE') + '</b></div><div class="nyx-prime-premium"><span>' +
-        (item.is_free ? 'تماشای رایگان' : 'included with premium') + '</span></div></div></a></li>').join('') +
-      '</ul><div class="nyx-prime-dots">' + items.map((_, i) => '<button type="button" data-slide="' + i + '" aria-pressed="' + (i === 0) + '" aria-label="اسلاید ' + (i + 1) + '"></button>').join('') + '</div></section>';
+      items.map((item, i) => {
+        const series = item.type === 'series';
+        const age = item.hero_age || (item.age_limit != null ? '+' + item.age_limit : '');
+        const heroGenres = (item.genres || []).slice(0,3).map(g => '<span>' + esc(typeof g === 'string' ? g : g.name) + '</span>').join('');
+        const fallback = media(item.banner || item.cover);
+        return '<li class="nyx-prime-slide"><a class="nyx-prime-card" href="' + titleURL(item) +
+          '"><picture class="nyx-prime-picture"><img src="' + (item.hero_artwork ? media(item.hero_artwork) : fallback) +
+          '" data-hero-fallback="' + fallback + '" alt="' + esc(item.title) + '" loading="' + (i < 2 ? 'eager' : 'lazy') +
+          '"' + (i === 0 ? ' fetchpriority="high"' : '') + ' decoding="async" draggable="false"></picture>' +
+          '<div class="nyx-prime-shade"></div><img class="nyx-prime-brand" src="' + logo + '" alt="Diastomy">' +
+          '<div class="nyx-prime-copy"><h2 dir="auto">' + name(item) + '</h2><div class="nyx-prime-meta">' +
+          (age ? '<span class="nyx-prime-age">' + esc(age) + '</span>' : '') +
+          (item.hero_duration ? '<span class="nyx-prime-duration">' + esc(item.hero_duration) + '</span>' : '') +
+          '<span class="nyx-prime-year">' + esc(item.production_year) + '</span>' +
+          (heroGenres ? '<span class="nyx-prime-genres">' + dot + '<span class="nyx-prime-genre-names">' + heroGenres + '</span>' + dot + '</span>' : '') +
+          '</div><div class="nyx-prime-trend"><b>' + (item.hero_trending ? 'TRENDING' : series ? 'NEW SERIES' : 'NEW MOVIE') +
+          '</b>' + (series ? '<span>all episodes available</span>' : '') + '</div><div class="nyx-prime-premium">' +
+          (!item.is_free ? '<span class="nyx-prime-check" aria-hidden="true">' + PWA_SOURCE.heroPremium + '</span>' : '') +
+          '<span>' + (item.is_free ? 'تماشای رایگان' : 'included with premium') + '</span></div></div></a></li>';
+      }).join('') + '</ul><div class="nyx-prime-dots">' + items.map((_, i) =>
+        '<button type="button" data-slide="' + i + '" data-distance="' + Math.min(i,3) + '" aria-pressed="' + (i === 0) +
+        '" aria-label="اسلاید ' + (i + 1) + '"></button>').join('') + '</div></section>';
   }
   function home(data, history = []) {
     const order = ['trending_movies','pwa_turkish_series','pwa_latest_movies','pwa_dubbed_movies','pwa_free_movies','pwa_latest_series','pwa_dubbed_series','pwa_free_series','pwa_recommended','animations'];
@@ -175,9 +190,11 @@ window.PWA = (() => {
   function install() {
     document.addEventListener('error', event => {
       const image = event.target;
-      if (!(image instanceof HTMLImageElement) || !image.dataset.historyFallback) return;
-      const fallback = image.dataset.historyFallback;
+      if (!(image instanceof HTMLImageElement)) return;
+      const fallback = image.dataset.historyFallback || image.dataset.heroFallback;
+      if (!fallback) return;
       delete image.dataset.historyFallback;
+      delete image.dataset.heroFallback;
       if (image.getAttribute('src') !== fallback) image.src = fallback;
     }, true);
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
@@ -187,8 +204,11 @@ window.PWA = (() => {
       const rail = event.target;
       if (!(rail instanceof Element) || !rail.matches('.nyx-prime-rail')) return;
       const active = Math.round(rail.scrollLeft / rail.clientWidth);
-      rail.parentElement.querySelectorAll('[data-slide]').forEach(dot =>
-        dot.setAttribute('aria-pressed', String(Number(dot.dataset.slide) === active)));
+      rail.parentElement.querySelectorAll('[data-slide]').forEach(dot => {
+        const distance = Math.abs(Number(dot.dataset.slide) - active);
+        dot.setAttribute('aria-pressed', String(distance === 0));
+        dot.dataset.distance = Math.min(distance,3);
+      });
     }, true);
     document.addEventListener('click', event => {
       if (event.target.closest('[data-local-menu]')) {

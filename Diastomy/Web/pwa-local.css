@@ -435,3 +435,17 @@ html body #dm-auth-reference .reference-sms{
 .reference-season-picker svg{position:absolute;inset:50% auto auto 11px;transform:translateY(-50%);pointer-events:none}
 .reference-episode-head strong{font-family:"PWA Inter",Arial,sans-serif;font-weight:600}
 .reference-episode-seen{vertical-align:middle;margin-left:6px;color:#bbb}
+html.dmf3-active body[data-page=home] #app .nyx-prime-shade{
+  display:block!important;background:linear-gradient(to bottom,transparent 36%,#0004 58%,#000e 86%,#000 100%)!important;
+}
+html.dmf3-active body[data-page=home] #app .nyx-prime-meta{gap:5px!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-age{
+  display:inline-flex!important;align-items:center;justify-content:center;border-radius:999px;background:#e30000!important;color:#100000!important;font-weight:750;padding:2px 6px!important;
+}
+html.dmf3-active body[data-page=home] #app .nyx-prime-trend>span{color:#ef6728!important;font-weight:650;margin-left:5px}
+html.dmf3-active body[data-page=home] #app .nyx-prime-check{display:inline-grid!important;place-items:center;width:14px!important;height:14px!important;background:none!important;flex:none}
+html.dmf3-active body[data-page=home] #app .nyx-prime-check>.dmf53-verify{display:block!important;width:14px!important;height:14px!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-dots button{min-width:0!important;min-height:0!important;width:4px;height:4px;background:#555}
+html.dmf3-active body[data-page=home] #app .nyx-prime-dots button[data-distance="2"]{width:3px;height:3px}
+html.dmf3-active body[data-page=home] #app .nyx-prime-dots button[data-distance="3"]{width:2px;height:2px}
+html.dmf3-active body[data-page=home] #app .nyx-prime-dots button[aria-pressed=true]{width:16px;height:4px;background:#fff}
