@@ -234,7 +234,17 @@ def detail(request, kind, slug):
     # Media links and entitlement are always obtained afresh from playback().
     if kind == 'movie':
         videos = item.videos.select_related('quality').order_by('-quality__weight')
-        data['download_options'] = [{'id': v.pk, 'quality': v.quality.title} for v in videos if v.download_url]
+        from movie.media_sources import video_has_dub
+        data['download_options'] = [
+            {'id': v.pk, 'quality': v.quality.title, 'variant': 'subbed',
+             'size': v.file_size_label}
+            for v in videos if v.direct_download_url
+        ] + [
+            {'id': v.pk, 'quality': v.quality.title, 'variant': 'dubbed',
+             'size': v.dubbed_file_size_label if v.dubbed_download_url else v.file_size_label,
+             'audio': 'دوبله فارسی' if v.dubbed_download_url else 'دوزبانه (فارسی + اصلی)'}
+            for v in videos if video_has_dub(v)
+        ]
         data['videos'] = [{'id': v.pk, 'quality': v.quality.title}
                           for v in videos if direct_url_usable(v)]
     else:

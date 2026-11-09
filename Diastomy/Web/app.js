@@ -292,14 +292,40 @@
           };
         });
         const downloadOptions = $('#film-download-options');
-        if (downloadOptions) $('#film-download').onclick = () => { downloadOptions.hidden = !downloadOptions.hidden; };
+        $('#film-comments').onclick = () => {
+          $('[data-detail-tab="comments"]').click();
+          $('[data-detail-tab="comments"]').scrollIntoView({behavior:'smooth', block:'start'});
+        };
+        if (downloadOptions) {
+          const selectDownloadTab = variant => {
+            downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
+              button.setAttribute('aria-pressed', String(button.dataset.downloadTab === variant));
+            });
+            downloadOptions.querySelectorAll('[data-download-panel]').forEach(panel => {
+              panel.hidden = panel.dataset.downloadPanel !== variant;
+            });
+          };
+          downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
+            button.onclick = () => selectDownloadTab(button.dataset.downloadTab);
+          });
+          $('#film-download').onclick = () => { selectDownloadTab('subbed'); downloadOptions.showModal(); };
+          const audio = $('#film-audio');
+          if (audio) audio.onclick = () => { selectDownloadTab('dubbed'); downloadOptions.showModal(); };
+          downloadOptions.addEventListener('click', event => {
+            if (event.target === downloadOptions) {
+              const bounds = downloadOptions.getBoundingClientRect();
+              if (event.clientX < bounds.left || event.clientX > bounds.right ||
+                  event.clientY < bounds.top || event.clientY > bounds.bottom) downloadOptions.close();
+            }
+          });
+        }
         $('.movie-detail-shell').addEventListener('click', async event => {
           const button = event.target.closest('[data-download]');
           if (!button || button.disabled) return;
           button.disabled = true;
           try {
             const action = kind === 'series' ? 'downloadSeries' : 'downloadMovie';
-            const result = await native({action, slug, id:Number(button.dataset.download)});
+            const result = await native({action, slug, id:Number(button.dataset.download), dubbed:button.dataset.variant === "dubbed"});
             toast(result.ok ? 'فایل در برنامه Files ذخیره شد.' : result.error);
           } catch (error) { toast(error.message); }
           finally { button.disabled = false; }

@@ -103,10 +103,31 @@ window.PWA = (() => {
         '</div>' + (episode.description ? '<p dir="auto">' + esc(episode.description) + '</p>' : '') + '</article>';
     }).join('');
   }
+  function filmDownloadDialog(options, series) {
+    const variants = ['subbed', 'dubbed'];
+    const panels = variants.map(variant => {
+      const dubbed = variant === 'dubbed';
+      const rows = options.filter(option => (option.variant || 'subbed') === variant).map(option =>
+        '<article class="film-download-card"><div class="film-download-meta"><strong dir="ltr">' +
+        esc(option.quality) + (!dubbed && !series ? ' · زیرنویس فارسی' : '') +
+        '</strong>' + (option.size ? '<small dir="ltr">' + esc(option.size) + '</small>' : '') + '</div>' +
+        (option.audio ? '<small>' + esc(option.audio) + '</small>' : '') +
+        '<button type="button" data-download="' + esc(option.id) + '" data-variant="' + variant + '">' +
+        (dubbed ? 'دانلود نسخه دوبله · ' + esc(option.quality) : 'دانلود با لینک مستقیم ↓') + '</button></article>');
+      return '<section data-download-panel="' + variant + '"' + (dubbed ? ' hidden' : '') + '>' +
+        (rows.join('') || '<p class="film-download-empty">لینک دانلود این نسخه در دسترس نیست.</p>') + '</section>';
+    });
+    return '<dialog id="film-download-options" class="film-download-dialog" dir="rtl" aria-labelledby="film-download-title">' +
+      '<form method="dialog"><button class="film-download-close" aria-label="بستن">×</button></form>' +
+      '<h2 id="film-download-title">لینک‌های دانلود</h2>' +
+      (series ? '' : '<div class="film-download-tabs"><button type="button" data-download-tab="subbed" aria-pressed="true">نسخه زیرنویس</button><button type="button" data-download-tab="dubbed" aria-pressed="false">نسخه دوبله</button></div>') +
+      panels.join('') + '</dialog>';
+  }
+
   function detail(item, episodes) {
     const series = item.type === 'series';
     const trailers = (item.trailers || []).filter(trailer => trailer.url && media(trailer.url));
-    const trailerButton = trailers.length ? '<button type="button" class="reference-trailer-play" data-trailer-index="0" aria-label="پخش تریلر">▶</button>' : '';
+    const trailerButton = trailers.length ? '<button type="button" class="reference-trailer-play" data-trailer-index="0" aria-label="پخش تریلر">' + PWA_SOURCE.detailTrailer + '</button>' : '';
     const episodeList = item.episodes || [];
     const firstEpisode = episodeList.find(episode => episode.videos?.length);
     const play = series ? firstEpisode?.videos[0] : (item.videos || [])[0];
@@ -119,12 +140,14 @@ window.PWA = (() => {
       '<div class="dm-film-reference-info"><div class="dm-film-title-row"><h1>' + name(item) + '</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<div class="dm-film-meta" dir="ltr">' + (series ? '<span>' + new Set(episodeList.map(episode => episode.season)).size + ' Season</span>' : item.duration ? '<span>' + esc(item.duration) + ' Min</span>' : '') + '<span>' + esc(item.production_year) + '</span><span>' + genres(item) + '</span></div>' +
       '<div class="dm-film-media">' + (item.age_limit != null ? '<span class="reference-age">' + esc(item.age_limit) + '</span>' : '') +
-      (play ? '<span class="reference-quality">' + esc(play.quality) + '</span>' : '') +
-      (item.comments ? '<span>' + item.comments.length + ' ♧</span>' : '') + '</div>' +
+      (play ? '<button type="button" data-play="' + esc(play.id) + '" data-kind="' + (series ? 'series' : 'movie') + '" aria-label="پخش HD">' + PWA_SOURCE.detailHD + '</button>' : '') +
+      '<button type="button" id="film-comments" aria-label="دیدگاه‌ها">' + esc(item.comment_count ?? (item.comments || []).length) + PWA_SOURCE.detailComments + '</button>' +
+      (!series && options.some(option => option.variant === 'dubbed') ? '<button type="button" id="film-audio" aria-label="نسخه دوبله">' + PWA_SOURCE.detailAudio + '</button>' : '') +
+      (play ? PWA_SOURCE.detailDolby : '') + '</div>' +
       '<div class="dm-film-buttons reference-film-actions" dir="ltr">' +
         (play ? '<button type="button" data-play="' + esc(play.id) + '" data-kind="' + (series ? 'series' : 'movie') + '">Play ' + PWA_SOURCE.detailPlay + '</button>' :
           '<button type="button" disabled>Play</button>') + download + '</div>' +
-      (options.length ? '<div id="film-download-options" class="reference-download-options" hidden>' + downloadOptions(options) + '</div>' : '') +
+      (options.length ? filmDownloadDialog(options, series) : '') +
       (series ? '<div class="reference-series-preferences">' +
         (item.id ? '<button type="button" data-follow="series" data-id="' + esc(item.id) + '" disabled>' + PWA_SOURCE.detailFollow + 'دنبال‌کردن</button>' : '') +
         (item.director_id ? '<button type="button" data-follow="person" data-id="' + esc(item.director_id) + '" disabled>' + PWA_SOURCE.detailFollow + 'دنبال‌کردن کارگردان</button>' : '') +

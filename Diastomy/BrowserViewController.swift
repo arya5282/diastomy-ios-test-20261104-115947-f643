@@ -353,7 +353,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         } else if ["downloadMovie", "downloadSeries"].contains(action), let slug = data["slug"] as? String,
                   let id = data["id"] as? Int, id > 0,
                   slug.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil {
-            downloadVideo(kind: action == "downloadSeries" ? "series" : "movie", slug: slug, id: id) { replyHandler($0, nil) }
+            downloadVideo(kind: action == "downloadSeries" ? "series" : "movie", slug: slug, id: id, dubbed: action == "downloadMovie" && data["dubbed"] as? Bool == true) { replyHandler($0, nil) }
         } else if action == "checkout", let plan = data["plan"] as? Int, plan > 0 {
             send("/accounts/api/create-payment/", method: "POST", body: ["plan_id": plan, "discount_code": data["discount"] as? String ?? ""]) { result in
                 guard let info = result["data"] as? [String: Any], info["success"] as? Bool == true,
@@ -468,8 +468,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         return url
     }
 
-    private func downloadVideo(kind: String, slug: String, id: Int, completion: @escaping ([String: Any]) -> Void) {
-        let url = URL(string: "/movie/\(kind)/\(slug)/download/\(id)/", relativeTo: server)!.absoluteURL
+    private func downloadVideo(kind: String, slug: String, id: Int, dubbed: Bool, completion: @escaping ([String: Any]) -> Void) {
+        let variant = dubbed ? "dubbed/" : ""
+        let url = URL(string: "/movie/\(kind)/\(slug)/download/\(id)/\(variant)", relativeTo: server)!.absoluteURL
         // The existing Django download route checks the session before redirecting.
         URLSession.shared.downloadTask(with: url) { [documents] file, response, _ in
             let result: [String: Any]
