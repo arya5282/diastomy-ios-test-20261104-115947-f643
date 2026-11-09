@@ -292,5 +292,18 @@ window.PWA = (() => {
       else link.removeAttribute('aria-current');
     });
   }
-  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchInput, install, page};
+  function stepFooter(direction) {
+    const nav = document.querySelector('#dm-app-bottom-nav');
+    if (!nav?.getClientRects().length || document.hidden ||
+        document.querySelector('dialog[open], .local-pwa-player') || document.fullscreenElement ||
+        document.activeElement?.matches('input, select, textarea, [contenteditable=true]')) return;
+    const links = [...nav.querySelectorAll('[data-nav-slot]')];
+    const current = links.findIndex(link => link.getAttribute('aria-current') === 'page');
+    if (current < 0) {
+      links[direction > 0 ? 0 : links.length - 1]?.click();
+      return;
+    }
+    links[current + direction]?.click();
+  }
+  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchInput, install, page, stepFooter};
 })();

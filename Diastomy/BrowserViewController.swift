@@ -2,11 +2,16 @@ import UIKit
 import WebKit
 import AVKit
 import CryptoKit
+import CoreMotion
 
 // All documents, scripts, fonts and styles are shipped in Web/.
 // Only JSON APIs and explicitly authorized media use the network.
 final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate {
     private var webView: WKWebView!
+    private let motion = CMMotionManager()
+    private var footerTiltArmed = false
+    private var footerTiltDirection = 0
+    private var footerTiltSamples = 0
     private let server = URL(string: "https://diastomy.top")!
     private var webRoot: URL!
     private var startupPanel: UIView?
@@ -30,6 +35,54 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     override var preferredStatusBarStyle: UIStatusBarStyle { .lightContent }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .allButUpsideDown }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard motion.isDeviceMotionAvailable else { return }
+        motion.deviceMotionUpdateInterval = 0.1
+        motion.startDeviceMotionUpdates(to: .main) { [weak self] sample, _ in
+            guard let sample else { return }
+            self?.updateFooterTilt(sample.gravity)
+        }
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        motion.stopDeviceMotionUpdates()
+        resetFooterTilt(armed: false)
+    }
+
+    private func resetFooterTilt(armed: Bool) {
+        footerTiltArmed = armed
+        footerTiltDirection = 0
+        footerTiltSamples = 0
+    }
+
+    private func updateFooterTilt(_ gravity: CMAcceleration) {
+        guard UIApplication.shared.applicationState == .active,
+              view.window?.windowScene?.interfaceOrientation == .portrait,
+              gravity.y < -0.45, isLocal(webView.url) else {
+            resetFooterTilt(armed: false)
+            return
+        }
+        if abs(gravity.x) < 0.15 {
+            resetFooterTilt(armed: true)
+            return
+        }
+        guard footerTiltArmed, abs(gravity.x) > 0.37 else {
+            footerTiltSamples = 0
+            return
+        }
+        let direction = gravity.x > 0 ? 1 : -1
+        if direction != footerTiltDirection {
+            footerTiltDirection = direction
+            footerTiltSamples = 0
+        }
+        footerTiltSamples += 1
+        guard footerTiltSamples >= 3 else { return }
+        resetFooterTilt(armed: false)
+        webView.evaluateJavaScript("window.PWA?.stepFooter(\(direction))")
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
