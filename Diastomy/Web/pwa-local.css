@@ -122,10 +122,13 @@ body .dm-film-buttons [data-play]{flex:1;justify-content:center;border-radius:99
 #app .reference-genre{position:relative;min-width:112px;overflow:hidden;justify-content:center;align-items:center}
 #app .reference-genre img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #app .reference-genre span{position:relative;color:white;font-weight:bold}
-.reference-continue{display:flex;overflow-x:auto;gap:9px}
-.reference-continue>div{flex:0 0 185px;min-width:0}
-.reference-continue progress{width:100%;height:4px;accent-color:#e20000}
-.reference-continue small{color:#aaa}
+.reference-continue{
+  display:flex;align-items:flex-start;gap:8px;overflow-x:auto;padding:0 16px;scrollbar-width:none;
+}
+#app .reference-continue .library-history-card{flex:0 0 min(47vw,215px);min-width:0;margin:0}
+#app .reference-continue .library-history-thumb{height:auto;aspect-ratio:2.15;width:100%;border-radius:9px;display:block;position:relative;overflow:hidden}
+#app .reference-continue .library-history-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+#app .reference-continue .library-history-meta{margin-top:5px;color:#aaa;font-size:10px}
 #app .nyx-prime-dots button[aria-pressed=true]{width:16px;border-radius:9px;background:white}
 body #dm-app-menu .dm-app-menu-top{display:grid!important;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:0;min-height:40px}
 body #dm-app-menu .ar-menu-heading{display:contents!important}

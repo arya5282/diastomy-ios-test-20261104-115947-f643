@@ -60,12 +60,8 @@ window.PWA = (() => {
       illustratedGenres.map(slug => '<a class="dm54-genre reference-genre" href="#/browse/all?genre=' + slug +
         '"><img loading="lazy" alt="" src="https://diastomy.top/pwa/genre-images/v1/' + slug + '/"><span>' +
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
-    const continueHTML = history.length ? '<section class="dm54-section dm54-horizontal-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library">بیشتر</a></div><div class="dm54-htrack reference-continue">' +
-      history.slice(0, 12).map(item => {
-        const percent = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
-        return '<div>' + landscape(item) + '<progress max="100" value="' + percent + '"></progress><small>' +
-          Math.max(0, Math.ceil((item.total - item.position) / 60)) + ' دقیقه باقی مانده</small></div>';
-      }).join('') + '</div></section>' : '';
+    const continueHTML = history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
+      '<div class="reference-continue">' + history.slice(0, 12).map(item => historyCard(item)).join('') + '</div></section>' : '';
     return hero(data.hero || []) + '<div class="dm-pwa-home-v54 dm-figma-home-v2">' +
       rails.filter(r => r.items.length).map(r => {
         const wide = r.key === 'pwa_free_movies';
