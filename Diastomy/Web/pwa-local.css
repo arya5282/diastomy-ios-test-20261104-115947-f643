@@ -449,3 +449,16 @@ html.dmf3-active body[data-page=home] #app .nyx-prime-dots button{min-width:0!im
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots button[data-distance="2"]{width:3px;height:3px}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots button[data-distance="3"]{width:2px;height:2px}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots button[aria-pressed=true]{width:16px;height:4px;background:#fff}
+.local-comments-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.local-comments-head small{color:#888;white-space:nowrap}
+.local-comment-spoiler{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:#aaa}
+.local-comment-spoiler input{width:16px;height:16px;accent-color:#d00}
+.local-comment-compose{display:flex;align-items:center;gap:6px;padding:4px;border:1px solid #383838;border-radius:16px}
+.local-comment-compose textarea{flex:1;min-width:0;background:none;border:0;padding:6px 8px;resize:vertical;font-size:12px}
+.local-comment-compose button{background:#d00;border:0;border-radius:10px;display:grid;place-items:center;padding:6px}
+.local-comment-compose svg{width:19px;height:19px}
+#title-comment-status:empty{display:none}
+[data-detail-panel=comments] .nd-comment{border:1px solid #292929;border-radius:12px;padding:10px;margin-top:14px}
+[data-detail-panel=comments] .nd-comment header{position:static;display:flex;justify-content:space-between;gap:8px;background:none;border:0;padding:0}
+[data-detail-panel=comments] .nd-comment p{white-space:pre-line;color:#ccc}
+.local-similar-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}

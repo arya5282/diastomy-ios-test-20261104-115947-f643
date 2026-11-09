@@ -141,15 +141,23 @@ window.PWA = (() => {
       '<button type="button" data-detail-tab="trailers" aria-pressed="false">تریلرها</button>' +
       '<button type="button" data-detail-tab="similar" aria-pressed="false">مشابه</button></div>' +
       (item.type === 'series' ? '<div data-detail-panel="episodes">' + episodes + '</div>' : '') +
-      '<div data-detail-panel="comments"' + (item.type === 'series' ? ' hidden' : '') + '><h2>دیدگاه‌های ' + name(item) + '</h2>' +
-      (item.comments || []).map(comment => comment.spoiler
-        ? '<details class="spoiler-comment"><summary>دیدگاه حاوی اسپویل</summary><p>' + esc(comment.text) + '</p></details>'
-        : '<p>' + esc(comment.text) + '</p>').join('') +
-      '<p>' + (item.comments ? item.comments.length + ' دیدگاه' : 'دیدگاه‌ها هنوز در دسترس نیستند.') + '</p></div>' +
+      '<div data-detail-panel="comments"' + (item.type === 'series' ? ' hidden' : '') + '><div class="local-comments-head"><h2>دیدگاه‌های ' +
+      name(item) + '</h2><small>' + esc(item.comment_count ?? (item.comments || []).length) + ' دیدگاه</small></div>' +
+      '<form id="title-comment"><label class="local-comment-spoiler"><input type="checkbox" name="spoiler"> این نظر حاوی اسپویل است</label>' +
+      '<div class="local-comment-compose"><textarea name="text" rows="1" aria-label="دیدگاه" placeholder="نظرت رو اینجا بنویس ..." maxlength="2000" required></textarea>' +
+      '<button type="submit" aria-label="ارسال دیدگاه"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 3 3 10l8 3 3 8 7-18Z"/><path d="m11 13 10-10"/></svg></button></div>' +
+      '<p id="title-comment-status" role="status"></p></form>' +
+      (item.comments || []).map(comment => '<article class="nd-comment' + (comment.spoiler ? ' spoiler-comment' : '') +
+        '"><header><strong>' + esc(comment.author) + '</strong>' +
+        (comment.created_at ? '<time>' + esc(new Date(comment.created_at).toLocaleDateString('fa-IR')) + '</time>' : '') + '</header>' +
+        (comment.spoiler ? '<details><summary>دیدگاه حاوی اسپویل</summary><p>' + esc(comment.text) + '</p></details>' :
+          '<p>' + esc(comment.text) + '</p>') + '</article>').join('') + '</div>' +
       '<div data-detail-panel="trailers" hidden>' + (trailers.length ? trailers.map((trailer, index) =>
         '<button type="button" data-trailer-index="' + index + '">▶ ' + esc(trailer.title || 'تریلر ' + (index + 1)) + '</button>').join('') :
         '<p>تریلر در دسترس نیست.</p>') + '</div>' +
-      '<div data-detail-panel="similar" hidden><a class="button" href="#/browse/' + (item.type === 'series' ? 'series' : 'movie') + '">مشاهده آرشیو</a></div></div></article>';
+      '<div data-detail-panel="similar" hidden>' + ((item.similar || []).length ?
+        '<div class="local-similar-grid">' + item.similar.map(card).join('') + '</div>' :
+        '<a class="button" href="#/browse/' + (item.type === 'series' ? 'series' : 'movie') + '">مشاهده آرشیو</a>') + '</div></div></article>';
   }
   function account(user, viewing, back) {
     const watchTime = viewing ? '<a class="dm-viewing-summary" href="#/library?tab=history"><span class="dm-viewing-icon">' +

@@ -216,10 +216,20 @@ def detail(request, kind, slug):
     data['hero_cover'] = file_url(getattr(item, 'trailer_cover', None)) or data['banner']
     data['actors'] = [{'slug': a.slug, 'name': a.name, 'photo': file_url(a.photo)}
                       for a in item.actors.all()[:30]]
+    from django.db.models import Count
+    comments = item.comments.filter(is_approved=True, parent__isnull=True)
+    data['comment_count'] = comments.count()
     data['comments'] = [
-        {'text': comment.text, 'spoiler': comment.is_spoiler}
-        for comment in item.comments.filter(is_approved=True, parent__isnull=True).order_by('-pk')[:30]
+        {'text': comment.text, 'spoiler': comment.is_spoiler,
+         'author': comment.user.username, 'created_at': comment.created_at.isoformat()}
+        for comment in comments.select_related('user').order_by('-pk')[:30]
     ]
+    related = type(item).objects.filter(genres__in=item.genres.all()).exclude(pk=item.pk)
+    if kind == 'series':
+        related = related.distinct().order_by('-imdb_rating', '-created_at')
+    else:
+        related = related.annotate(shared_genres=Count('genres', distinct=True)).order_by('-shared_genres', '-created_at', '-pk')
+    data['similar'] = [card(related_item) for related_item in related.prefetch_related('genres')[:10]]
     # Only public metadata here: this response can be retained offline.
     # Media links and entitlement are always obtained afresh from playback().
     if kind == 'movie':
@@ -243,6 +253,24 @@ def detail(request, kind, slug):
                                      'cover': file_url(episode.cover), 'duration': episode.duration,
                                      'description': getattr(episode, 'description_fa', '') or episode.description})
     return JsonResponse(data)
+
+
+@private
+@require_http_methods(['POST'])
+def add_title_comment(request, kind, slug):
+    import json
+
+    try:
+        body = json.loads(request.body)
+        text = body['text'].strip()
+        spoiler = body.get('is_spoiler', False)
+        if not 1 <= len(text) <= 2000 or type(spoiler) is not bool:
+            raise ValueError
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return JsonResponse({'error': 'متن دیدگاه باید بین ۱ تا ۲۰۰۰ نویسه باشد.'}, status=400)
+    item = title_object(kind, slug)
+    item.comments.create(user=request.user, text=text, is_spoiler=spoiler)
+    return JsonResponse({'message': 'دیدگاه ثبت شد و پس از تأیید نمایش داده می‌شود.'}, status=201)
 
 
 @never_cache
@@ -371,6 +399,7 @@ urlpatterns = [
     path('browser-sign-in/finish/', browser_sign_in_finish, name='ios_browser_sign_in_finish'),
     path('browser-sign-in/redeem/', browser_sign_in_redeem),
     path('title/<str:kind>/<slug:slug>/', detail),
+    path('title/<str:kind>/<slug:slug>/comments/', add_title_comment),
     path('playback/<str:kind>/<int:video_id>/', playback),
     path('library/', library), path('settings/', settings),
     path('rooms/', rooms), path('rooms/<str:code>/', room_detail),
