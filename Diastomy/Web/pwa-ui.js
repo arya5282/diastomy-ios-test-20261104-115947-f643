@@ -297,7 +297,7 @@ window.PWA = (() => {
   function page(name) {
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
     document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
-    document.getElementById('pwa-header').hidden = ['login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments'].includes(name);
+    document.getElementById('pwa-header').hidden = ['startup','login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
     const nav = document.getElementById('dm-app-bottom-nav');
     const links = [...nav.querySelectorAll('[data-nav-slot]')];

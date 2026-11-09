@@ -499,10 +499,6 @@
     $('#identify [name=identifier]').value = previousIdentifier;
     $('.reference-auth-back').onclick = event => { event.preventDefault(); login(); };
     const output = $('#identify-status');
-    if (state.checkingSession) {
-      $('#identify button').disabled = true;
-      output.textContent = 'در حال بررسی ورود…';
-    } else if (!state.sessionKnown) output.textContent = 'برای بررسی ورود به اینترنت وصل شوید.';
     submit('identify', async ({identifier}) => {
       const sequence = state.sequence;
       await api('/api/app/v1/session/');
@@ -969,9 +965,14 @@
     const params = new URLSearchParams(split === -1 ? '' : hash.slice(split + 1));
     let parts; try { parts = path.split('/').filter(Boolean).map(decodeURIComponent); } catch (_) { parts = ['home']; }
     const name = parts[0] || 'home';
-    if (state.checkingSession) {
-      PWA.page('login');
-      login();
+    if (state.checkingSession || (!state.sessionKnown && !state.user)) {
+      PWA.page('startup');
+      const content = state.checkingSession
+        ? '<div class="loading" aria-hidden="true"></div><p role="status">در حال آماده‌سازی دیاستومی…</p>'
+        : '<p role="status">وضعیت ورود بررسی نشد. اتصال اینترنت را بررسی کنید.</p><button id="retry-session" type="button">تلاش دوباره</button>';
+      mount('<section class="local-startup"><img src="assets/logo.svg" alt="دیاستومی">' + content + '</section>');
+      const retry = $('#retry-session');
+      if (retry) retry.onclick = checkStartupSession;
       return;
     }
     if (!state.user && !['login','otp','forgot'].includes(name)) {
@@ -1001,7 +1002,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }
@@ -1043,11 +1044,14 @@
   window.addEventListener('hashchange', route);
   window.addEventListener('online', () => { connection(true); if (!document.body.classList.contains('local-player-open')) route(); });
   window.addEventListener('offline', () => connection(false));
-  PWA.install();
-  route();
-  refreshSession().finally(() => {
+  async function checkStartupSession() {
+    state.checkingSession = true;
+    route();
+    await refreshSession();
     state.checkingSession = false;
     if (state.user && (!location.hash || location.hash === '#/login')) history.replaceState(null, '', '#/home');
     route();
-  });
+  }
+  PWA.install();
+  checkStartupSession();
 })();
