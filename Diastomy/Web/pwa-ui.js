@@ -19,6 +19,32 @@ window.PWA = (() => {
       '<span class="dm54-poster-brand" aria-hidden="true"><svg class="dmf54-poster-mark" width="28" height="24" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg></span>' +
       '</span><span class="dm54-vmeta"><strong>' + name(item) + '</strong><small class="dm54-old-genres">' + genres(item) + '</small></span></a>';
   }
+  function actorPage() {
+    return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
+      PWA_SOURCE.actorBack + '</a><h1>Actors</h1><button class="dm-actor-menu" type="button" data-local-menu aria-label="منو">' +
+      PWA_SOURCE.actorMenu + '</button></header><div class="dm-actor-page" id="actors-data"><div class="loading"></div></div>';
+  }
+  function actorProfile(data, slug) {
+    const actor = data.actor;
+    const films = data.filmography.map(item => '<a class="dm-actor-film" href="' + titleURL(item) + '"><div class="dm-actor-poster"><img src="' +
+      media(item.cover) + '" alt="' + name(item) + '" loading="lazy" width="180" height="240">' +
+      (item.imdb_rating ? '<span class="dm-actor-rating" dir="ltr">' + esc(item.imdb_rating) + star + '</span>' : '') +
+      '<span class="dm-actor-mark" aria-hidden="true"><img src="' + logo + '" alt=""></span></div><h3 dir="ltr">' +
+      name(item) + '</h3><p class="dm-actor-genres" dir="ltr">' + (item.genres || []).map(esc).join(', ') + '</p></a>').join('');
+    const href = '#/actor/' + encodeURIComponent(slug) + '/';
+    return '<section class="dm-actor-profile" aria-label="معرفی بازیگر"><img class="dm-actor-photo" src="' +
+      (actor.photo ? media(actor.photo) : '/static/public/assets/avatars/default/avatar-04.svg') + '" alt="' + esc(actor.name) + '"><div class="dm-actor-bio"><h2 dir="auto">' + esc(actor.name) +
+      '</h2><p id="dm-actor-facts" dir="rtl">' + esc(actor.summary || actor.bio) +
+      '</p><button type="button" class="dm-actor-more" aria-expanded="false" aria-controls="dm-actor-facts" hidden>بیشتر</button></div></section>' +
+      '<div class="reference-series-preferences dm-actor-preferences" dir="rtl"><button type="button" data-follow="person" data-id="' +
+      esc(actor.id) + '" aria-pressed="false" disabled>' + PWA_SOURCE.detailFollow + 'دنبال‌کردن</button>' +
+      '<button type="button" id="series-spoiler" aria-pressed="false" disabled>' + PWA_SOURCE.detailSpoiler + 'بدون اسپویل</button></div>' +
+      '<h2 class="dm-actor-heading">فیلم‌های بازیگر</h2><div class="dm-actor-grid" dir="rtl">' +
+      (films || '<p class="dm-actor-empty">اثری برای این بازیگر یافت نشد.</p>') + '</div>' +
+      (data.total_pages > 1 ? '<nav class="dm-actor-pagination" dir="rtl" aria-label="صفحه‌های آثار">' +
+        (data.has_previous ? '<a href="' + href + (data.page - 1) + '">قبلی</a>' : '') + '<span>' + esc(data.page) + ' / ' +
+        esc(data.total_pages) + '</span>' + (data.has_next ? '<a href="' + href + (data.page + 1) + '">بعدی</a>' : '') + '</nav>' : '');
+  }
   function landscape(item) {
     return '<a href="' + titleURL(item) + '" class="dm54-hcard" dir="ltr"><span class="dm54-landscape"><img src="' + media(item.banner || item.cover) +
       '" alt="' + esc(item.title) + '" loading="lazy"><span class="dm54-landscape-shade"></span><span class="dm54-landscape-brand"><img src="' + logo +
@@ -140,10 +166,10 @@ window.PWA = (() => {
       '<div class="dm-film-reference-info"><div class="dm-film-title-row"><h1>' + name(item) + '</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<div class="dm-film-meta" dir="ltr">' + (series ? '<span>' + new Set(episodeList.map(episode => episode.season)).size + ' Season</span>' : item.duration ? '<span>' + esc(item.duration) + ' Min</span>' : '') + '<span>' + esc(item.production_year) + '</span><span>' + genres(item) + '</span></div>' +
       '<div class="dm-film-media">' + (item.age_limit != null ? '<span class="reference-age">' + esc(item.age_limit) + '</span>' : '') +
-      (play ? '<button type="button" data-play="' + esc(play.id) + '" data-kind="' + (series ? 'series' : 'movie') + '" aria-label="پخش HD">' + PWA_SOURCE.detailHD + '</button>' : '') +
+      (play ? '<button type="button" data-play="' + esc(play.id) + '" data-kind="' + (series ? 'series' : 'movie') + '" class="reference-media-hd" aria-label="پخش HD">' + PWA_SOURCE.detailHD + '</button>' : '') +
       '<button type="button" id="film-comments" aria-label="دیدگاه‌ها">' + esc(item.comment_count ?? (item.comments || []).length) + PWA_SOURCE.detailComments + '</button>' +
       (!series && options.some(option => option.variant === 'dubbed') ? '<button type="button" id="film-audio" aria-label="نسخه دوبله">' + PWA_SOURCE.detailAudio + '</button>' : '') +
-      (play ? PWA_SOURCE.detailDolby : '') + '</div>' +
+      (play ? '<span class="reference-media-dolby" role="img" aria-label="Dolby Vision">' + PWA_SOURCE.detailDolby + '</span>' : '') + '</div>' +
       '<div class="dm-film-buttons reference-film-actions" dir="ltr">' +
         (play ? '<button type="button" data-play="' + esc(play.id) + '" data-kind="' + (series ? 'series' : 'movie') + '">Play ' + PWA_SOURCE.detailPlay + '</button>' :
           '<button type="button" disabled>Play</button>') + download + '</div>' +
@@ -266,5 +292,5 @@ window.PWA = (() => {
       else link.removeAttribute('aria-current');
     });
   }
-  return {card, home, historyCard, episodeCards, detail, account, auth, searchInput, install, page};
+  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchInput, install, page};
 })();

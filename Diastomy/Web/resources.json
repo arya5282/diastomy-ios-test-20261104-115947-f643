@@ -7,11 +7,13 @@
   "/player-icons.js": "application/javascript",
   "/player.css": "text/css",
   "/player.js": "application/javascript",
+  "/pwa-actor.css": "text/css",
   "/pwa-local.css": "text/css",
   "/pwa-pages.css": "text/css",
   "/pwa-shell.js": "application/javascript",
   "/pwa-source.css": "text/css",
   "/pwa-ui.js": "application/javascript",
+  "/static/public/assets/avatars/default/avatar-04.svg": "image/svg+xml",
   "/static/public/assets/fonts/Inter.woff2": "font/woff2",
   "/static/public/assets/fonts/YekanBakhFaNum-VF.woff2": "font/woff2",
   "/static/public/assets/fonts/auth-arabic-reference.ttf": "font/ttf",
@@ -33,5 +35,6 @@
   "/static/pwa/generated/7b07b7f4d9254846aff4.jpg": "image/jpeg",
   "/static/pwa/generated/c41b864f57f3eddd4c14.webp": "image/webp",
   "/static/pwa/generated/ca2572136e7c336b6923.ttf": "font/ttf",
-  "/static/pwa/generated/dc13c2c87dd3a5be4044.woff2": "font/woff2"
+  "/static/pwa/generated/dc13c2c87dd3a5be4044.woff2": "font/woff2",
+  "/static/pwa/generated/f11a358bd700e42e0265.png": "image/png"
 }

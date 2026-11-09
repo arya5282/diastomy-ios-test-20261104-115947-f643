@@ -3,6 +3,7 @@
 Install as core/mobile_app_api.py and include urlpatterns at api/app/v1/.
 Existing authentication, CSRF, media entitlement and playback routes stay active.
 """
+import json
 from functools import wraps
 
 from django.http import JsonResponse, Http404
@@ -403,7 +404,22 @@ def room_detail(request, code):
                          'videos': videos, 'state': room.state_dict(), 'server_ts': time.time()})
 
 
+@require_GET
+def actor_profile(request, slug):
+    from movie.actor_summary import actor_summary
+    from movie.api_views import api_actor_detail
+
+    response = api_actor_detail(request, slug)
+    if response.status_code != 200:
+        return response
+    data = json.loads(response.content)
+    actor = get_object_or_404(Person, pk=data['actor']['id'])
+    data['actor']['summary'] = actor_summary(actor)
+    return JsonResponse(data)
+
+
 urlpatterns = [
+    path('actor/<slug:slug>/', actor_profile),
     path('session/', session), path('home/', home),
     path('browser-sign-in/', browser_sign_in),
     path('browser-sign-in/finish/', browser_sign_in_finish, name='ios_browser_sign_in_finish'),

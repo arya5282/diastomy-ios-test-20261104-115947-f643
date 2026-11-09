@@ -205,7 +205,7 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
   }
-  function loadSeriesPreferences(sequence) {
+  function loadContentPreferences(sequence) {
     const endpoint = '/api/content-preferences/';
     const spoiler = $('#series-spoiler');
     function setSpoiler(enabled) {
@@ -276,7 +276,7 @@
             whenCurrent(seq, () => { watchState = result.items || {}; renderEpisodes(); });
           }).catch(() => {});
         }
-        if (kind === 'series') loadSeriesPreferences(seq);
+        if (kind === 'series') loadContentPreferences(seq);
         const trailers = (data.trailers || []).filter(trailer => imageURL(trailer.url));
         document.querySelectorAll('[data-trailer-index]').forEach(button => {
           button.onclick = () => {
@@ -342,12 +342,41 @@
       });
     } catch (error) { whenCurrent(seq, () => mount(shell('جزئیات عنوان', empty(error.message)))); }
   }
-  async function actors(seq, slug) {
-    mount(shell(slug ? 'بازیگر' : 'بازیگران', '<div id="actors-data"><div class="loading"></div></div>'));
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href^="#/actor/"]');
+    if (link && !location.hash.startsWith('#/actor/')) state.actorBack = location.hash;
+  });
+  async function actors(seq, slug, page) {
+    mount(slug ? PWA.actorPage() : shell('بازیگران', '<div id="actors-data"><div class="loading"></div></div>'));
+    const query = '?page=' + (Number(page) || 1);
     try {
-      const data = await api(slug ? '/movie/api/actor/' + enc(slug) + '/' : '/movie/api/actors/', { cache: true });
+      const cache = {cache:true};
+      const data = slug ? await api('/api/app/v1/actor/' + enc(slug) + '/' + query, cache)
+        .catch(() => api('/movie/api/actor/' + enc(slug) + '/' + query, cache)) :
+        await api('/movie/api/actors/', cache);
       whenCurrent(seq, () => {
-        $('#actors-data').innerHTML = slug ? image(data.actor.photo, 'avatar', data.actor.name) + '<h2>' + esc(data.actor.name) + '</h2><p class="description">' + esc(data.actor.bio) + '</p><div class="grid">' + data.filmography.map(card).join('') + '</div>' : '<div class="grid">' + data.actors.map(a => '<a class="person" href="#/actor/' + enc(a.slug) + '">' + image(a.photo, '', a.name) + '<p>' + esc(a.name) + '</p></a>').join('') + '</div>';
+        $('#actors-data').innerHTML = slug ? PWA.actorProfile(data, slug) :
+          '<div class="grid">' + data.actors.map(a => '<a class="person" href="#/actor/' + enc(a.slug) + '">' +
+          image(a.photo, '', a.name) + '<p>' + esc(a.name) + '</p></a>').join('') + '</div>';
+        if (!slug) return;
+        const back = $('.dm-actor-back');
+        back.onclick = event => {
+          if (!state.actorBack || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          location.hash = state.actorBack;
+        };
+        const facts = $('#dm-actor-facts');
+        const more = $('.dm-actor-more');
+        const measure = () => { if (!facts.classList.contains('dm-expanded')) more.hidden = facts.scrollHeight <= facts.clientHeight + 1; };
+        more.onclick = () => {
+          const expanded = facts.classList.toggle('dm-expanded');
+          more.setAttribute('aria-expanded', String(expanded));
+          more.textContent = expanded ? 'کمتر' : 'بیشتر';
+          measure();
+        };
+        measure();
+        document.fonts?.ready.then(measure);
+        loadContentPreferences(seq);
       });
     } catch (error) { whenCurrent(seq, () => fail($('#actors-data'), error)); }
   }
@@ -958,7 +987,7 @@
       else if (name === 'browse') await browse(seq, parts[1] || 'all', params, false);
       else if (name === 'search') await browse(seq, 'all', params, true);
       else if (name === 'title') await detail(seq, parts[1], parts[2]);
-      else if (name === 'actors' || name === 'actor') await actors(seq, parts[1]);
+      else if (name === 'actors' || name === 'actor') await actors(seq, parts[1], parts[2]);
       else if (name === 'library') library(seq, params);
       else if (name === 'login') login();
       else if (name === 'otp') otp(params);
