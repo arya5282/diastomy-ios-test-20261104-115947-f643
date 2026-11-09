@@ -468,6 +468,7 @@ html.dmf3-active body[data-page=home] #app .nyx-prime-dots{display:flex;align-it
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots button{margin:0;flex:none}
 #app .dm-film-media button{display:inline-flex;align-items:center;gap:4px;min-height:0;background:none;border:0;padding:0;color:inherit}
 #app .dm-film-media svg,#app .reference-trailer-play svg{display:block;flex:none}
+#app .dm-film-media svg{max-width:none;max-height:none}
 #app .dm-film-media .reference-media-hd svg{width:27px;height:20px}
 #app #film-comments svg{width:15px;height:15px}
 #app #film-audio svg{width:36px;height:12px}
