@@ -571,3 +571,19 @@ body[data-page=search] #app .dm-search-genre span{font:700 10px Arial,sans-serif
 body[data-page=search] #app .dm-search-recommendations{gap:20px clamp(14px,7vw,28px)}
 body[data-page=search] #app .dm-search-recommendations .dm54-poster{aspect-ratio:3/4;border-radius:7px}
 @media(prefers-reduced-motion:reduce){#search-genres-extra{transition:none}}
+body[data-page=my-library] #app{padding:0}
+body[data-page=my-library] #app .library-header{box-sizing:border-box;margin:0;padding:20px 16px}
+body[data-page=my-library] #app .library-shell{box-sizing:border-box;padding:15px 16px 115px}
+body[data-page=my-library] #app .library-tabs{margin:0 0 32px!important}
+body[data-page=my-library] #app .library-tabs button{padding:14px 2px!important;font-size:14px;line-height:24px}
+body[data-page=my-library] #app .library-history-meta{display:flex;direction:ltr;align-items:center;justify-content:space-between;margin-top:3px;color:#ccc;font:9px/18px Arial,sans-serif}
+body[data-page=my-library] #app .library-history-meta small{font:inherit}
+#app .library-history-thumb .local-history-mark{width:27px;height:24px;right:7px;bottom:12px;pointer-events:none}
+#app .local-library-progress{appearance:none;-webkit-appearance:none;inset:auto 7px 5px;width:calc(100% - 14px);height:2px;border:0;border-radius:3px;overflow:hidden;background:#aaa}
+#app .local-library-progress::-webkit-progress-bar{background:#aaa}
+#app .local-library-progress::-webkit-progress-value{background:#df0000}
+#app .library-remove{min-width:24px;min-height:0;padding:0;border:0;background:none;color:#aaa;font:16px/18px Arial,sans-serif}
+#history-menu{margin:auto;padding:16px;max-width:85vw;border:1px solid #444;border-radius:16px;background:#151515;color:#fff}
+#history-menu::backdrop{background:#0008}
+#history-menu a{display:block;margin:10px 0;color:white}
+#history-menu [hidden]{display:none}

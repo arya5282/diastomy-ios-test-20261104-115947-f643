@@ -108,14 +108,17 @@ window.PWA = (() => {
       order.map(key => sections.get(key) || '').join('') +
       [...sections].filter(([key]) => !order.includes(key)).map(([, html]) => html).join('') + '</div>';
   }
-  function historyCard(item) {
+  function historyCard(item, index) {
     const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
     const remaining = Math.max(0, Math.floor((item.total || 0) - (item.position || 0)));
     const time = Math.floor(remaining / 60) + ':' + String(remaining % 60).padStart(2, '0');
+    const frame = String(item.snapshot || '').match(/^(?:https:\/\/diastomy\.top)?(\/api\/watch-frame\/[1-9]\d*\/(?:\?v=\d+)?)$/)?.[1];
     return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '" aria-label="ادامه تماشا">' +
-      '<img src="' + media(item.snapshot || item.banner || item.cover) + '" data-history-fallback="' + media(item.banner || item.cover) + '" alt="' + esc(item.title) + '" loading="lazy">' +
-      '<svg class="local-history-mark" viewBox="0 0 28 24" aria-hidden="true"><use href="#dm-poster-mark-v1"/></svg><progress class="local-library-progress" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><strong>' +
-      name(item) + '</strong><small dir="ltr">' + time + ' باقی‌مانده</small></div></article>';
+      '<img src="/static/public/assets/img/continue-scene-pending-v1.svg" alt="' + esc(item.title) + '"' +
+      (frame ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
+      '<progress class="local-library-progress" dir="rtl" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><small dir="ltr">' +
+      time + ' باقی‌مانده</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
+      index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>') + '</div></article>';
   }
   function downloadOptions(options) {
     return options.map(option => '<button type="button" data-download="' + esc(option.id) + '">' + esc(option.quality) + '</button>').join('');

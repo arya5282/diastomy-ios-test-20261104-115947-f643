@@ -137,6 +137,20 @@
       finally { button.disabled = false; }
     });
   }
+  let historyFrameObserver;
+  function loadHistoryFrames(container) {
+    historyFrameObserver?.disconnect();
+    const observer = historyFrameObserver = new IntersectionObserver(entries => {
+      entries.forEach(({target, isIntersecting}) => {
+        if (!isIntersecting) return;
+        observer.unobserve(target);
+        native({action:'historyFrame',path:target.dataset.historyFrame}).then(result => {
+          if (target.isConnected && result?.image) target.src = result.image;
+        }).catch(() => {});
+      });
+    }, {rootMargin:'150px'});
+    container.querySelectorAll('[data-history-frame]').forEach(image => observer.observe(image));
+  }
   async function home(seq) {
     mount('<div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
     try {
@@ -144,7 +158,7 @@
       whenCurrent(seq, () => {
         $('#home-data').innerHTML = PWA.home(data);
         if (state.user) api('/api/app/v1/library/').then(library => {
-          whenCurrent(seq, () => { $('#home-data').innerHTML = PWA.home(data, library.history); });
+          whenCurrent(seq, () => { $('#home-data').innerHTML = PWA.home(data, library.history); loadHistoryFrames($('#home-data')); });
         }).catch(() => {});
       });
     } catch (error) { whenCurrent(seq, () => fail($('#home-data'), error)); }
@@ -383,7 +397,7 @@
   }
   function library(seq, params) {
     const tabs = [['downloads','دانلودها'], ['saved','لیست من'], ['history','ادامه تماشا']];
-    mount(PWA_SOURCE.libraryHeader + '<dialog id="delete-download-dialog"><p>فایل دانلودشده حذف شود؟</p><button type="button" data-cancel-delete>انصراف</button><button type="button" data-confirm-delete>حذف فایل</button></dialog><section class="library-shell" aria-label="لیست من"><div class="library-tabs" role="tablist">' +
+    mount(PWA_SOURCE.libraryHeader + '<dialog id="history-menu"><form method="dialog"><button aria-label="بستن">×</button></form><a>مشاهده جزئیات</a><button type="button" data-remove-history>حذف از ادامه تماشا</button></dialog><dialog id="delete-download-dialog"><p>فایل دانلودشده حذف شود؟</p><button type="button" data-cancel-delete>انصراف</button><button type="button" data-confirm-delete>حذف فایل</button></dialog><section class="library-shell" aria-label="لیست من"><div class="library-tabs" role="tablist">' +
       tabs.map(([id,label]) => '<button type="button" role="tab" id="library-tab-' + id + '" aria-controls="library-' + id +
         '" data-library-tab="' + id + '">' + label + '</button>').join('') + '</div>' +
       tabs.map(([id]) => '<section class="library-panel" id="library-' + id + '" aria-labelledby="library-tab-' + id + '" role="tabpanel" hidden></section>').join('') + '</section>');
@@ -403,6 +417,28 @@
         '<p class="library-empty">هنوز فیلم یا سریالی ذخیره نکرده‌ای.</p>';
       panel('history').innerHTML = data.history.length ? '<div class="library-history-grid">' + data.history.map(PWA.historyCard).join('') +
         '</div>' : '<p class="library-empty">هنوز چیزی تماشا نکرده‌ای.</p>';
+      loadHistoryFrames(panel('history'));
+      const menu = $('#history-menu');
+      panel('history').querySelectorAll('[data-history-more]').forEach(button => {
+        button.onclick = () => {
+          const item = data.history[Number(button.dataset.historyMore)];
+          menu.querySelector('a').href = '#/title/' + enc(item.type) + '/' + enc(item.slug);
+          const remove = menu.querySelector('[data-remove-history]');
+          const id = item.history_id || String(item.snapshot || '').match(/\/api\/watch-frame\/(\d+)\//)?.[1];
+          remove.hidden = !id;
+          remove.onclick = async () => {
+            remove.disabled = true;
+            try {
+              await api('/api/watch-history/' + enc(id) + '/remove/', {body:{}});
+              if (seq !== state.sequence) return;
+              menu.close();
+              await loadCollection();
+            } catch (error) { toast(error.message); }
+            finally { remove.disabled = false; }
+          };
+          menu.showModal();
+        };
+      });
       panel('saved').querySelectorAll('[data-remove-saved]').forEach(button => {
         button.onclick = async () => {
           const item = data.saved[Number(button.dataset.removeSaved)];
@@ -953,6 +989,7 @@
     if (state.handleRoomState) state.handleRoomState(data);
   });
   async function route() {
+    historyFrameObserver?.disconnect();
     PWAPlayer.close();
     if (state.roomCleanup) state.roomCleanup();
     state.roomCleanup = null;
@@ -1003,7 +1040,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

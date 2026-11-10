@@ -242,6 +242,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             "/accounts/support/api/messages/", "/accounts/support/api/send/"
         ]
         if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") ||
+            p.range(of: #"^/api/watch-history/[1-9][0-9]*/remove/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/movie-room/r/[A-Za-z0-9_-]+/delete/$"#, options: .regularExpression) != nil {
             return url
         }
@@ -282,6 +283,24 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         }.resume()
     }
 
+    private func loadHistoryFrame(_ path: String, reply: @escaping (Any?, String?) -> Void) {
+        guard path.range(of: #"^/api/watch-frame/[1-9][0-9]*/(?:\?v=[0-9]+)?$"#, options: .regularExpression) != nil,
+              let url = URL(string: path, relativeTo: server)?.absoluteURL else {
+            reply(nil, "Invalid history frame")
+            return
+        }
+        var request = URLRequest(url: url)
+        request.setValue("image/jpeg", forHTTPHeaderField: "Accept")
+        api.dataTask(with: request) { data, response, _ in
+            guard let response = response as? HTTPURLResponse, response.statusCode == 200,
+                  response.mimeType == "image/jpeg", let data, data.count <= 512 * 1024 else {
+                reply([:], nil)
+                return
+            }
+            reply(["image": "data:image/jpeg;base64," + data.base64EncodedString()], nil)
+        }.resume()
+    }
+
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage,
                                replyHandler: @escaping (Any?, String?) -> Void) {
@@ -293,6 +312,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         }
         if action == "request", let path = data["path"] as? String {
             send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
+        } else if action == "historyFrame", let path = data["path"] as? String {
+            loadHistoryFrame(path, reply: replyHandler)
         } else if action == "play", let kind = data["kind"] as? String,
                   ["movie", "series"].contains(kind), let id = data["id"] as? Int, id > 0 {
             let code = data["room"] as? String

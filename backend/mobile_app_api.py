@@ -339,7 +339,7 @@ def library(request):
     for row in services.get_user_watch_history(request.user)[:100]:
         item = row.movie or (row.episode.season.series if row.episode else None)
         if item:
-            history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration, 'snapshot': row.snapshot_url})
+            history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration, 'snapshot': row.snapshot_url, 'history_id': row.pk})
     return JsonResponse({'saved': saved_movies + saved_series, 'history': history})
 
 
