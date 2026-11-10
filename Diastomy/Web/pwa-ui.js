@@ -240,10 +240,10 @@ window.PWA = (() => {
         '<div class="local-similar-grid">' + item.similar.map(card).join('') + '</div>' :
         '<a class="button" href="#/browse/' + (item.type === 'series' ? 'series' : 'movie') + '">مشاهده آرشیو</a>') + '</div></div></article>';
   }
-  function account(user, viewing, back) {
-    const watchTime = viewing ? '<a class="dm-viewing-summary" href="#/library?tab=history"><span class="dm-viewing-icon">' +
-      PWA_SOURCE.watchIcon + '</span><span class="dm-viewing-copy"><small>مجموع زمان تماشای شما</small><strong>' +
-      esc(viewing.hours) + ' ساعت و ' + esc(viewing.minutes) + ' دقیقه</strong></span>' + PWA_SOURCE.watchChevron + '</a>' : '';
+  function account(user, back) {
+    const watchTime = '<a class="dm-viewing-summary" href="#/library?tab=history"><span class="dm-viewing-icon">' +
+      PWA_SOURCE.watchIcon + '</span><span class="dm-viewing-copy"><small>مجموع زمان تماشای شما</small>' +
+      '<strong id="account-watch-time" aria-live="polite">در حال دریافت…</strong></span>' + PWA_SOURCE.watchChevron + '</a>';
     const identity = (user.avatar ? '<img class="reference-profile-avatar" src="' + media(user.avatar) + '" alt="">' : '') +
       '<div><strong>' + esc(user.name) + '</strong><small dir="ltr">' + esc(user.phone || user.username) + '</small>' +
       '<div class="local-subscription-line"><span class="reference-subscription-badge">' + (user.subscribed ? 'اشتراک فعال' : 'بدون اشتراک فعال') + '</span>' +
@@ -252,7 +252,8 @@ window.PWA = (() => {
       '<div class="ar-menu-heading"><h1>پروفایل کاربری</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<a class="dm-app-menu-close" href="' + esc(back) + '" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a></div>' +
       '<div class="dm-app-menu-profile">' + identity + '</div>' + watchTime + '<div class="dm-app-menu-nav">' + PWA_SOURCE.accountRows +
-      '</div><button id="logout" type="button">خروج از حساب کاربری ↗</button>' +
+      '</div><button id="logout" type="button">خروج از حساب کاربری' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5m3-4 4-4-4-4m4 4H8"/></svg></button>' +
       '<footer class="reference-profile-footer"><img src="' + logo + '" alt="Diastomy"><p>برای مطلع شدن از آخرین اخبار و به‌روزرسانی‌ها،<br>دیاستومی را در شبکه‌های اجتماعی دنبال کنید.</p>' +
       PWA_SOURCE.accountSocial + '</footer></div></div>';
   }

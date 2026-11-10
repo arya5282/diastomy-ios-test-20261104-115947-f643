@@ -758,3 +758,15 @@ body[data-page=local-startup]{background:radial-gradient(ellipse at 0 0,#240505,
   html.dmf3-active body[data-page=home] #app .nyx-prime-brand{top:auto!important;bottom:20px!important}
   html.dmf3-active body[data-page=home] #app .nyx-prime-dots{gap:3px!important}
 }
+
+html.dmf3-active body[data-page=local-account] .dmf3-root{
+  background:radial-gradient(ellipse 105% 35% at 0 0,#360504 0%,transparent 75%),
+    radial-gradient(ellipse 105% 38% at 100% 100%,#390504 0%,transparent 78%),#000!important;
+}
+html body[data-page=local-account] #dm-app-menu{background:transparent!important}
+body[data-page=local-account] #dm-app-menu .reference-profile-avatar{background:#252525;border-color:#4a4a4a}
+body[data-page=local-account] #dm-app-menu .dm-app-menu-profile>div>strong{font-size:12px;line-height:17px;font-weight:600}
+body[data-page=local-account] #dm-app-menu .dm-app-menu-profile>div>small{font:10px/15px "PWA Inter",Arial,sans-serif;color:#999}
+html body[data-page=local-account] #dm-app-menu .dm-app-menu-row{height:42px!important;min-height:42px!important;padding:0 17px!important}
+body[data-page=local-account] #dm-app-menu #logout{display:inline-flex;align-items:center;align-self:flex-start;gap:5px}
+#dm-app-menu #logout svg{width:14px;height:14px;flex:none}

@@ -726,7 +726,7 @@
   function account() {
     const user = state.user;
     const sequence = state.sequence;
-    mount(PWA.account(user, null, PWA.accountBack || '#/home') +
+    mount(PWA.account(user, PWA.accountBack || '#/home') +
       '<dialog id="local-logout-dialog"><p>از حساب کاربری خارج می‌شوید؟</p><button type="button" data-logout-cancel>انصراف</button>' +
       '<button type="button" data-logout-confirm>خروج</button></dialog>');
     const dialog = $('#local-logout-dialog');
@@ -748,13 +748,17 @@
       try { const result = await native({action:'openSocial', site:link.dataset.social}); if (!result.ok) throw Error(result.error); }
       catch (error) { toast(error.message); }
     });
+    const output = $('#account-watch-time');
     api('/api/watch-time/').then(viewing => {
       if (state.user !== user || sequence !== state.sequence) return;
-      const template = document.createElement('template');
-      template.innerHTML = PWA.account(user, viewing, PWA.accountBack || '#/home');
-      const summary = template.content.querySelector('.dm-viewing-summary');
-      if (summary) $('.dm-app-menu-profile').after(summary);
-    }).catch(() => {});
+      if (!Number.isInteger(viewing.hours) || !Number.isInteger(viewing.minutes)) {
+        output.textContent = 'زمان تماشا در دسترس نیست.';
+        return;
+      }
+      output.textContent = viewing.hours + ' ساعت و ' + viewing.minutes + ' دقیقه';
+    }).catch(() => {
+      if (state.user === user && sequence === state.sequence) output.textContent = 'زمان تماشا در دسترس نیست.';
+    });
   }
   function profile() {
     const user = state.user;
@@ -1166,7 +1170,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
