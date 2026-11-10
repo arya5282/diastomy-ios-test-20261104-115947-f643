@@ -349,7 +349,7 @@ html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-
 }
 html.dmf3-active body[data-page=home] #pwa-header .dmf3-header{
   height:auto!important;grid-template-rows:22px 36px!important;row-gap:8px!important;
-  align-content:start!important;padding-block:0 20px!important;
+  align-content:start!important;padding-block:0 14px!important;
 }
 html.dmf3-active body[data-page=home] #pwa-header .dmf3-search-row{grid-row:2!important;margin-block:0!important}
 html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search span{
@@ -722,4 +722,39 @@ body[data-page=local-startup]{background:radial-gradient(ellipse at 0 0,#240505,
   html.dmf3-active body[data-page=home] #app .dm-pwa-home-v54>section:is(.dm54-section,.dm54-genres){
     margin-bottom:28px!important;
   }
+}
+
+@media(max-width:767px){
+  html.dmf3-active body[data-page=home] #app .nyx-prime-hero{
+    --home-hero-banner-height:clamp(235px,64vw,275px);
+    height:calc(var(--home-hero-banner-height) + 23px)!important;
+    min-height:calc(var(--home-hero-banner-height) + 23px)!important;
+    max-height:none!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-hero :is(.nyx-prime-rail,.nyx-prime-slide,.nyx-prime-card){
+    height:var(--home-hero-banner-height)!important;
+    min-height:var(--home-hero-banner-height)!important;
+    max-height:none!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-copy{
+    inset:auto 16px 17px 24px!important;display:flex!important;flex-direction:column!important;
+    width:auto!important;height:auto!important;min-height:0!important;max-height:none!important;gap:7px!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-copy :is(h2,.nyx-prime-meta,.nyx-prime-trend,.nyx-prime-premium){
+    position:static!important;inset:auto!important;height:auto!important;max-width:100%!important;margin:0!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-copy h2{
+    font-size:clamp(23px,6.5vw,28px)!important;line-height:1.18!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-copy .nyx-prime-meta{
+    gap:7px!important;font-size:13px!important;line-height:18px!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-copy .nyx-prime-trend{
+    width:auto!important;min-height:17px!important;font-size:11px!important;line-height:17px!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-copy .nyx-prime-premium{
+    max-width:calc(100% - 80px)!important;font-size:13px!important;line-height:18px!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-brand{top:auto!important;bottom:20px!important}
+  html.dmf3-active body[data-page=home] #app .nyx-prime-dots{gap:3px!important}
 }
