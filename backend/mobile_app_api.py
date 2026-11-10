@@ -333,14 +333,23 @@ def playback(request, kind, video_id):
 @require_GET
 def library(request):
     from interactions import services
-    saved_movies = [card(x) for x in services.get_user_saved_movies(request.user)]
-    saved_series = [card(x) for x in services.get_user_saved_series(request.user)]
+    saved_items = sorted(
+        [*services.get_user_saved_movies(request.user), *services.get_user_saved_series(request.user)],
+        key=lambda item: item.created_at,
+        reverse=True,
+    )
+    saved = []
+    for item in saved_items:
+        entry = card(item)
+        entry['genres'] = [{'slug': g.slug, 'name': genre_name(g), 'name_en': getattr(g, 'name_en', '')}
+                           for g in item.genres.all()]
+        saved.append(entry)
     history = []
     for row in services.get_user_watch_history(request.user)[:100]:
         item = row.movie or (row.episode.season.series if row.episode else None)
         if item:
             history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration, 'snapshot': row.snapshot_url, 'history_id': row.pk})
-    return JsonResponse({'saved': saved_movies + saved_series, 'history': history})
+    return JsonResponse({'saved': saved, 'history': history})
 
 
 @private

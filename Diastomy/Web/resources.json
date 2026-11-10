@@ -2,6 +2,7 @@
   "/app.css": "text/css",
   "/app.js": "application/javascript",
   "/assets/Yekan.woff2": "font/woff2",
+  "/assets/library-mark.svg": "image/svg+xml",
   "/assets/logo.svg": "image/svg+xml",
   "/index.html": "text/html",
   "/player-icons.js": "application/javascript",

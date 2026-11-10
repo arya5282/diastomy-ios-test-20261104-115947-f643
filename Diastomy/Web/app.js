@@ -412,7 +412,7 @@
     }
     function renderCollection(data) {
       panel('saved').innerHTML = data.saved.length ? '<div class="library-grid">' + data.saved.map((item,index) =>
-        '<article class="local-library-saved">' + card(item) + '<button type="button" class="library-heart" data-remove-saved="' + index +
+        '<article class="local-library-saved">' + PWA.savedCard(item) + '<button type="button" class="library-heart" data-remove-saved="' + index +
         '" aria-label="حذف از لیست من">' + PWA_SOURCE.libraryHeart + '</button></article>').join('') + '</div>' :
         '<p class="library-empty">هنوز فیلم یا سریالی ذخیره نکرده‌ای.</p>';
       panel('history').innerHTML = data.history.length ? '<div class="library-history-grid">' + data.history.map(PWA.historyCard).join('') +
@@ -1040,7 +1040,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۶ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
   }

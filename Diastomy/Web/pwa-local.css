@@ -587,3 +587,23 @@ body[data-page=my-library] #app .library-history-meta small{font:inherit}
 #history-menu::backdrop{background:#0008}
 #history-menu a{display:block;margin:10px 0;color:white}
 #history-menu [hidden]{display:none}
+body[data-page=my-library] #app:focus{outline:none}
+body[data-page=my-library] #app .library-grid{direction:ltr;column-gap:clamp(14px,8.6vw,34px);row-gap:25px}
+#app .local-library-saved .dm54-poster{box-sizing:border-box;aspect-ratio:3/4;border:1px solid #444;border-radius:8px;width:100%}
+#app .local-library-saved .dm54-rating{left:4px;right:auto;top:4px;gap:2px;padding:2px 5px;border-radius:99px;background:#292b33;color:#fff;font:9px/12px Arial,sans-serif;z-index:1}
+#app .local-library-saved .dm54-rating svg{width:10px;height:10px}
+#app .local-library-saved .dm54-poster-brand{right:2px;bottom:2px}
+#app .local-library-saved .dm54-poster-brand img{display:block;width:25px;height:22px}
+#app .local-library-saved .dm54-vmeta strong{margin-top:5px;font:600 10px/15px Arial,sans-serif}
+#app .local-library-saved .dm54-old-genres{display:block;margin-top:1px;font:8px/12px Arial,sans-serif;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#app .local-library-saved .library-heart{display:grid;place-items:center;right:4px;top:4px;width:22px;height:22px;min-width:0;min-height:0;padding:0;border:0;border-radius:50%;background:rgba(145,153,160,.60);color:#ed0000}
+#app .local-library-saved .library-heart svg{width:19px;height:19px}
+body[data-page=home] #app .dm54-genre-track{direction:rtl;gap:8px;padding-inline:16px}
+body[data-page=home] #app .dm54-genre-track .dm54-genre{box-sizing:border-box;display:grid!important;place-items:center!important;flex:0 0 113px!important;width:113px!important;height:66px!important;min-height:66px!important;padding:0!important;border:1px solid #ffffff45;border-radius:9px;overflow:hidden}
+body[data-page=home] #app .dm54-genre-track .dm54-genre span{position:relative!important;inset:auto!important;margin:0!important;text-align:center!important;font:750 11px/1.2 "PWA Inter",Arial,sans-serif!important}
+@media(max-width:767px) and (prefers-reduced-motion:no-preference){
+  html.dmf3-active body[data-page=home] #app .nyx-prime-slide :is(.nyx-prime-copy > h2,.nyx-prime-meta,.nyx-prime-trend,.nyx-prime-premium,.nyx-prime-brand){
+    opacity:var(--hero-text-opacity,1)!important;
+    transform:translate3d(var(--hero-text-x,0px),0,0)!important;
+  }
+}

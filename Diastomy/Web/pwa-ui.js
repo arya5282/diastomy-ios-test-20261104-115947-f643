@@ -12,13 +12,16 @@ window.PWA = (() => {
   const star = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2 2 9.3l6.9-1L12 2Z"/></svg>';
   const genres = item => (item.genres || []).map(g => esc(typeof g === 'string' ? g : g.name)).slice(0, 3).join(' · ');
   const name = item => esc(item.english_title_full || item.title);
-  function card(item) {
+  function renderCard(item, saved) {
+    const genreText = saved ? (item.genres || []).slice(0,2).map(g => esc(typeof g === "string" ? g : (g.name_en || g.name))).join(", ") : genres(item);
     return '<a href="' + titleURL(item) + '" class="dm54-vcard" dir="ltr"><span class="dm54-poster">' +
       '<img class="dm54-poster-img" src="' + media(item.cover) + '" alt="' + esc(item.title) + '" loading="lazy" decoding="async">' +
       (item.imdb_rating ? '<span class="dm54-rating"><b>' + esc(item.imdb_rating) + '</b>' + star + '</span>' : '') +
-      '<span class="dm54-poster-brand" aria-hidden="true"><svg class="dmf54-poster-mark" width="28" height="24" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg></span>' +
-      '</span><span class="dm54-vmeta"><strong>' + name(item) + '</strong><small class="dm54-old-genres">' + genres(item) + '</small></span></a>';
+      (saved ? '<span class="dm54-poster-brand" aria-hidden="true"><img src="/assets/library-mark.svg" alt=""></span>' :
+      '<span class="dm54-poster-brand" aria-hidden="true"><svg class="dmf54-poster-mark" width="28" height="24" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg></span>') +
+      '</span><span class="dm54-vmeta"><strong>' + name(item) + '</strong><small class="dm54-old-genres">' + (saved ? genreText || "DIASTOMY" : genreText) + '</small></span></a>';
   }
+  function card(item) { return renderCard(item, false); }
   function actorPage() {
     return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
       PWA_SOURCE.actorBack + '</a><h1>Actors</h1><button class="dm-actor-menu" type="button" data-local-menu aria-label="منو">' +
@@ -78,6 +81,22 @@ window.PWA = (() => {
         '<button type="button" data-slide="' + i + '" data-distance="' + Math.min(i,3) + '" aria-pressed="' + (i === 0) +
         '" aria-label="اسلاید ' + (i + 1) + '"></button>').join('') + '</div></section>';
   }
+  const genreArt = {
+      "action": "/static/public/assets/images/genre-user-v2/action-a19b0e17be35.jpg",
+      "adventure": "/static/public/assets/images/genre-user-v2/adventure-e5e740adcace.jpg",
+      "animation": "/static/public/assets/images/genre-user-v2/animation-c2cb2d2855a5.jpg",
+      "art": "/static/public/assets/images/genre-user-v2/art-0f0365e59ca8.jpg",
+      "comedy": "/static/public/assets/images/genre-user-v2/comedy-8e465b276750.jpg",
+      "documentary": "/static/public/assets/images/genre-user-v2/documentary-ded24d0ef9f5.jpg",
+      "drama": "/static/public/assets/images/genre-user-v2/drama-6ae1ebd9b57f.jpg",
+      "family": "/static/public/assets/images/genre-user-v2/family-8e76541212b3.jpg",
+      "fantasy": "/static/public/assets/images/genre-user-v2/fantasy-1bf48d576722.jpg",
+      "horror": "/static/public/assets/images/genre-user-v2/horror-fc0c39db6ffe.jpg",
+      "kids": "/static/public/assets/images/genre-user-v2/kids-11828d48ba9d.jpg",
+      "musical": "/static/public/assets/images/genre-user-v2/musical-b707ff1dd80d.jpg",
+      "romance": "/static/public/assets/images/genre-user-v2/romance-0c130a671b81.jpg",
+      "sci-fi": "/static/public/assets/images/genre-user-v2/sci-fi-a837508e6156.jpg"
+    };
   function home(data, history = []) {
     const order = [
       'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series',
@@ -88,7 +107,7 @@ window.PWA = (() => {
     const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'documentary', 'animation'];
     const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
       illustratedGenres.map(slug => '<a class="dm54-genre reference-genre" href="#/browse/all?genre=' + slug +
-        '"><img loading="lazy" alt="" src="https://diastomy.top/pwa/genre-images/v1/' + slug + '/"><span>' +
+        '"><img loading="lazy" alt="" src="' + genreArt[slug] + '"><span>' +
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
     const continueHTML = history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
       '<div class="reference-continue">' + history.slice(0, 12).map(item => historyCard(item)).join('') + '</div></section>' : '';
@@ -240,22 +259,6 @@ window.PWA = (() => {
       '</div></div></div></div>';
   }
   function searchDiscovery(catalog, recommendations) {
-    const art = {
-      "action": "/static/public/assets/images/genre-user-v2/action-a19b0e17be35.jpg",
-      "adventure": "/static/public/assets/images/genre-user-v2/adventure-e5e740adcace.jpg",
-      "animation": "/static/public/assets/images/genre-user-v2/animation-c2cb2d2855a5.jpg",
-      "art": "/static/public/assets/images/genre-user-v2/art-0f0365e59ca8.jpg",
-      "comedy": "/static/public/assets/images/genre-user-v2/comedy-8e465b276750.jpg",
-      "documentary": "/static/public/assets/images/genre-user-v2/documentary-ded24d0ef9f5.jpg",
-      "drama": "/static/public/assets/images/genre-user-v2/drama-6ae1ebd9b57f.jpg",
-      "family": "/static/public/assets/images/genre-user-v2/family-8e76541212b3.jpg",
-      "fantasy": "/static/public/assets/images/genre-user-v2/fantasy-1bf48d576722.jpg",
-      "horror": "/static/public/assets/images/genre-user-v2/horror-fc0c39db6ffe.jpg",
-      "kids": "/static/public/assets/images/genre-user-v2/kids-11828d48ba9d.jpg",
-      "musical": "/static/public/assets/images/genre-user-v2/musical-b707ff1dd80d.jpg",
-      "romance": "/static/public/assets/images/genre-user-v2/romance-0c130a671b81.jpg",
-      "sci-fi": "/static/public/assets/images/genre-user-v2/sci-fi-a837508e6156.jpg"
-    };
     const definitions = [
       ['drama','درام'], ['action','اکشن'], ['fantasy','فانتزی'], ['comedy','کمدی'],
       ['sci-fi','علمی تخیلی'], ['horror','ترسناک'], ['adventure','ماجراجویی'], ['romance','عاشقانه'],
@@ -266,7 +269,7 @@ window.PWA = (() => {
       const genre = catalog.find(item => item.slug.toLowerCase() === key || [key,label].includes(item.name.toLowerCase()));
       const query = genre ? 'genre=' + encodeURIComponent(genre.slug) : 'q=' + encodeURIComponent(label);
       return '<a class="dm-search-genre reference-genre" href="#/browse/all?' + query +
-        '"><img alt="" src="' + art[key] + '"><span>' + key.toUpperCase() + '</span></a>';
+        '"><img alt="" src="' + genreArt[key] + '"><span>' + key.toUpperCase() + '</span></a>';
     });
     return '<h2>ژانرها</h2><div class="dm-search-genres" dir="ltr">' + tiles.slice(0,6).join('') +
       '</div><div id="search-genres-extra" aria-hidden="true" inert><div class="dm-search-genres" dir="ltr">' +
@@ -303,15 +306,12 @@ window.PWA = (() => {
     document.getElementById('pwa-nav').innerHTML = PWA_SOURCE.nav;
     installFooterSwipe(document.getElementById('dm-app-bottom-nav'));
     document.getElementById('pwa-sprite').innerHTML = PWA_SOURCE.sprite;
+    let heroFrame;
     document.addEventListener('scroll', event => {
       const rail = event.target;
       if (!(rail instanceof Element) || !rail.matches('.nyx-prime-rail')) return;
-      const active = Math.round(rail.scrollLeft / rail.clientWidth);
-      rail.parentElement.querySelectorAll('[data-slide]').forEach(dot => {
-        const distance = Math.abs(Number(dot.dataset.slide) - active);
-        dot.setAttribute('aria-pressed', String(distance === 0));
-        dot.dataset.distance = Math.min(distance,3);
-      });
+      cancelAnimationFrame(heroFrame);
+      heroFrame = requestAnimationFrame(() => syncHeroMotion(rail));
     }, true);
     document.addEventListener('click', event => {
       if (event.target.closest('[data-local-menu]')) {
@@ -330,6 +330,31 @@ window.PWA = (() => {
         const slide = document.querySelectorAll('.nyx-prime-slide')[Number(dot.dataset.slide)];
         if (slide) slide.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
+    });
+  }
+  function syncHeroMotion(rail) {
+    if (!rail.isConnected || !rail.clientWidth) return;
+    const active = Math.round(rail.scrollLeft / rail.clientWidth);
+    rail.parentElement.querySelectorAll('[data-slide]').forEach(dot => {
+      const distance = Math.abs(Number(dot.dataset.slide) - active);
+      dot.setAttribute('aria-pressed', String(distance === 0));
+      dot.dataset.distance = Math.min(distance, 3);
+    });
+    const enabled = matchMedia('(max-width:767px) and (prefers-reduced-motion:no-preference)').matches;
+    const viewport = rail.getBoundingClientRect();
+    const center = viewport.left + viewport.width / 2;
+    rail.querySelectorAll('.nyx-prime-slide').forEach(slide => {
+      const bounds = slide.getBoundingClientRect();
+      const offset = (bounds.left + bounds.width / 2 - center) / Math.max(1, bounds.width);
+      slide.querySelectorAll('.nyx-prime-copy > h2,.nyx-prime-meta,.nyx-prime-trend,.nyx-prime-premium,.nyx-prime-brand')
+        .forEach((row, index) => {
+          const fade = enabled ? Math.max(0, 1 - Math.abs(offset) / (.72 - index * .025)) : 1;
+          row.style.setProperty('--hero-text-opacity', fade * fade * (3 - 2 * fade));
+          if (row.tagName === 'H2') {
+            const x = enabled ? Math.max(-1, Math.min(1, offset)) * 100 : 0;
+            row.style.setProperty('--hero-text-x', x + 'px');
+          }
+        });
     });
   }
   function page(name) {
@@ -400,5 +425,5 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchDiscovery, searchInput, install, page};
+  return {card, savedCard:item => renderCard(item, true), actorPage, actorProfile, home, historyCard, episodeCards, detail, account, auth, searchDiscovery, searchInput, install, page};
 })();
