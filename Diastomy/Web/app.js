@@ -169,13 +169,22 @@
     const form = dialog.querySelector('form');
     const select = (name, label, choices) => '<label>' + label + '<select name="' + name + '"><option value="">همه</option>' +
       choices.map(([value,text]) => '<option value="' + esc(value) + '">' + esc(text) + '</option>').join('') + '</select></label>';
-    const years = Array.from({length: new Date().getFullYear() - 1896}, (_, i) => [String(new Date().getFullYear() + 3 - i), String(new Date().getFullYear() + 3 - i)]);
     if (!form.children.length) {
-      form.innerHTML = '<header><h2 id="local-filter-title" tabindex="-1" autofocus>اعمال فیلتر</h2><button type="button" data-close-filter aria-label="بستن">⊗</button></header>' +
+      const latestYear = new Date().getFullYear() + 3;
+      const yearOptions = Array.from({length:latestYear - 1899}, (_, index) => {
+        const year = latestYear - index;
+        return '<option value="' + year + '">' + year + '</option>';
+      }).join('');
+      const yearSelect = (name, label) => '<label class="local-filter-year"><span>' + label +
+        '</span><select name="' + name + '" dir="ltr" lang="en"><option value="">همه</option>' +
+        yearOptions + '</select></label>';
+      form.innerHTML = '<header><h2 id="local-filter-title" tabindex="-1" autofocus>اعمال فیلتر</h2><button type="button" data-close-filter aria-label="بستن">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6" stroke-linecap="round"/></svg></button></header>' +
         '<div class="local-filter-fields">' + select('type','نوع',[['movie','فیلم'],['series','سریال']]) +
         '<label>کارگردان<input name="director" placeholder="نام کارگردان"></label><label>بازیگران<input name="actor" placeholder="نام بازیگر"></label>' +
-        '<div class="local-filter-pair"><label>حداقل امتیاز<input type="number" name="rating" min="0" max="10" step="0.1" placeholder="7.8"></label>' +
-        '<fieldset><legend>سال ساخت</legend><div>' + select('year_from','از',years) + select('year_to','تا',years) + '</div></fieldset></div>' +
+        '<div class="local-filter-pair"><label>حداقل امتیاز<input type="text" inputmode="decimal" name="rating" lang="en" placeholder="7.8"></label>' +
+        '<fieldset><legend>سال ساخت</legend><div class="local-filter-years">' + yearSelect('year_from','از') +
+        '<span aria-hidden="true">–</span>' + yearSelect('year_to','تا') + '</div></fieldset></div>' +
         select('country','کشور',[['ایالات متحده آمریکا','ایالات متحده آمریکا'],['ایران','ایران'],['ترکیه','ترکیه'],['بریتانیا','بریتانیا'],['فرانسه','فرانسه'],['هند','هند'],['کره جنوبی','کره جنوبی'],['ژاپن','ژاپن']]) +
         select('sort','ترتیب نمایش',[['newest','جدیدترین'],['oldest','قدیمی‌ترین'],['most_viewed','پربازدیدترین'],['highest_rating','بالاترین امتیاز']]) +
         select('genre','ژانر',[]) +
@@ -185,8 +194,28 @@
         '</div></fieldset></div><footer><button type="submit">جستجو</button></footer>';
       form.querySelector('[data-close-filter]').onclick = () => dialog.close();
       dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+      const {rating, year_from:fromYear, year_to:toYear} = form.elements;
+      rating.oninput = () => {
+        rating.value = rating.value.replace(/[۰-۹٠-٩]/g, digit => String(digit.charCodeAt(0) & 15))
+          .replace(/[٫,]/g, '.');
+        rating.setCustomValidity('');
+      };
+      const clearYearError = () => toYear.setCustomValidity('');
+      fromYear.onchange = clearYearError;
+      toYear.onchange = clearYearError;
       form.onsubmit = event => {
         event.preventDefault();
+        const score = rating.value.trim();
+        if (score && (!/^[0-9]+(?:\.[0-9]+)?$/.test(score) || Number(score) > 10)) {
+          rating.setCustomValidity('امتیاز را بین 0 تا 10 وارد کنید.');
+          rating.reportValidity();
+          return;
+        }
+        if (fromYear.value && toYear.value && Number(fromYear.value) > Number(toYear.value)) {
+          toYear.setCustomValidity('سال پایان باید برابر یا بعد از سال شروع باشد.');
+          toYear.reportValidity();
+          return;
+        }
         const query = new URLSearchParams();
         const data = new FormData(form);
         data.forEach((value,key) => { if (key !== 'type' && value.trim()) query.append(key,value.trim()); });
@@ -1137,7 +1166,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
