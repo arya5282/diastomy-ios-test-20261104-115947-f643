@@ -712,3 +712,14 @@ body[data-page=local-startup]{background:radial-gradient(ellipse at 0 0,#240505,
 #app :is(.archive-reference-card,.dm-search-live-results) .dm54-poster-brand img{display:block;width:25px;height:22px}
 #app :is(.archive-reference-card,.dm-search-live-results) .dm54-old-genres{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:9px}
 @media(prefers-reduced-motion:reduce){#route-loading,body #app.route-enter,body[data-page=search] #app.route-enter,.startup-progress i::before,#local-filters[open]{animation:none}}
+
+
+@media(max-width:767px){
+  html.dm-pwa-standalone.dmf3-active body[data-page=home] .dmf3-root{
+    padding-top:calc(env(safe-area-inset-top,0px) + 8px)!important;
+  }
+  html.dmf3-active body[data-page=home] #app .nyx-prime-hero{margin-bottom:12px!important}
+  html.dmf3-active body[data-page=home] #app .dm-pwa-home-v54>section:is(.dm54-section,.dm54-genres){
+    margin-bottom:28px!important;
+  }
+}
