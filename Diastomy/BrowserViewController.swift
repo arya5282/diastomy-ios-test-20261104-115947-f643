@@ -163,6 +163,42 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let panel = UIView()
         panel.backgroundColor = .black
         panel.translatesAutoresizingMaskIntoConstraints = false
+        if !canRetry {
+            let logo = UIImageView(image: UIImage(named: "LaunchLogo"))
+            logo.contentMode = .scaleAspectFit
+            logo.translatesAutoresizingMaskIntoConstraints = false
+            let caption = UILabel()
+            caption.text = "loading..."
+            caption.font = .systemFont(ofSize: 10)
+            caption.textColor = .lightGray
+            caption.textAlignment = .center
+            let progress = UIProgressView(progressViewStyle: .default)
+            progress.progressTintColor = .systemRed
+            progress.trackTintColor = .white
+            let footer = UIStackView(arrangedSubviews: [caption, progress])
+            footer.axis = .vertical
+            footer.spacing = 9
+            footer.translatesAutoresizingMaskIntoConstraints = false
+            panel.addSubview(logo)
+            panel.addSubview(footer)
+            view.addSubview(panel)
+            NSLayoutConstraint.activate([
+                panel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                panel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                panel.topAnchor.constraint(equalTo: view.topAnchor),
+                panel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+                logo.centerXAnchor.constraint(equalTo: panel.centerXAnchor),
+                logo.centerYAnchor.constraint(equalTo: panel.centerYAnchor),
+                logo.widthAnchor.constraint(equalToConstant: 174),
+                logo.heightAnchor.constraint(equalToConstant: 44),
+                footer.centerXAnchor.constraint(equalTo: panel.centerXAnchor),
+                footer.widthAnchor.constraint(equalTo: panel.widthAnchor, multiplier: 0.73),
+                footer.bottomAnchor.constraint(equalTo: panel.safeAreaLayoutGuide.bottomAnchor, constant: -15)
+            ])
+            progress.setProgress(0.68, animated: true)
+            startupPanel = panel
+            return
+        }
         let label = UILabel()
         label.text = message
         label.textColor = .white
@@ -238,7 +274,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             "/accounts/api/update-profile/", "/accounts/api/update-player-quality/",
             "/accounts/api/set-language/", "/accounts/api/plans/", "/accounts/api/payments/",
             "/accounts/api/create-payment/",
-            "/api/bookmark/toggle/", "/api/content-preferences/", "/api/watch-progress/", "/api/watch-time/",
+            "/api/suggest-content/", "/api/bookmark/toggle/", "/api/content-preferences/", "/api/watch-progress/", "/api/watch-time/",
             "/accounts/support/api/messages/", "/accounts/support/api/send/"
         ]
         if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") ||
@@ -270,7 +306,15 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             if let cookie = HTTPCookieStorage.shared.cookies(for: server)?.first(where: { $0.name == "csrftoken" }) {
                 request.setValue(cookie.value, forHTTPHeaderField: "X-CSRFToken")
             }
-            request.httpBody = try? JSONSerialization.data(withJSONObject: body ?? [:])
+            if url.path == "/api/suggest-content" || url.path == "/api/suggest-content/" {
+                let values = body as? [String: String] ?? [:]
+                var form = URLComponents()
+                form.queryItems = ["title", "source_query"].map { URLQueryItem(name: $0, value: values[$0] ?? "") }
+                request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+                request.httpBody = form.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B").data(using: .utf8)
+            } else {
+                request.httpBody = try? JSONSerialization.data(withJSONObject: body ?? [:])
+            }
         }
         api.dataTask(with: request) { data, response, error in
             if error != nil { completion(["status": 0, "data": ["error": "اتصال به سرور برقرار نشد."]]); return }

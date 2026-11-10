@@ -14,7 +14,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods
 
 from core.content_labels import content_title, genre_name
-from movie.models import Movie, Series, Episode, MovieVideo, EpisodeVideo, Genre, Person
+from movie.models import Movie, Series, Episode, MovieVideo, EpisodeVideo, Genre, Person, Country
 from movie.access import can_access_content
 from movie.media_sources import direct_url_usable
 
@@ -168,7 +168,7 @@ def home(request):
     from django.utils.translation import get_language
     from movie.templatetags.image_perf import hero_artwork
     from movie.templatetags.pwa_ui import pwa_hero_age_rating, pwa_hero_duration
-    key = 'mobile-app-home:v3:' + (get_language() or 'fa')
+    key = 'mobile-app-home:v4:' + (get_language() or 'fa')
     data = cache.get(key)
     if data is None:
         context = _home_public_context()
@@ -193,6 +193,7 @@ def home(request):
             'rails': [{'key': key, 'title': title, 'items': [card(x) for x in context.get(key, [])]}
                       for key, title in names],
             'genres': [{'slug': x.slug, 'name': genre_name(x)} for x in context['genres']],
+            'countries': list(Country.objects.order_by('name').values('slug', 'name')),
         }
         cache.set(key, data, 60)
     return JsonResponse(data)
@@ -238,7 +239,7 @@ def detail(request, kind, slug):
         from movie.media_sources import video_has_dub
         data['download_options'] = [
             {'id': v.pk, 'quality': v.quality.title, 'variant': 'subbed',
-             'size': v.file_size_label}
+             'size': v.file_size_label, 'format': 'MKV' if '.mkv' in v.direct_download_url.lower() else 'MP4'}
             for v in videos if v.direct_download_url
         ] + [
             {'id': v.pk, 'quality': v.quality.title, 'variant': 'dubbed',

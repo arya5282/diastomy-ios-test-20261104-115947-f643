@@ -104,10 +104,10 @@ window.PWA = (() => {
       'pwa_dubbed_series', 'pwa_free_series', 'pwa_recommended', 'animations'
     ];
     const sections = new Map();
-    const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'documentary', 'animation'];
+    const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'romance', 'family', 'musical', 'documentary', 'animation', 'art', 'kids'];
     const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
-      illustratedGenres.map(slug => '<a class="dm54-genre reference-genre" href="#/browse/all?genre=' + slug +
-        '"><img loading="lazy" alt="" src="' + genreArt[slug] + '"><span>' +
+      illustratedGenres.map(slug => '<a class="dm54-genre dm-home-original-genre" href="#/browse/all?genre=' + slug +
+        '"><img loading="lazy" alt="" src="/static/public/assets/images/genre-user-v1/' + slug + '.webp"><span class="dm-home-genre-label">' +
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
     const continueHTML = history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
       '<div class="reference-continue">' + history.slice(0, 12).map(item => historyCard(item)).join('') + '</div></section>' : '';
@@ -168,19 +168,22 @@ window.PWA = (() => {
       const dubbed = variant === 'dubbed';
       const rows = options.filter(option => (option.variant || 'subbed') === variant).map(option =>
         '<article class="film-download-card"><div class="film-download-meta"><strong dir="ltr">' +
-        esc(option.quality) + (!dubbed && !series ? ' · زیرنویس فارسی' : '') +
-        '</strong>' + (option.size ? '<small dir="ltr">' + esc(option.size) + '</small>' : '') + '</div>' +
+        '<bdi class="film-download-number">' + esc(option.quality) + '</bdi>' +
+        (!dubbed && !series ? ' · <bdi dir="rtl">زیرنویس فارسی</bdi>' : '') +
+        '</strong>' + (option.size ? '<small class="film-download-number" dir="ltr">' + esc(option.size) + '</small>' : '') + '</div>' +
         (option.audio ? '<small>' + esc(option.audio) + '</small>' : '') +
+        (!dubbed && !series ? '<div class="film-download-format" dir="ltr"><span>دیاستومی</span>' +
+          (option.format ? '<span class="film-download-number">' + esc(option.format) + '</span>' : '') + '</div>' : '') +
         '<button type="button" data-download="' + esc(option.id) + '" data-variant="' + variant + '">' +
-        (dubbed ? 'دانلود نسخه دوبله · ' + esc(option.quality) : 'دانلود با لینک مستقیم ↓') + '</button></article>');
+        (dubbed ? 'دانلود نسخه دوبله · ' + '<bdi class="film-download-number">' + esc(option.quality) + '</bdi>' : PWA_SOURCE.filmDownloadArrow + 'دانلود با لینک مستقیم') + '</button></article>');
       return '<section data-download-panel="' + variant + '"' + (dubbed ? ' hidden' : '') + '>' +
         (rows.join('') || '<p class="film-download-empty">لینک دانلود این نسخه در دسترس نیست.</p>') + '</section>';
     });
     return '<dialog id="film-download-options" class="film-download-dialog" dir="rtl" aria-labelledby="film-download-title">' +
-      '<form method="dialog"><button class="film-download-close" aria-label="بستن">×</button></form>' +
-      '<h2 id="film-download-title">لینک‌های دانلود</h2>' +
+      '<div class="film-download-heading"><form method="dialog"><button class="film-download-close" aria-label="بستن">' +
+      PWA_SOURCE.filmDownloadClose + '</button></form><h2 id="film-download-title" tabindex="-1" autofocus>لینک‌های دانلود</h2></div>' +
       (series ? '' : '<div class="film-download-tabs"><button type="button" data-download-tab="subbed" aria-pressed="true">نسخه زیرنویس</button><button type="button" data-download-tab="dubbed" aria-pressed="false">نسخه دوبله</button></div>') +
-      panels.join('') + '</dialog>';
+      '<div class="film-download-content">' + panels.join('') + '</div></dialog>';
   }
 
   function detail(item, episodes) {
@@ -285,12 +288,8 @@ window.PWA = (() => {
     form.innerHTML = '<button type="submit" aria-label="جست‌وجو"></button><input type="search" name="q" placeholder="Search titles, genres…" aria-label="جست‌وجو">';
     form.querySelector('button').append(button.querySelector('svg').cloneNode(true));
     form.elements.q.value = query;
-    form.onsubmit = event => {
-      event.preventDefault();
-      const term = form.elements.q.value.trim();
-      location.hash = term ? '#/search?q=' + encodeURIComponent(term) : '#/search';
-    };
     button.replaceWith(form);
+    return form;
   }
   function install() {
     document.addEventListener('error', event => {
@@ -303,6 +302,7 @@ window.PWA = (() => {
       if (image.getAttribute('src') !== fallback) image.src = fallback;
     }, true);
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
+    document.querySelector('.dmf3-filter').removeAttribute('data-local-search');
     document.getElementById('pwa-nav').innerHTML = PWA_SOURCE.nav;
     installFooterSwipe(document.getElementById('dm-app-bottom-nav'));
     document.getElementById('pwa-sprite').innerHTML = PWA_SOURCE.sprite;
@@ -359,6 +359,7 @@ window.PWA = (() => {
   }
   function page(name) {
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
+    document.querySelector('.dmf3-filter').removeAttribute('data-local-search');
     document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
     document.getElementById('pwa-header').hidden = ['startup','login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];

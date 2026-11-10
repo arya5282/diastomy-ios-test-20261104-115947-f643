@@ -163,30 +163,63 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#home-data'), error)); }
   }
-  async function browse(seq, kind, params, isSearch) {
-    const q = params.get('q') || '';
-    const route = isSearch ? '#/search' : '#/browse/' + enc(kind);
-    const results = '<div id="catalogue"><div class="loading"></div></div>';
-    if (isSearch) {
-      PWA.searchInput(q);
-      mount('<section class="dmf3-search-discovery" aria-label="جست‌وجو">' + results + '</section>');
-    } else {
-      const title = kind === 'movie' ? 'Movies Archive' : kind === 'series' ? 'Series Archive' : 'آرشیو فیلم و سریال';
-      mount('<section class="archive-reference-shell"><header class="archive-reference-header"><a href="#/home" aria-label="بازگشت">←</a><h1 data-dm-archive-title dir="auto">' +
-        title + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">☰</button></header>' +
-        '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><select id="sort">' +
-        '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="most_viewed">پربازدیدترین</option>' +
-        '<option value="highest_rating">بالاترین امتیاز</option></select></div>' + results + '</section>');
-      $('#sort').value = params.get('sort') || 'newest';
-      $('#sort').onchange = event => {
-        params.set('sort', event.target.value);
-        params.delete('page');
-        location.hash = route + '?' + params;
+  function openFilters() {
+    const dialog = $('#local-filters');
+    if (dialog.open) return;
+    const form = dialog.querySelector('form');
+    const select = (name, label, choices) => '<label>' + label + '<select name="' + name + '"><option value="">همه</option>' +
+      choices.map(([value,text]) => '<option value="' + esc(value) + '">' + esc(text) + '</option>').join('') + '</select></label>';
+    const years = Array.from({length: new Date().getFullYear() - 1896}, (_, i) => [String(new Date().getFullYear() + 3 - i), String(new Date().getFullYear() + 3 - i)]);
+    if (!form.children.length) {
+      form.innerHTML = '<header><h2 id="local-filter-title" tabindex="-1" autofocus>اعمال فیلتر</h2><button type="button" data-close-filter aria-label="بستن">⊗</button></header>' +
+        '<div class="local-filter-fields">' + select('type','نوع',[['movie','فیلم'],['series','سریال']]) +
+        '<label>کارگردان<input name="director" placeholder="نام کارگردان"></label><label>بازیگران<input name="actor" placeholder="نام بازیگر"></label>' +
+        '<div class="local-filter-pair"><label>حداقل امتیاز<input type="number" name="rating" min="0" max="10" step="0.1" placeholder="7.8"></label>' +
+        '<fieldset><legend>سال ساخت</legend><div>' + select('year_from','از',years) + select('year_to','تا',years) + '</div></fieldset></div>' +
+        select('country','کشور',[['ایالات متحده آمریکا','ایالات متحده آمریکا'],['ایران','ایران'],['ترکیه','ترکیه'],['بریتانیا','بریتانیا'],['فرانسه','فرانسه'],['هند','هند'],['کره جنوبی','کره جنوبی'],['ژاپن','ژاپن']]) +
+        select('sort','ترتیب نمایش',[['newest','جدیدترین'],['oldest','قدیمی‌ترین'],['most_viewed','پربازدیدترین'],['highest_rating','بالاترین امتیاز']]) +
+        select('genre','ژانر',[]) +
+        '<fieldset class="local-filter-tags"><legend>انتخاب بر اساس</legend><div>' +
+        [['dubbed','دوبله فارسی'],['subtitled','زیرنویس فارسی'],['uncensored','بدون سانسور'],['censored','سانسور شده']]
+          .map(([value,label]) => '<label><input type="checkbox" name="tags" value="' + value + '"><span>' + label + '</span></label>').join('') +
+        '</div></fieldset></div><footer><button type="submit">جستجو</button></footer>';
+      form.querySelector('[data-close-filter]').onclick = () => dialog.close();
+      dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+      form.onsubmit = event => {
+        event.preventDefault();
+        const query = new URLSearchParams();
+        const data = new FormData(form);
+        data.forEach((value,key) => { if (key !== 'type' && value.trim()) query.append(key,value.trim()); });
+        const term = document.querySelector('.reference-search-form input')?.value.trim();
+        if (term) query.set('q',term);
+        dialog.close();
+        location.hash = '#/browse/' + (data.get('type') || 'all') + (query.size ? '?' + query : '');
       };
     }
-    if (isSearch && !q) {
+    dialog.showModal();
+    form.querySelector('.local-filter-fields').scrollTop = 0;
+    api('/api/app/v1/home/', {cache:true}).then(data => {
+      for (const [field, choices] of [['genre', data.genres], ['country', data.countries]]) {
+        if (!choices?.length) continue;
+        const select = form.elements[field], value = select.value;
+        select.replaceChildren(new Option('همه',''), ...choices.map(item => new Option(item.name,item.slug)));
+        select.value = value;
+      }
+    }).catch(() => {});
+  }
+  async function searchPage(seq, initialQuery) {
+    const search = PWA.searchInput(initialQuery);
+    const input = search.elements.q;
+    mount('<section class="dmf3-search-discovery" aria-label="جست‌وجو"><div id="catalogue"></div></section>');
+    const catalogue = $('#catalogue');
+    let timer;
+    let searchRequest = 0;
+    async function render(term, request) {
+      if (seq !== state.sequence || request !== searchRequest) return;
+      if (!term) {
       try {
         const data = await api('/api/app/v1/home/', {cache:true});
+        if (request !== searchRequest) return;
         whenCurrent(seq, () => {
           const rails = data.rails || [];
           const recommended = rails.find(rail => rail.key === 'trending_movies' && rail.items.length) ||
@@ -202,15 +235,69 @@
             extra.setAttribute('aria-hidden', String(!expanded));
           };
         });
-      } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
-      return;
+      } catch (error) { if (request === searchRequest) whenCurrent(seq, () => fail($('#catalogue'), error)); }
+        return;
+      }
+      try {
+        const query = new URLSearchParams({q:term, type:'all', sort:'relevance'});
+        const data = await api('/movie/api/filter/?' + query, {cache:true});
+        if (request !== searchRequest || seq !== state.sequence) return;
+        catalogue.innerHTML = '<h2>نتایج جستجو</h2>' + (data.results.length ?
+          '<div class="dm-search-live-results">' + data.results.map(PWA.savedCard).join('') + '</div>' :
+          '<form id="search-suggestion"><p>متأسفانه جستجوی شما نتیجه‌ای نداشت. می‌توانید عنوان موردنظر را پیشنهاد بدهید تا به مجموعه اضافه کنیم.</p>' +
+          '<label>نام فیلم یا سریال<input name="title" maxlength="255" required></label>' +
+          '<button type="submit">ثبت پیشنهاد</button><small id="search-suggestion-status" role="status"></small></form>');
+        const suggestion = $('#search-suggestion');
+        if (suggestion) {
+          suggestion.elements.title.value = term;
+          submit('search-suggestion', async ({title}, output) => {
+            const result = await api('/api/suggest-content/', {body:{title,source_query:term}});
+            output.textContent = result.message;
+          });
+        }
+      } catch (error) {
+        if (request === searchRequest) whenCurrent(seq, () => fail(catalogue, error));
+      }
     }
-    const query = new URLSearchParams(params); query.set('type', kind || 'all');
+    function queue(immediate) {
+      clearTimeout(timer);
+      const term = input.value.trim();
+      const request = ++searchRequest;
+      history.replaceState(null, '', term ? '#/search?q=' + enc(term) : '#/search');
+      if (term) catalogue.innerHTML = '<h2>نتایج جستجو</h2><p class="live-search-loading" role="status">در حال جستجو…</p>';
+      if (immediate) return render(term, request);
+      timer = setTimeout(() => render(term, request), 230);
+    }
+    input.oninput = () => queue(false);
+    search.onsubmit = event => {
+      event.preventDefault();
+      input.blur();
+      queue(true);
+    };
+    await queue(true);
+  }
+  async function browse(seq, kind, params) {
+    const route = '#/browse/' + enc(kind);
+    const results = '<div id="catalogue"><div class="loading"></div></div>';
+
+      const title = kind === 'movie' ? 'Movies Archive' : kind === 'series' ? 'Series Archive' : 'آرشیو فیلم و سریال';
+      mount('<section class="archive-reference-shell"><header class="archive-reference-header"><a href="#/home" aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</a><h1 data-dm-archive-title dir="auto">' +
+        title + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">' + PWA_SOURCE.actorMenu + '</button></header>' +
+        '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><select id="sort">' +
+        '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="most_viewed">پربازدیدترین</option>' +
+        '<option value="highest_rating">بالاترین امتیاز</option></select></div>' + results + '</section>');
+      $('#sort').value = params.get('sort') || 'newest';
+      $('#sort').onchange = event => {
+        params.set('sort', event.target.value);
+        params.delete('page');
+        location.hash = route + '?' + params;
+      };
+        const query = new URLSearchParams(params); query.set('type', kind || 'all');
     try {
       const data = await api('/movie/api/filter/?' + query, { cache: true });
       whenCurrent(seq, () => {
         $('#catalogue').innerHTML = '<div class="archive-reference-grid">' + data.results.map(item =>
-          '<article class="archive-reference-card">' + card(item) + '</article>').join('') + '</div>' +
+          '<article class="archive-reference-card">' + PWA.savedCard(item) + '</article>').join('') + '</div>' +
           (!data.results.length ? empty('عنوانی پیدا نشد.') : '') +
           (data.has_next ? '<div class="archive-reference-pagination"><button id="more">بعدی</button></div>' : '');
         if ($('#more')) $('#more').onclick = () => {
@@ -313,6 +400,7 @@
         };
         if (downloadOptions) {
           const selectDownloadTab = variant => {
+            downloadOptions.querySelector('.film-download-content').scrollTop = 0;
             downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
               button.setAttribute('aria-pressed', String(button.dataset.downloadTab === variant));
             });
@@ -512,9 +600,9 @@
     });
     const initial = tabs.some(([id]) => id === params.get('tab')) ? params.get('tab') : 'saved';
     select(initial);
-    if (initial === 'downloads') loadDownloads();
     panel('saved').innerHTML = '<p role="status">دریافت لیست…</p>';
-    loadCollection();
+    const collection = loadCollection();
+    return initial === 'downloads' ? loadDownloads() : collection;
   }
   function login(previousIdentifier = '') {
     const identifierField = '<div class="dm-auth-phone-field"><input name="identifier" type="text" dir="ltr" autocomplete="username" inputmode="email" required ' +
@@ -699,7 +787,7 @@
     if (state.user) $('#quality select').value = state.user.quality;
     submit('quality', async (data, output) => { await api('/accounts/api/update-player-quality/', { body: data }); output.textContent = 'ذخیره شد.'; });
     submit('password', async (data, output) => { await api('/accounts/api/change-password/', { body: data }); output.textContent = 'رمز تغییر کرد.'; });
-    api('/api/app/v1/settings/').then(data => whenCurrent(seq, () => { $('#devices').innerHTML = data.devices.map(d => '<div class="ar-note device">' + esc(d.name) + (d.current ? ' · این دستگاه' : '') + '</div>').join(''); })).catch(() => {});
+    return api('/api/app/v1/settings/').then(data => whenCurrent(seq, () => { $('#devices').innerHTML = data.devices.map(d => '<div class="ar-note device">' + esc(d.name) + (d.current ? ' · این دستگاه' : '') + '</div>').join(''); })).catch(() => {});
   }
   function rooms(seq) {
     const slides = ['ساخت اتاق', 'تنظیم ساعت پخش', 'دعوت'];
@@ -830,8 +918,7 @@
       }});
       if (seq === state.sequence) openRoom(result.code);
     });
-    refreshRooms();
-    searchMovies('');
+    return Promise.all([refreshRooms(), searchMovies('')]);
   }
   async function room(seq, code) {
     mount(PWA_SOURCE.libraryHeader + '<section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1><a href="#/rooms">← بازگشت</a></div>' +
@@ -988,7 +1075,11 @@
     if (data.type === 'error') { $('#room-status').textContent = 'اتصال قطع شد'; toast(data.message); }
     if (state.handleRoomState) state.handleRoomState(data);
   });
+  let previousRoute;
   async function route() {
+    const loader = $('#route-loading');
+    loader.hidden = true;
+    app.classList.remove('route-enter');
     historyFrameObserver?.disconnect();
     PWAPlayer.close();
     if (state.roomCleanup) state.roomCleanup();
@@ -1006,9 +1097,9 @@
     if (state.checkingSession || (!state.sessionKnown && !state.user)) {
       PWA.page('startup');
       const content = state.checkingSession
-        ? '<div class="startup-spinner" aria-hidden="true"></div><p role="status">در حال آماده‌سازی دیاستومی…</p>'
+        ? '<div class="startup-progress" role="status"><span>loading...</span><i aria-hidden="true"></i></div>'
         : '<p role="status">وضعیت ورود بررسی نشد. اتصال اینترنت را بررسی کنید.</p><button id="retry-session" type="button">تلاش دوباره</button>';
-      mount('<section class="local-startup"><img src="assets/logo.svg" alt="دیاستومی">' + content + '</section>');
+      mount('<section class="local-startup' + (state.checkingSession ? ' local-startup-active' : '') + '"><img src="assets/logo.svg" alt="دیاستومی">' + content + '</section>');
       const retry = $('#retry-session');
       if (retry) retry.onclick = checkStartupSession;
       return;
@@ -1018,16 +1109,20 @@
       history.replaceState(null, '', '#/login');
       return route();
     }
+    const animateRoute = path !== previousRoute;
+    previousRoute = path;
+    const loadingTimer = animateRoute && !['login','otp','forgot'].includes(name)
+      ? setTimeout(() => whenCurrent(seq, () => { if (!document.activeElement?.matches('.reference-search-form input')) loader.hidden = false; }), 100) : null;
     PWA.page(name);
     document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
     window.scrollTo(0,0);
     try {
       if (name === 'home') await home(seq);
-      else if (name === 'browse') await browse(seq, parts[1] || 'all', params, false);
-      else if (name === 'search') await browse(seq, 'all', params, true);
+      else if (name === 'browse') await browse(seq, parts[1] || 'all', params);
+      else if (name === 'search') await searchPage(seq, params.get('q') || '');
       else if (name === 'title') await detail(seq, parts[1], parts[2]);
       else if (name === 'actors' || name === 'actor') await actors(seq, parts[1], parts[2]);
-      else if (name === 'library') library(seq, params);
+      else if (name === 'library') await library(seq, params);
       else if (name === 'login') login();
       else if (name === 'otp') otp(params);
       else if (name === 'forgot') forgot();
@@ -1039,10 +1134,17 @@
       else if (name === 'subscription') await subscription(seq);
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
-      else if (name === 'settings') settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۶ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'settings') await settings(seq);
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۲۷ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
+    finally {
+      clearTimeout(loadingTimer);
+      whenCurrent(seq, () => {
+        loader.hidden = true;
+        if (animateRoute) app.classList.add('route-enter');
+      });
+    }
   }
   document.addEventListener('click', async e => {
     const purchase = e.target.closest('[data-plan]');
@@ -1090,6 +1192,15 @@
     if (state.user && (!location.hash || location.hash === '#/login')) history.replaceState(null, '', '#/home');
     route();
   }
+  document.addEventListener('click', event => {
+    if (event.target.closest('.dmf3-filter')) { openFilters(); return; }
+    if (!event.target.closest('[data-local-search]') || !state.user) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    history.pushState(null, '', '#/search');
+    route();
+    document.querySelector('.reference-search-form input')?.focus();
+  });
   PWA.install();
   checkStartupSession();
 })();
