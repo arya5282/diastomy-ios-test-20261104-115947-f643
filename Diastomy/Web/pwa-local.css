@@ -347,6 +347,17 @@ html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-
   display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;direction:ltr!important;
   box-sizing:border-box!important;width:100%!important;max-width:100%!important;margin-inline:0!important;padding-inline:16px!important;
 }
+html.dmf3-active body[data-page=home] #pwa-header .dmf3-header{
+  height:auto!important;grid-template-rows:22px 36px!important;row-gap:8px!important;
+  align-content:start!important;padding-block:0 20px!important;
+}
+html.dmf3-active body[data-page=home] #pwa-header .dmf3-search-row{grid-row:2!important;margin-block:0!important}
+html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search span{
+  font-size:13px!important;line-height:18px!important;
+}
+html.dmf3-active body[data-page=search] #pwa-header .reference-search-form input{
+  font-size:16px!important;line-height:20px!important;outline:none!important;box-shadow:none!important;
+}
 html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search-row{
   display:grid!important;grid-template-columns:minmax(0,1fr) 51px!important;align-items:center!important;gap:8px!important;
   grid-column:1 / -1!important;justify-self:stretch!important;position:static!important;transform:none!important;
