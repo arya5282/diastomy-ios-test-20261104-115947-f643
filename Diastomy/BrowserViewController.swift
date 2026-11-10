@@ -327,6 +327,33 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         }.resume()
     }
 
+    private func updateAvatar(_ content: String, reply: @escaping (Any?, String?) -> Void) {
+        guard content.utf8.count <= 4 * 1024 * 1024,
+              let image = Data(base64Encoded: content), !image.isEmpty,
+              let url = allowed("/accounts/api/update-profile/") else {
+            reply(["status": 400], nil)
+            return
+        }
+        let boundary = UUID().uuidString
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(server.absoluteString, forHTTPHeaderField: "Referer")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token = HTTPCookieStorage.shared.cookies(for: server)?.first(where: { $0.name == "csrftoken" }) {
+            request.setValue(token.value, forHTTPHeaderField: "X-CSRFToken")
+        }
+        var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"avatar\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8)
+        body.append(image)
+        body.append(Data("\r\n--\(boundary)--\r\n".utf8))
+        request.httpBody = body
+        api.dataTask(with: request) { data, response, _ in
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let result = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any] ?? [:]
+            reply(["status": status, "data": result], nil)
+        }.resume()
+    }
+
     private func loadHistoryFrame(_ path: String, reply: @escaping (Any?, String?) -> Void) {
         guard path.range(of: #"^/api/watch-frame/[1-9][0-9]*/(?:\?v=[0-9]+)?$"#, options: .regularExpression) != nil,
               let url = URL(string: path, relativeTo: server)?.absoluteURL else {
@@ -356,6 +383,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         }
         if action == "request", let path = data["path"] as? String {
             send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
+        } else if action == "updateAvatar", let content = data["content"] as? String {
+            updateAvatar(content, reply: replyHandler)
         } else if action == "historyFrame", let path = data["path"] as? String {
             loadHistoryFrame(path, reply: replyHandler)
         } else if action == "play", let kind = data["kind"] as? String,

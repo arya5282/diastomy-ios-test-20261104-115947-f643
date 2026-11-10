@@ -748,6 +748,9 @@
       try { const result = await native({action:'openSocial', site:link.dataset.social}); if (!result.ok) throw Error(result.error); }
       catch (error) { toast(error.message); }
     });
+    loadAccountWatchTime(user, sequence);
+  }
+  function loadAccountWatchTime(user, sequence) {
     const output = $('#account-watch-time');
     api('/api/watch-time/').then(viewing => {
       if (state.user !== user || sequence !== state.sequence) return;
@@ -762,16 +765,63 @@
   }
   function profile() {
     const user = state.user;
-    mount(shell('اطلاعات کاربری', form('edit-profile',
-      '<label>نام و نام خانوادگی<input name="full_name" value="' + esc(user.name) + '"></label>' +
-      '<label>نام کاربری<input name="username" value="' + esc(user.username || '') + '"></label>' +
-      '<label>ایمیل<input name="email" type="email" value="' + esc(user.email || '') + '"></label>' +
-      (user.phone ? '<div class="ar-row">شماره تلفن <bdi>' + esc(user.phone) + '</bdi></div>' : ''), 'ذخیره')));
+    const sequence = state.sequence;
+    const [first = '', ...last] = (user.full_name ?? user.name ?? '').trim().split(/\s+/);
+    const avatar = imageURL(user.avatar) || '/static/public/assets/avatars/default/avatar-04.svg';
+    const profileField = (name, label, value, attributes) =>
+      '<label><span>' + label + '</span><input name="' + name + '" value="' + esc(value) + '" ' + attributes + '></label>';
+    mount('<section class="profile-editor"><header><h1>پروفایل کاربری</h1><a href="#/account" aria-label="بازگشت">' +
+      PWA_SOURCE.actorBack + '</a></header>' + PWA.watchTimeCard() +
+      '<div class="profile-editor-avatar"><button type="button" id="profile-avatar-edit" aria-label="تغییر آواتار">' +
+      '<img id="profile-avatar-current" src="' + esc(avatar) + '" alt="آواتار"><span aria-hidden="true">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m4 16-1 5 5-1L21 7l-4-4L4 16Zm11-11 4 4M4 16l4 4"/></svg></span></button>' +
+      '<span class="reference-subscription-badge">' + (user.subscribed ? 'اشتراک فعال' : 'اشتراک غیرفعال') + '</span></div>' +
+      form('edit-profile', profileField('first','نام',first,'autocomplete="given-name"') +
+        profileField('last','نام خانوادگی',last.join(' '),'autocomplete="family-name"') +
+        profileField('username','نام کاربری',user.username || '','dir="ltr" autocomplete="username" required') +
+        profileField('email','ایمیل',user.email || '','dir="ltr" type="email" autocomplete="email" readonly') +
+        profileField('phone','شماره تماس',user.phone || '','dir="ltr" type="tel" autocomplete="tel" readonly'), 'ذخیره اطلاعات') +
+      '<dialog id="profile-avatar-dialog" aria-labelledby="profile-avatar-title"><form method="dialog"><button aria-label="بستن">×</button></form>' +
+      '<h2 id="profile-avatar-title">تغییر آواتار</h2><label>بارگذاری تصویر<input id="profile-avatar-file" type="file" accept="image/*"></label>' +
+      '<p id="profile-avatar-status" role="status"></p></dialog></section>');
+    loadAccountWatchTime(user, sequence);
     submit('edit-profile', async (values, output) => {
-      const result = await api('/accounts/api/update-profile/', {body:values});
+      const full_name = [values.first.trim(), values.last.trim()].filter(Boolean).join(' ');
+      const result = await api('/accounts/api/update-profile/', {body:{full_name,username:values.username}});
       await refreshSession();
       output.textContent = result.message || 'ذخیره شد.';
     });
+    const dialog = $('#profile-avatar-dialog');
+    const picker = $('#profile-avatar-file');
+    $('#profile-avatar-edit').onclick = () => dialog.showModal();
+    picker.onchange = async () => {
+      const file = picker.files[0];
+      if (!file) return;
+      const output = $('#profile-avatar-status');
+      if (file.size > 3 * 1024 * 1024) {
+        output.textContent = 'حجم تصویر باید حداکثر ۳ مگابایت باشد.';
+        picker.value = '';
+        return;
+      }
+      picker.disabled = true;
+      output.textContent = 'در حال ذخیره…';
+      try {
+        const content = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result).split(',')[1]);
+          reader.onerror = () => reject(Error('خواندن تصویر ممکن نشد.'));
+          reader.readAsDataURL(file);
+        });
+        const result = await native({action:'updateAvatar', content});
+        if (result.status !== 200) throw Error(result.data?.error || 'ذخیرهٔ تصویر ممکن نشد.');
+        await refreshSession();
+        whenCurrent(sequence, () => {
+          $('#profile-avatar-current').src = imageURL(state.user?.avatar) || avatar;
+          dialog.close();
+        });
+      } catch (error) { output.textContent = error.message; }
+      finally { picker.disabled = false; picker.value = ''; }
+    };
   }
   async function payments(seq) {
     mount(shell('اطلاعات پرداخت', '<div id="payment-history"><p role="status">در حال دریافت…</p></div>'));
@@ -1170,7 +1220,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
