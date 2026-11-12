@@ -665,6 +665,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         case "toggle":
             if playback.timeControlStatus == .paused { playback.playImmediately(atRate: inlineRate) } else { playback.pause() }
         case "mute": playback.isMuted.toggle()
+        case "volume":
+            if let volume = data["value"] as? Double, (0...1).contains(volume) {
+                playback.volume = Float(volume)
+            }
         case "seek":
             if let seconds = data["value"] as? Double, seconds.isFinite, seconds >= 0 {
                 playback.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))

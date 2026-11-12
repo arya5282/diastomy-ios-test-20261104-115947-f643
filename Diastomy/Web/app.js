@@ -197,12 +197,12 @@
           }
         }
         choose(0);
-        wheel.onscroll = () => choose(Math.round(wheel.scrollTop / 24));
+        wheel.onscroll = () => choose(Math.round((wheel.scrollTop + 10) / 22));
         wheel.onkeydown = event => {
           if (!['ArrowDown','ArrowUp'].includes(event.key)) return;
           event.preventDefault();
           choose(select.selectedIndex + (event.key === 'ArrowDown' ? 1 : -1));
-          wheel.scrollTop = select.selectedIndex * 24;
+          wheel.scrollTop = Math.max(0, select.selectedIndex * 22 - 10);
         };
         continue;
       }
@@ -264,13 +264,13 @@
     const select = (name, label, choices) => '<label>' + label + '<select name="' + name + '"><option value="">همه</option>' +
       choices.map(([value,text]) => '<option value="' + esc(value) + '">' + esc(text) + '</option>').join('') + '</select></label>';
     if (!form.children.length) {
-      const latestYear = new Date().getFullYear() + 3;
-      const yearOptions = Array.from({length:latestYear - 1899}, (_, index) => {
+      const latestYear = new Date().getFullYear() + 2;
+      const yearOptions = Array.from({length:latestYear - 1887}, (_, index) => {
         const year = latestYear - index;
         return '<option value="' + year + '">' + year + '</option>';
       }).join('');
       const yearSelect = (name, label) => '<label class="local-filter-year"><span>' + label +
-        '</span><select name="' + name + '" dir="ltr" lang="en"><option value="">همه</option>' +
+        '</span><select name="' + name + '" dir="ltr" lang="en"><option value="">all</option>' +
         yearOptions + '</select></label>';
       form.innerHTML = '<header><h2 id="local-filter-title" tabindex="-1" autofocus>اعمال فیلتر</h2><button type="button" data-close-filter aria-label="بستن">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6" stroke-linecap="round"/></svg></button></header>' +
@@ -505,14 +505,16 @@
         if (kind === 'series') loadContentPreferences(seq);
         const trailers = (data.trailers || []).filter(trailer => imageURL(trailer.url));
         document.querySelectorAll('[data-trailer-index]').forEach(button => {
-          button.onclick = () => {
-            const trailer = trailers[Number(button.dataset.trailerIndex)];
-            if (!trailer) return;
-            PWAPlayer.open({
-              info:{url:imageURL(trailer.url), title:trailer.title || data.title},
-              groups:[], group:-1, kind:'trailer', id:0, native, onError:toast, save:() => {}
-            });
-          };
+          const trailer = trailers[Number(button.dataset.trailerIndex)];
+          if (!trailer) return;
+          button.dataset.inlineTrailerSrc = imageURL(trailer.url);
+          if (!button.closest('.movie-detail-hero')) {
+            button.classList.add('local-trailer-card');
+            const host = document.createElement('span');
+            host.className = 'dm-trailer-thumb';
+            button.before(host);
+            host.append(button);
+          }
         });
         const downloadOptions = $('#film-download-options');
         $('#film-comments').onclick = () => {
@@ -1308,6 +1310,8 @@
     app.classList.remove('route-enter');
     historyFrameObserver?.disconnect();
     PWAPlayer.close();
+    document.querySelectorAll('.dm-inline-trailer').forEach(player => player.dmDispose?.());
+    document.getElementById('dm-playback-choice')?.dispatchEvent(new Event('cancel'));
     if (state.roomCleanup) state.roomCleanup();
     state.roomCleanup = null;
     state.handleRoomState = null;
@@ -1361,7 +1365,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1387,8 +1391,12 @@
         if (!response.data.url) throw new Error('آدرس پخش در دسترس نیست.');
         const groups = state.playGroups || [];
         const group = groups.findIndex(options => options.some(option => Number(option.id) === id));
+        const position = Number(response.data.position) || 0;
+        const start = room || position <= 0 ? position : await PWAPlayer.chooseResume(position);
+        if (start === null || sequence !== state.sequence) return;
+        document.querySelectorAll('.dm-inline-trailer').forEach(player => player.dmDispose?.());
         PWAPlayer.open({
-          info:response.data, groups, group, kind, id, room, native, onError:toast,
+          info:{...response.data, position:start}, groups, group, kind, id, room, native, onError:toast,
           save:body => api('/api/watch-progress/', {body}).catch(() => {})
         });
       }
