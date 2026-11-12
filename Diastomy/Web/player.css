@@ -22,3 +22,8 @@
 .local-player-error{position:absolute;inset:35% 12% auto;padding:20px;background:#111;border-radius:12px;text-align:center;direction:rtl}
 .local-player-error button{margin:auto;background:#303030;border-radius:8px}
 .local-pwa-player [hidden]{display:none!important}
+
+html:has(body.local-player-native-open),body.local-player-native-open{background:transparent!important}
+body.local-player-native-open .dmf3-root{visibility:hidden}
+.local-pwa-player.local-player-native{background:transparent}
+.local-player-native video{visibility:hidden}

@@ -508,13 +508,10 @@
           button.onclick = () => {
             const trailer = trailers[Number(button.dataset.trailerIndex)];
             if (!trailer) return;
-            const player = document.createElement('video');
-            player.controls = true;
-            player.playsInline = true;
-            player.src = imageURL(trailer.url);
-            $('.movie-detail-hero').replaceChildren(player);
-            player.scrollIntoView({block:'nearest'});
-            player.play().catch(() => {});
+            PWAPlayer.open({
+              info:{url:imageURL(trailer.url), title:trailer.title || data.title},
+              groups:[], group:-1, kind:'trailer', id:0, native, onError:toast, save:() => {}
+            });
           };
         });
         const downloadOptions = $('#film-download-options');
@@ -1364,7 +1361,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۷ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1384,14 +1381,14 @@
       const id = Number(button.dataset.play);
       const room = button.dataset.room;
       const sequence = state.sequence;
-      const response = await native({ action: 'play', kind, id, room, inline: !room });
+      const response = await native({ action: 'play', kind, id, room, inline: true });
       if (response.status !== 200) throw new Error(response.data.error || 'پخش ممکن نشد.');
-      if (!room && sequence === state.sequence) {
+      if (sequence === state.sequence) {
         if (!response.data.url) throw new Error('آدرس پخش در دسترس نیست.');
         const groups = state.playGroups || [];
         const group = groups.findIndex(options => options.some(option => Number(option.id) === id));
         PWAPlayer.open({
-          info:response.data, groups, group, kind, id, native, onError:toast,
+          info:response.data, groups, group, kind, id, room, native, onError:toast,
           save:body => api('/api/watch-progress/', {body}).catch(() => {})
         });
       }

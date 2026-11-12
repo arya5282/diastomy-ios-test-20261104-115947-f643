@@ -13,6 +13,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var startupTimer: Timer?
     private var startupNavigation: WKNavigation?
     private var startupDocumentCommitted = false
+    private var inlineLayer: AVPlayerLayer?
+    private var inlineGeneration = 0
+    private var inlineRotated = false
+    private var inlineRate: Float = 1
     private var player: AVPlayer?
     private var playerController: AVPlayerViewController?
     private var progressObserver: Any?
@@ -45,6 +49,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         configuration.websiteDataStore = .default()
         configuration.setURLSchemeHandler(BundledInterfaceHandler(), forURLScheme: "diastomy")
         configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
         configuration.userContentController.addScriptMessageHandler(self, contentWorld: .page, name: "native")
@@ -155,6 +160,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        stopInlinePlayer()
         startupFailed("بخش رابط برنامه متوقف شد. روی تلاش دوباره بزنید.")
     }
 
@@ -387,6 +393,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             updateAvatar(content, reply: replyHandler)
         } else if action == "historyFrame", let path = data["path"] as? String {
             loadHistoryFrame(path, reply: replyHandler)
+        } else if action == "inlineControl", let command = data["command"] as? String {
+            replyHandler(controlInlinePlayer(command, data: data), nil)
         } else if action == "play", let kind = data["kind"] as? String,
                   ["movie", "series"].contains(kind), let id = data["id"] as? Int, id > 0 {
             let code = data["room"] as? String
@@ -395,11 +403,23 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 return
             }
             let room = code.map { "?room=" + $0 } ?? ""
+            let surface = data["surface"] as? Bool == true
+            if surface { inlineGeneration += 1 }
+            let generation = inlineGeneration
             send("/api/app/v1/playback/\(kind)/\(id)/" + room) { result in
                 guard result["status"] as? Int == 200, let info = result["data"] as? [String: Any],
                       let value = info["url"] as? String, let url = URL(string: value),
                       url.scheme == "https", url.host == self.server.host,
                       url.path.hasPrefix("/movie/\(kind)-direct-hls/") else { replyHandler(result, nil); return }
+                if surface {
+                    guard generation == self.inlineGeneration else {
+                        replyHandler(["status": 409], nil)
+                        return
+                    }
+                    self.startInlinePlayer(url, position: data["position"] as? Double ?? 0)
+                    replyHandler(["status": 200, "data": ["surface": true]], nil)
+                    return
+                }
                 if data["inline"] as? Bool == true {
                     let store = self.webView.configuration.websiteDataStore.httpCookieStore
                     let group = DispatchGroup()
@@ -410,9 +430,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                     group.notify(queue: .main) { replyHandler(result, nil) }
                     return
                 }
-                self.playingRoom = room.isEmpty ? nil : code
-                self.presentPlayer(url, info: info)
-                replyHandler(["status": 200, "data": ["playing": true]], nil)
+                replyHandler(["status": 400, "data": ["error": "پخش آنلاین از پلیر داخلی باز می‌شود."]], nil)
             }
         } else if action == "listDownloads" {
             do {
@@ -585,6 +603,88 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             }
             DispatchQueue.main.async { completion(result) }
         }.resume()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        layoutInlinePlayer()
+    }
+
+    private func layoutInlinePlayer() {
+        guard let layer = inlineLayer else { return }
+        let bounds = view.bounds
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.bounds = CGRect(origin: .zero, size: inlineRotated
+            ? CGSize(width: bounds.height, height: bounds.width) : bounds.size)
+        layer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        layer.setAffineTransform(CGAffineTransform(rotationAngle: inlineRotated ? .pi / 2 : 0))
+        CATransaction.commit()
+    }
+
+    private func stopInlinePlayer() {
+        inlineGeneration += 1
+        inlineLayer?.player?.pause()
+        inlineLayer?.removeFromSuperlayer()
+        inlineLayer = nil
+        inlineRotated = false
+        inlineRate = 1
+        webView.underPageBackgroundColor = .black
+        webView.backgroundColor = .black
+        webView.scrollView.backgroundColor = .black
+    }
+
+    private func startInlinePlayer(_ url: URL, position: Double) {
+        stopInlinePlayer()
+        let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
+        let asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
+        let playback = AVPlayer(playerItem: AVPlayerItem(asset: asset))
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let layer = AVPlayerLayer(player: playback)
+        layer.videoGravity = .resizeAspect
+        view.layer.insertSublayer(layer, below: webView.layer)
+        inlineLayer = layer
+        layoutInlinePlayer()
+        webView.underPageBackgroundColor = .clear
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        if position.isFinite, position > 0 {
+            playback.seek(to: CMTime(seconds: position, preferredTimescale: 600))
+        }
+        playback.play()
+    }
+
+    private func controlInlinePlayer(_ command: String, data: [String: Any]) -> [String: Any] {
+        if command == "stop" {
+            stopInlinePlayer()
+            return ["ok": true]
+        }
+        guard let playback = inlineLayer?.player else { return ["ok": false] }
+        switch command {
+        case "toggle":
+            if playback.timeControlStatus == .paused { playback.playImmediately(atRate: inlineRate) } else { playback.pause() }
+        case "mute": playback.isMuted.toggle()
+        case "seek":
+            if let seconds = data["value"] as? Double, seconds.isFinite, seconds >= 0 {
+                playback.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+            }
+        case "rate":
+            if let rate = data["value"] as? Double, (0.5...2).contains(rate) {
+                inlineRate = Float(rate)
+                if playback.rate != 0 { playback.rate = Float(rate) }
+            }
+        case "rotate":
+            inlineRotated = data["value"] as? Bool == true
+            layoutInlinePlayer()
+        default: break
+        }
+        let duration = playback.currentItem?.duration.seconds ?? 0
+        let position = playback.currentTime().seconds
+        return ["ok": true, "duration": duration.isFinite ? duration : 0,
+                "position": position.isFinite ? position : 0, "muted": playback.isMuted,
+                "paused": playback.timeControlStatus == .paused,
+                "failed": playback.status == .failed || playback.currentItem?.status == .failed]
     }
 
     private func presentPlayer(_ url: URL, info: [String: Any]) {
