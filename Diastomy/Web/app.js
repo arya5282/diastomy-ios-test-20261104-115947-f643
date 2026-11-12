@@ -997,18 +997,105 @@
     }
   }
   async function support(seq) {
-    mount(shell('پشتیبانی', '<div id="messages">' + empty('پیام‌ها از سرور دریافت می‌شوند.') + '</div>' + form('support', '<label>پیام شما<textarea name="content" required maxlength="4000"></textarea></label>', 'ارسال پیام')));
-    submit('support', async (data, output) => {
-      await api('/accounts/support/api/send/', { body: data }); output.textContent = 'پیام ارسال شد.';
-      if (state.sequence === seq) await loadMessages();
-    });
+    const quickReplies = ['فیلم پخش نمی‌شه','مشکل اتصال به اینترنت','مشکل حساب کاربری'];
+    const icon = path => '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' + path + '</svg>';
+    const clip = icon('<path d="M8 9v9a4 4 0 0 0 8 0V6a3 3 0 0 0-6 0v11a1 1 0 0 0 2 0V8"/>');
+    const smile = icon('<circle cx="12" cy="12" r="10"/><path d="M8 14a4 4 0 0 0 8 0M9 9h.1M15 9h.1"/>');
+    const missing = icon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m5 17 5-5 3 3 2-2 4 4"/><path stroke="#ed1423" d="M2 3l20 18"/>');
+    mount(shell('پشتیبانی', '<section class="local-support-chat"><div class="local-support-chat-head"><h2>پشتیبانی</h2><span>پاسخ‌گویی آنلاین</span></div>' +
+      '<div id="messages" role="log" aria-label="گفتگوی پشتیبانی"><p>در حال دریافت پیام‌ها…</p></div>' +
+      '<form id="support"><div class="local-support-quick">' + quickReplies.map(text => '<button type="button">' + text + '</button>').join('') + '</div>' +
+      '<div class="local-support-emojis" hidden>' + ['😊','🙏','👍','❤️','😕'].map(text => '<button type="button">' + text + '</button>').join('') + '</div>' +
+      '<div class="local-support-file" hidden><span></span><button type="button" aria-label="حذف پیوست">×</button></div>' +
+      '<div class="local-support-compose"><div class="local-support-field"><label aria-label="افزودن پیوست">' + clip + '<input type="file" name="file" accept="image/*" aria-label="افزودن پیوست"></label>' +
+      '<textarea name="content" maxlength="4000" rows="1" placeholder="پیام خود را بنویسید…" aria-label="پیام شما"></textarea>' +
+      '<button type="button" class="local-support-emoji-toggle" aria-label="ایموجی" aria-expanded="false">' + smile + '</button></div>' +
+      '<button type="submit" class="local-support-send">ارسال</button></div><p id="support-feedback" role="status"></p></form></section>'));
+    const log = $('#messages'), composer = $('#support'), input = composer.elements.content, file = composer.elements.file;
+    const feedback = $('#support-feedback'), selected = $('.local-support-file'), emojis = $('.local-support-emojis');
+    const emojiToggle = $('.local-support-emoji-toggle');
+    const scrollLatest = () => { log.scrollTop = log.scrollHeight; };
+    for (const button of $('.local-support-quick').children) button.onclick = () => { input.value = button.textContent; };
+    emojiToggle.onclick = () => { emojis.hidden = !emojis.hidden; emojiToggle.setAttribute('aria-expanded',String(!emojis.hidden)); };
+    for (const button of emojis.children) button.onclick = () => {
+      input.setRangeText(button.textContent,input.selectionStart,input.selectionEnd,'end');
+      emojiToggle.click();
+    };
+    const showFile = () => {
+      selected.hidden = !file.files.length;
+      selected.querySelector('span').textContent = file.files[0]?.name || '';
+    };
+    file.onchange = showFile;
+    selected.querySelector('button').onclick = () => { file.value = ''; showFile(); };
+    let lastMessages;
     async function loadMessages() {
       try {
         const data = await api('/accounts/support/api/messages/');
-        whenCurrent(seq, () => { $('#messages').innerHTML = data.messages.map(m => '<div class="message ar-support-bubble ' + (m.is_operator ? 'operator' : '') + '"><small>' + esc(m.sender_name) + ' · ' + esc(m.created_at) + '</small><p>' + esc(m.content) + '</p>' + (m.attachment_name ? '<small>پیوست: ' + esc(m.attachment_name) + '</small>' : '') + '</div>').join('') || empty('پیام خود را برای پشتیبانی بفرستید.'); });
-      } catch (error) { whenCurrent(seq, () => fail($('#messages'), error)); }
+        if (seq !== state.sequence) return;
+        const messages = data.messages || [];
+        const signature = JSON.stringify(messages.map(m => [m.id,m.is_read,m.content,m.attachment_url]));
+        if (signature === lastMessages) return;
+        const follow = !lastMessages || log.scrollHeight - log.scrollTop - log.clientHeight < 64;
+        lastMessages = signature;
+        let day;
+        log.innerHTML = messages.map(m => {
+          const date = m.date_display && m.date_display !== day ? '<p class="local-support-day">' + esc(m.date_display) + '</p>' : '';
+          day = m.date_display;
+          const attachment = m.attachment_name || m.attachment_url ? '<div class="local-support-attachment"' +
+            (m.attachment_type === 'image' && m.attachment_url ? ' data-support-image="' + esc(m.id) + '"' : '') + '>' +
+            missing + '<span>Attachment unavailable</span></div>' : '';
+          return date + '<article class="local-support-message ' + (m.is_operator ? 'operator' : 'mine') + '">' +
+            (m.content ? '<p class="local-support-bubble" dir="auto">' + esc(m.content) + '</p>' : '') + attachment +
+            '<small dir="ltr">' + esc(m.created_at) + (m.is_operator ? '' : (m.is_read ? ' <span aria-label="خوانده‌شده">✓✓</span>' : ' <span aria-label="ارسال‌شده">✓</span>')) +
+            '</small></article>';
+        }).join('') || '<p class="local-support-empty">پیام خود را برای پشتیبانی بفرستید.</p>';
+        if (follow) scrollLatest();
+        for (const frame of log.querySelectorAll('[data-support-image]')) {
+          native({action:'supportImage', id:Number(frame.dataset.supportImage)}).then(result => {
+            if (!frame.isConnected || !result.image) return;
+            const image = new Image();
+            image.alt = 'تصویر پیوست';
+            image.src = result.image;
+            frame.replaceChildren(image);
+            if (follow && log.scrollHeight - log.scrollTop - log.clientHeight < 64) scrollLatest();
+          }).catch(() => {});
+        }
+      } catch (error) {
+        if (!lastMessages) whenCurrent(seq, () => fail(log,error));
+      }
     }
+    composer.onsubmit = async event => {
+      event.preventDefault();
+      const content = input.value.trim(), attachment = file.files[0], send = composer.querySelector('[type=submit]');
+      if (send.disabled || (!content && !attachment)) return;
+      if (attachment && attachment.size > 5 * 1024 * 1024) { feedback.textContent = 'حجم تصویر باید حداکثر ۵ مگابایت باشد.'; return; }
+      send.disabled = true;
+      feedback.textContent = '';
+      try {
+        if (attachment) {
+          const content64 = await new Promise((resolve,reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result).split(',')[1]);
+            reader.onerror = () => reject(Error('خواندن پیوست ممکن نشد.'));
+            reader.readAsDataURL(attachment);
+          });
+          const result = await native({action:'sendSupportImage', content, content64, name:attachment.name});
+          if (result.status !== 200) throw Error(result.data?.error || 'ارسال پیوست ممکن نشد.');
+        } else await api('/accounts/support/api/send/', {body:{content}});
+        input.value = ''; file.value = ''; showFile();
+        await loadMessages();
+        if (seq === state.sequence) scrollLatest();
+      } catch (error) { feedback.textContent = error.message; }
+      finally { send.disabled = false; }
+    };
     await loadMessages();
+    if (seq !== state.sequence) return;
+    async function refresh() {
+      if (seq !== state.sequence) return;
+      if (!document.hidden) await loadMessages();
+      if (seq === state.sequence) setTimeout(refresh, 8000);
+    }
+    setTimeout(refresh, 8000);
   }
   async function subscription(seq) {
     mount(shell('خرید یا تمدید اشتراک', '<div id="plans">' + empty('اطلاعات اشتراک از سرور دریافت می‌شود.') + '</div>'));
@@ -1547,7 +1634,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۱ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {

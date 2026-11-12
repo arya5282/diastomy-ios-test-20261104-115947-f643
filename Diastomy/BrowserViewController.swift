@@ -334,13 +334,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         }.resume()
     }
 
-    private func updateAvatar(_ content: String, reply: @escaping (Any?, String?) -> Void) {
-        guard content.utf8.count <= 4 * 1024 * 1024,
-              let image = Data(base64Encoded: content), !image.isEmpty,
-              let url = allowed("/accounts/api/update-profile/") else {
+    private func uploadAttachment(path: String, field: String, name: String, encoded: String,
+                                  message: String? = nil, limit: Int,
+                                  reply: @escaping (Any?, String?) -> Void) {
+        guard encoded.utf8.count <= ((limit + 2) / 3) * 4,
+              let file = Data(base64Encoded: encoded), !file.isEmpty, file.count <= limit,
+              let url = allowed(path) else {
             reply(["status": 400], nil)
             return
         }
+        let filename = String(name.prefix(128)).replacingOccurrences(of: #"[^a-zA-Z0-9_.-]"#, with: "_", options: .regularExpression)
         let boundary = UUID().uuidString
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -350,14 +353,38 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         if let token = HTTPCookieStorage.shared.cookies(for: server)?.first(where: { $0.name == "csrftoken" }) {
             request.setValue(token.value, forHTTPHeaderField: "X-CSRFToken")
         }
-        var body = Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"avatar\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8)
-        body.append(image)
+        var body = Data()
+        if let message {
+            body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"content\"\r\n\r\n\(message)\r\n".utf8))
+        }
+        body.append(Data("--\(boundary)\r\nContent-Disposition: form-data; name=\"\(field)\"; filename=\"\(filename)\"\r\nContent-Type: application/octet-stream\r\n\r\n".utf8))
+        body.append(file)
         body.append(Data("\r\n--\(boundary)--\r\n".utf8))
         request.httpBody = body
         api.dataTask(with: request) { data, response, _ in
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let result = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any] ?? [:]
             reply(["status": status, "data": result], nil)
+        }.resume()
+    }
+
+    private func loadSupportImage(_ id: Int, reply: @escaping (Any?, String?) -> Void) {
+        guard id > 0, let url = URL(string: "/accounts/support/attachment/\(id)/", relativeTo: server)?.absoluteURL else {
+            reply([:], nil)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("image/*", forHTTPHeaderField: "Accept")
+        api.downloadTask(with: request) { location, response, _ in
+            guard let response = response as? HTTPURLResponse, response.statusCode == 200,
+                  let mime = response.mimeType, ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"].contains(mime),
+                  let location, let size = try? location.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                  size <= 5 * 1024 * 1024, let data = try? Data(contentsOf: location) else {
+                reply([:], nil)
+                return
+            }
+            reply(["image": "data:\(mime);base64," + data.base64EncodedString()], nil)
         }.resume()
     }
 
@@ -391,7 +418,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         if action == "request", let path = data["path"] as? String {
             send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
         } else if action == "updateAvatar", let content = data["content"] as? String {
-            updateAvatar(content, reply: replyHandler)
+            uploadAttachment(path: "/accounts/api/update-profile/", field: "avatar", name: "avatar",
+                             encoded: content, limit: 3 * 1024 * 1024, reply: replyHandler)
+        } else if action == "sendSupportImage", let encoded = data["content64"] as? String,
+                  let content = data["content"] as? String, content.count <= 4000, let name = data["name"] as? String {
+            uploadAttachment(path: "/accounts/support/api/send/", field: "file", name: name,
+                             encoded: encoded, message: content, limit: 5 * 1024 * 1024, reply: replyHandler)
+        } else if action == "supportImage", let id = data["id"] as? Int {
+            loadSupportImage(id, reply: replyHandler)
         } else if action == "historyFrame", let path = data["path"] as? String {
             loadHistoryFrame(path, reply: replyHandler)
         } else if action == "inlineControl", let command = data["command"] as? String {
