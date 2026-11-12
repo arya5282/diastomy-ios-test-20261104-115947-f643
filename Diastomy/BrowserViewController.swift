@@ -273,7 +273,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             "/accounts/api/notifications/mark-read/", "/accounts/api/change-password/",
             "/accounts/api/update-profile/", "/accounts/api/update-player-quality/",
             "/accounts/api/set-language/", "/accounts/api/plans/", "/accounts/api/payments/",
-            "/accounts/api/create-payment/",
+            "/accounts/api/create-payment/", "/accounts/api/check-discount/",
             "/api/suggest-content/", "/api/bookmark/toggle/", "/api/content-preferences/", "/api/watch-progress/", "/api/watch-time/",
             "/accounts/support/api/messages/", "/accounts/support/api/send/"
         ]

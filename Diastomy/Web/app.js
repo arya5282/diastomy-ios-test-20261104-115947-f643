@@ -857,12 +857,63 @@
     await loadMessages();
   }
   async function subscription(seq) {
-    mount(shell('خرید یا تمدید اشتراک', '<div id="plans" class="sub-plans">' + empty('اطلاعات اشتراک از سرور دریافت می‌شود.') + '</div>'));
+    mount(shell('خرید یا تمدید اشتراک', '<div id="plans">' + empty('اطلاعات اشتراک از سرور دریافت می‌شود.') + '</div>'));
     try {
       const data = await api('/accounts/api/plans/');
       whenCurrent(seq, () => {
         const plans = data.plans || [];
-        $('#plans').innerHTML = plans.map(p => '<article class="sub-plan"><h2 class="sub-plan-name">' + esc(p.name || p.title) + '</h2><p>' + esc(p.description || '') + '</p><strong>' + number(p.newPriceRaw || p.oldPriceRaw) + ' تومان</strong><button class="sub-pay" data-plan="' + p.id + '">خرید اشتراک</button></article>').join('') + '<label>کد تخفیف<input id="discount" autocomplete="off"></label><p>پرداخت در مرورگر امن درگاه انجام می‌شود.</p>';
+        if (!plans.length) { $('#plans').innerHTML = empty('در حال حاضر پلنی برای خرید موجود نیست.'); return; }
+        const money = value => new Intl.NumberFormat('en-US', {maximumFractionDigits:0}).format(value);
+        const planPrice = plan => Number(plan.newPriceRaw || plan.oldPriceRaw || 0);
+        let selected = plans[0], discount = 0, applied = '', revision = 0;
+        $('#plans').innerHTML = '<div class="sub-plans" role="radiogroup" aria-label="انتخاب اشتراک">' +
+          plans.map((plan, i) => '<label class="sub-plan"><span><input type="radio" name="subscription-plan" value="' + i +
+            '"' + (i === 0 ? ' checked' : '') + '> ' + esc(plan.name || plan.title) + '</span><span>' +
+            (plan.newPriceRaw && plan.oldPriceRaw ? '<del>' + money(plan.oldPriceRaw) + '</del> ' : '') +
+            '<strong>' + money(planPrice(plan)) + '</strong> <small>تومان</small></span></label>').join('') +
+          '</div><p class="sub-tax-note">به مبلغ نهایی ۱۰٪ مالیات بر ارزش افزوده اضافه خواهد شد.</p>' +
+          '<form class="sub-discount" id="sub-discount-form"><input name="code" placeholder="کد تخفیف یا هدیه" aria-label="کد تخفیف یا هدیه" maxlength="100" required><button type="submit">ثبت کد</button></form>' +
+          '<p id="sub-discount-form-status" role="status"></p><div class="sub-summary"><dl>' +
+          [['price','قیمت'],['discount','مبلغ کد تخفیف'],['vat','مالیات بر ارزش افزوده'],['total','جمع مبلغ قابل پرداخت']]
+            .map(([key,label]) => '<div><dt>' + label + '</dt><dd data-total="' + key + '"></dd></div>').join('') +
+          '</dl><button class="sub-pay" type="button" id="sub-pay">انتقال به درگاه پرداخت</button></div>';
+        function render() {
+          const price = planPrice(selected), taxable = Math.max(0, price - discount);
+          const amounts = {price, discount, vat:taxable * .10, total:taxable * 1.10};
+          Object.entries(amounts).forEach(([key,value]) => {
+            $('[data-total="' + key + '"]').textContent = money(value) + ' تومان';
+          });
+        }
+        function clearDiscount() {
+          revision++;
+          discount = 0;
+          applied = '';
+          $('#sub-discount-form-status').textContent = '';
+          render();
+        }
+        document.querySelectorAll('[name=subscription-plan]').forEach(input => {
+          input.onchange = () => { selected = plans[Number(input.value)]; clearDiscount(); };
+        });
+        $('#sub-discount-form input').oninput = clearDiscount;
+        submit('sub-discount-form', async ({code}, output) => {
+          const version = revision;
+          const result = await api('/accounts/api/check-discount/', {body:{code:code.trim(),plan_id:selected.id}});
+          if (seq !== state.sequence || version !== revision) return;
+          discount = Math.min(planPrice(selected), Math.max(0, Number(result.discount) || 0));
+          applied = code.trim();
+          output.textContent = result.message || 'کد تخفیف ثبت شد.';
+          render();
+        });
+        const pay = $('#sub-pay');
+        pay.onclick = async () => {
+          pay.disabled = true;
+          try {
+            const result = await native({action:'checkout',plan:Number(selected.id),discount:applied});
+            if (!result.data?.opened) throw Error(result.data?.message || 'درگاه پرداخت باز نشد.');
+          } catch (error) { toast(error.message); }
+          finally { pay.disabled = false; }
+        };
+        render();
       });
     } catch (error) { whenCurrent(seq, () => fail($('#plans'), error)); }
   }
@@ -1220,7 +1271,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1232,14 +1283,6 @@
     }
   }
   document.addEventListener('click', async e => {
-    const purchase = e.target.closest('[data-plan]');
-    if (purchase) {
-      purchase.disabled = true;
-      try { const result = await native({ action: 'checkout', plan: Number(purchase.dataset.plan), discount: $('#discount') ? $('#discount').value : '' }); if (!result.data.opened) throw new Error(result.data.error || result.data.message || 'درگاه پرداخت باز نشد.'); }
-      catch (error) { toast(error.message); }
-      finally { purchase.disabled = false; }
-      return;
-    }
     const button = e.target.closest('[data-play]');
     if (!button) return;
     button.disabled = true;

@@ -348,8 +348,8 @@ html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-
   box-sizing:border-box!important;width:100%!important;max-width:100%!important;margin-inline:0!important;padding-inline:16px!important;
 }
 html.dmf3-active body[data-page=home] #pwa-header .dmf3-header{
-  height:auto!important;grid-template-rows:22px 36px!important;row-gap:8px!important;
-  align-content:start!important;padding-block:0 14px!important;
+  height:auto!important;grid-template-rows:22px 36px!important;row-gap:23px!important;
+  align-content:start!important;padding-block:0 20px!important;
 }
 html.dmf3-active body[data-page=home] #pwa-header .dmf3-search-row{grid-row:2!important;margin-block:0!important}
 html.dmf3-active body:is([data-page=home],[data-page=search]) #pwa-header .dmf3-search span{
@@ -455,7 +455,7 @@ html.dmf3-active body[data-page=home] #app .nyx-prime-meta{gap:5px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-age{
   display:inline-flex!important;align-items:center;justify-content:center;border-radius:999px;background:#e30000!important;color:#100000!important;font-weight:750;padding:2px 6px!important;
 }
-html.dmf3-active body[data-page=home] #app .nyx-prime-trend>span{color:#ef6728!important;font-weight:650;margin-left:5px}
+html.dmf3-active body[data-page=home] #app .nyx-prime-trend>span{color:#ff721c!important;font-size:12px!important;font-weight:800!important;margin-left:5px}
 html.dmf3-active body[data-page=home] #app .nyx-prime-check{display:inline-grid!important;place-items:center;width:14px!important;height:14px!important;background:none!important;flex:none}
 html.dmf3-active body[data-page=home] #app .nyx-prime-check>.dmf53-verify{display:block!important;width:14px!important;height:14px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots button{min-width:0!important;min-height:0!important;width:4px;height:4px;background:#555}
@@ -790,3 +790,23 @@ body[data-page=local-profile] #app{padding:0 14px calc(18px + env(safe-area-inse
 #edit-profile-status:empty{display:none}
 #profile-avatar-dialog{border:1px solid #444;border-radius:16px;background:#161616;color:#fff;padding:16px}
 #profile-avatar-dialog::backdrop{background:#0008}
+body[data-page=local-subscription] #pwa-nav{display:none}
+body[data-page=local-subscription] #app{padding:0 16px 32px}
+#app .sub-shell{padding:0;margin:0 auto;max-width:460px}
+#app .sub-head{min-height:0;padding:9px 0 24px;margin:0}
+#app .sub-head a{background:none;border:0}
+#app .sub-head h1{font-size:21px;font-weight:500}
+#plans .sub-plan{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px;padding:8px 13px;margin:0 0 10px;border:1px solid #333;border-radius:18px;background:#0d0d0d}
+#plans .sub-plan input{width:16px;height:16px;accent-color:#dc0000;vertical-align:middle}
+#plans .sub-plan strong,#plans .sub-plan del,#plans dd{font-family:"PWA Inter","PWA Yekan",sans-serif}
+#plans .sub-plan del{color:#888;font-size:9px}
+#plans .sub-tax-note{font-size:10px;color:#999;text-align:center}
+#plans .sub-discount{display:flex;gap:8px;margin-top:32px;padding:6px;border:1px solid #444;border-radius:18px}
+#plans .sub-discount input{min-width:0;flex:1;font-size:16px;background:none;border:0}
+#plans .sub-discount button{background:#fff;color:#111;border:0;border-radius:10px;font-size:11px}
+#sub-discount-form-status{min-height:17px;font-size:11px}
+#plans .sub-summary{padding:17px;border:1px solid #333;border-radius:22px;background:#0d0d0d}
+#plans .sub-summary dl>div{display:flex;justify-content:space-between;gap:10px;margin-bottom:16px;font-size:12px}
+#plans .sub-summary dd{margin:0}
+#plans [data-total=discount]{color:#4ac789}
+#plans #sub-pay{width:100%;margin-top:15px;background:#de0000;border:1px solid #ff6565;border-radius:13px;color:white;min-height:46px}
