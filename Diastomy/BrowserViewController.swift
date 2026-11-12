@@ -284,6 +284,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             "/accounts/support/api/messages/", "/accounts/support/api/send/"
         ]
         if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") ||
+            p.range(of: #"^/accounts/api/devices/[1-9][0-9]*/terminate/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/api/watch-history/[1-9][0-9]*/remove/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/movie-room/r/[A-Za-z0-9_-]+/delete/$"#, options: .regularExpression) != nil {
             return url

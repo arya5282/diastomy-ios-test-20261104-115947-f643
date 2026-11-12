@@ -1071,13 +1071,126 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#plans'), error)); }
   }
-  function settings(seq) {
-    mount(shell('تنظیمات', '<div class="panel"><h2>نمایش آفلاین</h2><p>صفحات، فونت و منوها داخل اپ هستند. اطلاعات عمومیِ دریافت‌شده برای دفعات بعد ذخیره می‌شوند.</p><button id="clear">پاک کردن اطلاعات عمومی ذخیره‌شده</button></div>' + form('quality', '<label>کیفیت پیش‌فرض<select name="quality"><option value="AUTO">خودکار</option><option value="VeryHigh">1080p</option><option value="High">720p</option><option value="Medium">480p</option><option value="Low">360p</option></select></label>', 'ذخیره کیفیت') + '<h2>تغییر رمز عبور</h2>' + form('password', field('old_password', 'رمز فعلی', 'password', 'autocomplete="current-password"') + field('new_password', 'رمز جدید', 'password', 'autocomplete="new-password" minlength="8"') + field('confirm_password', 'تکرار رمز جدید', 'password', 'autocomplete="new-password" minlength="8"'), 'تغییر رمز') + '<h2>دستگاه‌ها</h2><div id="devices"><p>برای نمایش دستگاه‌ها آنلاین شوید.</p></div>'));
-    $('#clear').onclick = async () => { await native({ action: 'clearCache' }); toast('اطلاعات عمومی پاک شد.'); };
-    if (state.user) $('#quality select').value = state.user.quality;
-    submit('quality', async (data, output) => { await api('/accounts/api/update-player-quality/', { body: data }); output.textContent = 'ذخیره شد.'; });
-    submit('password', async (data, output) => { await api('/accounts/api/change-password/', { body: data }); output.textContent = 'رمز تغییر کرد.'; });
-    return api('/api/app/v1/settings/').then(data => whenCurrent(seq, () => { $('#devices').innerHTML = data.devices.map(d => '<div class="ar-note device">' + esc(d.name) + (d.current ? ' · این دستگاه' : '') + '</div>').join(''); })).catch(() => {});
+  const qualityChoices = [['AUTO','خودکار','بهترین کیفیت موجود'],['VeryHigh','1080p','Full HD'],
+    ['High','720p','HD'],['Medium','480p','مصرف کمتر اینترنت'],['Low','360p','کمترین مصرف اینترنت']];
+  const languageChoices = [['fa','فارسی','فارسی'],['en','انگلیسی','English'],['ar','عربی','العربية'],['ru','روسی','Русский']];
+  const settingsArrow = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg>';
+  function settingsRow(label,href) {
+    return '<a class="account-notice-row settings-row" href="' + href + '"><span>' + label + '</span>' + settingsArrow + '</a>';
+  }
+  function preferenceSheet({key,title,caption,choices,endpoint}) {
+    const dialog = $('#settings-choice');
+    const trigger = $('#settings-' + key);
+    const selected = () => choices.find(([value]) => value === state.user[key]) || choices[0];
+    trigger.querySelector('span').textContent = selected()[1];
+    trigger.onclick = () => {
+      dialog.innerHTML = '<div class="settings-sheet-handle" aria-hidden="true"></div><header><div><h2>' + title +
+        '</h2>' + (caption ? '<p>' + caption + '</p>' : '') + '</div><button type="button" aria-label="بستن" data-choice-close>×</button></header>' +
+        choices.map(([value,label,note]) => '<button type="button" class="settings-choice-option" data-choice="' + value +
+          '" aria-pressed="' + (value === selected()[0]) + '"><span>' + label + '<small>' + note + '</small></span><i aria-hidden="true"></i></button>').join('') +
+        (key === 'quality' ? '<p class="settings-choice-help">اگر کیفیت انتخابی موجود نباشد، نزدیک‌ترین کیفیت پایین‌تر پخش می‌شود.</p>' : '') +
+        '<p class="settings-choice-error" role="status"></p>';
+      dialog.showModal();
+      dialog.querySelector('[data-choice-close]').onclick = () => dialog.close();
+      const options = [...dialog.querySelectorAll('[data-choice]')];
+      for (const button of options) button.onclick = async () => {
+        const value = button.dataset.choice;
+        if (value === selected()[0]) { dialog.close(); return; }
+        options.forEach(option => { option.disabled = true; });
+        try {
+          const result = await api(endpoint, {body:{[key]:value}});
+          if (result.success === false) throw Error(result.error || 'ذخیره نشد.');
+          state.user[key] = result[key] || value;
+          trigger.querySelector('span').textContent = selected()[1];
+          dialog.close();
+        } catch (error) { dialog.querySelector('.settings-choice-error').textContent = error.message; }
+        finally { options.forEach(option => { option.disabled = false; }); }
+      };
+    };
+  }
+  async function settings(seq, params) {
+    const section = params.get('section');
+    if (section === 'following') {
+      mount(shell('دنبال‌شده‌ها', '<p class="account-notice-row settings-follow-help">با اضافه‌شدن قسمت جدید یا اثری از افراد دنبال‌شده، در بخش اعلان‌ها باخبر می‌شوید.</p><div id="settings-follows"><p role="status">در حال دریافت…</p></div>'));
+      $('.pwa-internal-head a').href = '#/settings';
+      try {
+        const data = await api('/api/app/v1/settings/');
+        whenCurrent(seq, () => {
+          $('#settings-follows').innerHTML = (data.following || []).map(item =>
+            '<div class="account-notice-row settings-follow-row"><span>' + esc(item.name) +
+            '</span><button type="button" class="settings-pill" aria-pressed="true" data-follow="' + esc(item.id) +
+            '" data-kind="' + esc(item.kind) + '">' + PWA_SOURCE.detailFollow + ' دنبال‌کردن <span aria-hidden="true">✓</span></button></div>').join('') ||
+            '<p class="account-reference-empty">هنوز کسی یا سریالی را دنبال نکرده‌اید.</p>';
+          for (const button of document.querySelectorAll('[data-follow]')) button.onclick = async () => {
+            const following = button.getAttribute('aria-pressed') !== 'true';
+            button.disabled = true;
+            try {
+              const result = await api('/api/content-preferences/', {body:{kind:button.dataset.kind,id:Number(button.dataset.follow),following}});
+              button.setAttribute('aria-pressed',String(result.following));
+              button.querySelector('span').hidden = !result.following;
+            } catch (error) { toast(error.message); }
+            finally { button.disabled = false; }
+          };
+        });
+      } catch (error) { whenCurrent(seq, () => fail($('#settings-follows'),error)); }
+      return;
+    }
+    if (section === 'password') {
+      mount(shell('تغییر رمز عبور', form('password', field('old_password','رمز فعلی','password','autocomplete="current-password"') +
+        field('new_password','رمز جدید','password','autocomplete="new-password" minlength="8"') +
+        field('confirm_password','تکرار رمز جدید','password','autocomplete="new-password" minlength="8"'),'تغییر رمز')));
+      $('.pwa-internal-head a').href = '#/settings';
+      submit('password', async (data, output) => { await api('/accounts/api/change-password/', {body:data}); $('#password').reset(); output.textContent = 'رمز تغییر کرد.'; });
+      return;
+    }
+    mount(shell('تنظیمات', settingsRow('دنبال‌شده‌ها','#/settings?section=following') +
+      '<button type="button" id="settings-spoiler" class="settings-pill" aria-pressed="false" disabled>' + PWA_SOURCE.detailSpoiler + ' بدون اسپویل</button>' +
+      settingsRow('شماره تلفن','#/profile?field=phone') + settingsRow('تغییر رمز عبور','#/settings?section=password') + settingsRow('ایمیل','#/profile?field=email') +
+      '<details class="settings-section"><summary>دستگاه‌های متصل</summary><div id="devices"><p role="status">در حال دریافت…</p></div></details>' +
+      '<details class="settings-section"><summary>تنظیمات پخش و زبان</summary><p>کیفیت پیش‌فرض</p><button type="button" id="settings-quality" class="account-notice-row settings-row"><span></span>' + settingsArrow +
+      '</button><p>زبان</p><button type="button" id="settings-language" class="account-notice-row settings-row"><span></span>' + settingsArrow +
+      '</button></details><details class="settings-section"><summary>نمایش آفلاین</summary><button type="button" id="clear" class="account-notice-row settings-row">پاک کردن اطلاعات عمومی ذخیره‌شده</button></details>' +
+      '<dialog id="settings-choice" aria-label="انتخاب تنظیمات"></dialog>'));
+    const dialog = $('#settings-choice');
+    dialog.onclick = event => {
+      if (event.target !== dialog) return;
+      const rect = dialog.getBoundingClientRect();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
+    };
+    $('#clear').onclick = async () => { await native({action:'clearCache'}); toast('اطلاعات عمومی پاک شد.'); };
+    preferenceSheet({key:'quality',title:'کیفیت پخش',caption:'کیفیت پیش‌فرض فیلم‌ها و سریال‌ها',choices:qualityChoices,endpoint:'/accounts/api/update-player-quality/'});
+    preferenceSheet({key:'language',title:'زبان',choices:languageChoices,endpoint:'/accounts/api/set-language/'});
+    const spoiler = $('#settings-spoiler');
+    api('/api/content-preferences/').then(data => whenCurrent(seq, () => {
+      spoiler.setAttribute('aria-pressed',String(Boolean(data.spoiler_mode)));
+      spoiler.disabled = false;
+    })).catch(() => {});
+    spoiler.onclick = async () => {
+      spoiler.disabled = true;
+      try {
+        const data = await api('/api/content-preferences/', {body:{spoiler_mode:spoiler.getAttribute('aria-pressed') !== 'true'}});
+        spoiler.setAttribute('aria-pressed',String(Boolean(data.spoiler_mode)));
+      } catch (error) { toast(error.message); }
+      finally { spoiler.disabled = false; }
+    };
+    try {
+      const data = await api('/api/app/v1/settings/');
+      whenCurrent(seq, () => {
+        $('#devices').innerHTML = (data.devices || []).map(device =>
+          '<article class="account-notice-row settings-device"><strong>' + esc(device.name) + '</strong>' +
+          (device.last_activity ? '<time dir="ltr">' + esc(paymentDate(device.last_activity)) + ' ، ' + esc(device.last_activity.slice(11,19)) + '</time>' : '') +
+          (device.current ? '<small>دستگاه فعلی</small>' : '<button type="button" data-device="' + esc(device.id) + '">خروج دستگاه</button>') + '</article>').join('') ||
+          '<p class="account-reference-empty">دستگاه متصلی ثبت نشده است.</p>';
+        for (const button of document.querySelectorAll('[data-device]')) button.onclick = async () => {
+          button.disabled = true;
+          try {
+            await api('/accounts/api/devices/' + Number(button.dataset.device) + '/terminate/', {body:{}});
+            button.closest('article').remove();
+            if (!$('#devices').children.length) $('#devices').textContent = 'دستگاه متصلی ثبت نشده است.';
+          } catch (error) { toast(error.message); button.disabled = false; }
+        };
+      });
+    } catch (error) { whenCurrent(seq, () => fail($('#devices'),error)); }
   }
   function rooms(seq) {
     const slides = ['ساخت اتاق', 'تنظیم ساعت پخش', 'دعوت'];
@@ -1419,15 +1532,22 @@
       else if (name === 'otp') otp(params);
       else if (name === 'forgot') forgot();
       else if (name === 'account') account();
-      else if (name === 'profile') profile();
+      else if (name === 'profile') {
+        profile();
+        const field = params.get('field');
+        if (field === 'phone' || field === 'email') {
+          $('.profile-editor header a').href = '#/settings';
+          $('#edit-profile [name="' + field + '"]')?.scrollIntoView({block:'center'});
+        }
+      }
       else if (name === 'payments') await payments(seq);
       else if (name === 'notifications') await notifications(seq, params);
       else if (name === 'support') await support(seq);
       else if (name === 'subscription') await subscription(seq);
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
-      else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'settings') await settings(seq, params);
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۱ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1444,7 +1564,14 @@
     button.disabled = true;
     try {
       const kind = button.dataset.kind;
-      const id = Number(button.dataset.play);
+      let id = Number(button.dataset.play);
+      const targetQuality = {VeryHigh:1080,High:720,Medium:480,Low:360}[state.user?.quality];
+      if (targetQuality && !button.dataset.room) {
+        const variants = (state.playGroups || []).find(options => options.some(option => Number(option.id) === id));
+        const ranked = (variants || []).map(option => ({id:Number(option.id), height:parseInt(option.quality,10)}))
+          .filter(option => Number.isFinite(option.height)).sort((a,b) => b.height-a.height);
+        id = (ranked.find(option => option.height <= targetQuality) || ranked.at(-1))?.id || id;
+      }
       const room = button.dataset.room;
       const sequence = state.sequence;
       const response = await native({ action: 'play', kind, id, room, inline: true });

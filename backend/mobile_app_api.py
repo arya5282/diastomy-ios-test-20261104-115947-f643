@@ -357,10 +357,24 @@ def library(request):
 @require_GET
 def settings(request):
     from accounts.models import UserDevice
+    from interactions.models import ContentFollow
+    from django.utils.timezone import localtime
+
     devices = UserDevice.objects.filter(user=request.user).order_by('-last_activity')[:50]
-    return JsonResponse({'devices': [{'id': x.pk, 'name': x.device_name,
-                                      'current': x.session_key == request.session.session_key}
-                                     for x in devices]})
+    follows = ContentFollow.objects.filter(user=request.user).select_related('series', 'person').order_by('-created_at')
+    return JsonResponse({
+        'devices': [
+            {'id': device.pk, 'name': device.device_name,
+             'current': device.session_key == request.session.session_key,
+             'last_activity': localtime(device.last_activity).isoformat() if device.last_activity else None}
+            for device in devices
+        ],
+        'following': [
+            {'kind': 'series', 'id': follow.series_id, 'name': follow.series.title} if follow.series_id else
+            {'kind': 'person', 'id': follow.person_id, 'name': follow.person.name}
+            for follow in follows
+        ],
+    })
 
 
 @private
