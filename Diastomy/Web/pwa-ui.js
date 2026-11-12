@@ -247,7 +247,7 @@ window.PWA = (() => {
   }
   function account(user, back) {
     const identity = (user.avatar ? '<img class="reference-profile-avatar" src="' + media(user.avatar) + '" alt="">' : '') +
-      '<div><strong>' + esc(user.name) + '</strong><small dir="ltr">' + esc(user.phone || user.username) + '</small>' +
+      '<div class="account-identity"><strong>' + esc(user.name) + '</strong><small><bdi dir="ltr">' + esc(user.phone || user.username) + '</bdi></small>' +
       '<div class="local-subscription-line"><span class="reference-subscription-badge">' + (user.subscribed ? 'اشتراک فعال' : 'بدون اشتراک فعال') + '</span>' +
       (user.subscription_days != null ? '<small>' + esc(user.subscription_days) + ' روز باقی مانده</small>' : '') + '</div></div>';
     return '<div id="dm-app-menu" class="dm-app-menu" open><div class="dm-app-menu-shell"><div class="dm-app-menu-top">' +

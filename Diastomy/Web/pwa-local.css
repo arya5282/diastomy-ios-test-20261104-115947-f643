@@ -810,3 +810,8 @@ body[data-page=local-subscription] #app{padding:0 16px 32px}
 #plans .sub-summary dd{margin:0}
 #plans [data-total=discount]{color:#4ac789}
 #plans #sub-pay{width:100%;margin-top:15px;background:#de0000;border:1px solid #ff6565;border-radius:13px;color:white;min-height:46px}
+
+#dm-app-menu .account-identity{min-width:0;text-align:right;direction:rtl}
+#dm-app-menu .account-identity>strong{overflow-wrap:anywhere}
+#dm-app-menu .account-identity .local-subscription-line{justify-content:flex-start;flex-wrap:wrap}
+#dm-app-menu .dm-app-menu-profile .reference-profile-avatar{flex:none}
