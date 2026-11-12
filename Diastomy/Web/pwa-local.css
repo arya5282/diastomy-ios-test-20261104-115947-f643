@@ -836,3 +836,32 @@ button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
 .filter-year-wheel>div[aria-selected=true]{color:white}
 #filter-range-error:empty{display:none}
 #filter-range-error{color:#ff7777;font-size:11px;margin:0 0 5px}
+body:is([data-page=local-payments],[data-page=local-notifications]) #pwa-nav{display:none}
+body:is([data-page=local-payments],[data-page=local-notifications]) #app{padding:0 14px calc(24px + env(safe-area-inset-bottom))}
+body:is([data-page=local-payments],[data-page=local-notifications]) #app .ar-shell{padding:0;margin:0 auto;max-width:460px}
+body:is([data-page=local-payments],[data-page=local-notifications]) #app .ar-head{min-height:0;margin:0;padding:8px 0 29px}
+body:is([data-page=local-payments],[data-page=local-notifications]) #app .ar-head h1{font-size:21px;font-weight:500}
+body:is([data-page=local-payments],[data-page=local-notifications]) #app .ar-head a{background:none;border:0;width:25px;height:31px}
+.ar-payment-head,.ar-payment summary{display:grid;grid-template-columns:1.2fr 1fr 1fr .6fr;gap:5px;align-items:center;text-align:center;padding:8px 10px;border:1px solid #292929;border-radius:14px;background:#0b0b0b;font-size:10px;min-height:36px;box-sizing:border-box}
+.ar-payment-head{margin-bottom:20px;min-height:39px;font-size:12px}
+.ar-payment{margin-bottom:10px}
+.ar-payment summary{cursor:pointer;list-style:none}
+.ar-payment summary::-webkit-details-marker{display:none}
+.ar-payment summary span:last-child{font-size:15px;line-height:1}
+.ar-payment time,.ar-payment summary span[dir=ltr],.ar-payment-detail bdi{font-family:"PWA Inter","PWA Yekan",sans-serif}
+.ar-payment-detail{padding:12px;font-size:11px;line-height:1.45;color:#aaa}
+.ar-payment-detail p{margin:0}
+.account-notice-row{display:flex;justify-content:space-between;align-items:center;min-height:41px;padding:7px 15px;border:1px solid #292929;border-radius:14px;background:#0b0b0b;color:#ddd;font-size:11px;box-sizing:border-box}
+.account-notice-pref{margin-bottom:24px}
+.account-notice-pref button{position:relative;width:38px;height:22px;min-width:0;min-height:0;border:0;border-radius:20px;background:#3a3a3a;padding:0}
+.account-notice-pref button[aria-checked=true]{background:#e00000}
+.account-notice-pref button::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:white;transition:transform .18s ease}
+.account-notice-pref button[aria-checked=true]::after{transform:translateX(16px)}
+#notifications .account-notice-row{margin:0 0 10px}
+.account-notice-row svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.account-notice-unread{display:inline-block;width:5px;height:5px;border-radius:50%;margin-inline-start:6px;background:#e00000}
+.account-reference-empty{text-align:center;color:#858585;font-size:11px;padding:38px 10px;margin:0}
+.account-notice-item{display:block}
+.account-notice-item h2{font-size:12px;margin:0 0 4px}
+.account-notice-item p{margin:0;white-space:pre-line}
+.account-notice-item small{color:#999}

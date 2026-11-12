@@ -915,24 +915,86 @@
       finally { picker.disabled = false; picker.value = ''; }
     };
   }
+  const persianDate = new Intl.DateTimeFormat('en-GB-u-ca-persian-nu-latn', {
+    year:'numeric', month:'2-digit', day:'2-digit', timeZone:'Asia/Tehran'
+  });
+  function paymentDate(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value || '');
+    if (!match) return value || '—';
+    const date = new Date(match.slice(1).join('-') + 'T12:00:00Z');
+    if (!Number.isFinite(date.getTime())) return value;
+    const parts = Object.fromEntries(persianDate.formatToParts(date).map(({type,value}) => [type,value]));
+    return [parts.year,parts.month,parts.day].join('/');
+  }
   async function payments(seq) {
     mount(shell('اطلاعات پرداخت', '<div id="payment-history"><p role="status">در حال دریافت…</p></div>'));
     try {
       const data = await api('/accounts/api/payments/');
-      whenCurrent(seq, () => { $('#payment-history').innerHTML = (data.payments || []).map(payment =>
-        '<article class="ar-note"><strong>' + esc(payment.plan_name) + '</strong><p>' + esc(payment.amount) + ' · ' +
-        esc(payment.status_display) + '</p><small dir="ltr">' + esc(payment.created_at) + ' · ' + esc(payment.tracking_code) + '</small></article>').join('') ||
-        empty('پرداختی ثبت نشده است.'); });
+      whenCurrent(seq, () => {
+        const detailLine = (label,value) => value ? '<p>' + label + ' <bdi>' + esc(value) + '</bdi></p>' : '';
+        const rows = (data.payments || []).map(payment =>
+          '<details class="ar-payment"><summary><span>' + esc(payment.plan_name === '-' ? '' : payment.plan_name) + '</span>' +
+          '<time dir="ltr">' + esc(paymentDate(payment.created_at)) + '</time><span dir="ltr">' + esc(payment.amount) + '</span>' +
+          '<span aria-label="جزئیات پرداخت">•••</span></summary><div class="ar-payment-detail">' +
+          detailLine('وضعیت:',payment.status_display) + detailLine('مبلغ:',payment.amount + ' تومان') +
+          detailLine('کد تخفیف:',payment.discount_code) +
+          detailLine('شروع:',payment.start_date && paymentDate(payment.start_date)) +
+          detailLine('پایان:',payment.end_date && paymentDate(payment.end_date)) + '</div></details>').join('');
+        $('#payment-history').innerHTML = '<div class="ar-payment-head"><span>نوع خرید</span><span>تاریخ</span><span>مبلغ</span><span>جزئیات</span></div>' +
+          (rows || '<p class="account-reference-empty">هنوز پرداختی ثبت نشده است.</p>');
+      });
     } catch (error) { whenCurrent(seq, () => fail($('#payment-history'), error)); }
   }
-  async function notifications(seq) {
-    mount(shell('اعلان‌ها', '<div id="notifications">' + empty('برای دریافت اعلان‌ها به اینترنت و حساب کاربری نیاز است.') + '</div>'));
+  const noticeCategories = {media:'فیلم و سریال',room:'اتاق فیلم',news:'اخبار و اطلاعیه‌ها',account:'حساب و سیستم'};
+  function noticeCategory(title) {
+    if (/اتاق|میزبان|دعوت/.test(title)) return 'room';
+    if (/ورود|حساب|اشتراک|دانلود|اینترنت|سرویس|پرداخت/.test(title)) return 'account';
+    return /فیلم|سریال|قسمت|تماشا/.test(title) ? 'media' : 'news';
+  }
+  async function notifications(seq, params) {
+    const requested = params.get('category');
+    const category = Object.hasOwn(noticeCategories,requested) ? requested : '';
+    const label = category === 'media' ? 'اعلان‌های فیلم و سریال' : noticeCategories[category] || 'اعلان‌ها';
+    mount(shell('اعلان‌ها', '<div class="account-notice-row account-notice-pref"><strong>' + label +
+      '</strong><button type="button" role="switch" aria-label="فعال بودن ' + label +
+      '" aria-checked="true"></button></div><div id="notifications"><p role="status">در حال دریافت…</p></div>'));
+    if (category) $('.pwa-internal-head a').href = '#/notifications';
+    const toggle = $('.account-notice-pref button');
+    const key = 'diastomy_notifications_' + (category || 'enabled');
+    toggle.setAttribute('aria-checked', String(localStorage.getItem(key) !== 'false'));
+    toggle.onclick = () => {
+      const enabled = toggle.getAttribute('aria-checked') !== 'true';
+      toggle.setAttribute('aria-checked',String(enabled));
+      localStorage.setItem(key,String(enabled));
+    };
+    if (!category) {
+      $('#notifications').innerHTML = Object.entries(noticeCategories).map(([key,label]) =>
+        '<a class="account-notice-row" href="#/notifications?category=' + key + '"><span>' + label +
+        '</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></a>').join('');
+    }
     try {
       const data = await api('/accounts/api/notifications/');
       whenCurrent(seq, () => {
-        $('#notifications').innerHTML = data.notifications.map(n => '<article class="ar-note"><h2>' + esc(n.title) + '</h2><p>' + esc(n.message) + '</p><small>' + esc(n.created_at) + '</small></article>').join('') || empty('اعلان جدیدی ندارید.');
+        const notices = data.notifications || [];
+        if (!category) {
+          for (const key of Object.keys(noticeCategories)) {
+            if (notices.some(n => n.is_read === false && noticeCategory(n.title) === key)) {
+              const dot = document.createElement('i');
+              dot.className = 'account-notice-unread';
+              dot.setAttribute('aria-label','خوانده‌نشده');
+              $('#notifications a[href="#/notifications?category=' + key + '"] span').append(dot);
+            }
+          }
+          return;
+        }
+        $('#notifications').innerHTML = notices.filter(n => noticeCategory(n.title) === category).map(n =>
+          '<article class="account-notice-row account-notice-item"><h2>' + esc(n.title) + '</h2><p>' + esc(n.message) +
+          '</p><small>' + esc(n.created_at) + '</small></article>').join('') ||
+          '<p class="account-reference-empty">اعلانی در این بخش ندارید.</p>';
       });
-    } catch (error) { whenCurrent(seq, () => fail($('#notifications'), error)); }
+    } catch (error) {
+      if (category) whenCurrent(seq, () => fail($('#notifications'), error));
+    }
   }
   async function support(seq) {
     mount(shell('پشتیبانی', '<div id="messages">' + empty('پیام‌ها از سرور دریافت می‌شوند.') + '</div>' + form('support', '<label>پیام شما<textarea name="content" required maxlength="4000"></textarea></label>', 'ارسال پیام')));
@@ -1359,13 +1421,13 @@
       else if (name === 'account') account();
       else if (name === 'profile') profile();
       else if (name === 'payments') await payments(seq);
-      else if (name === 'notifications') await notifications(seq);
+      else if (name === 'notifications') await notifications(seq, params);
       else if (name === 'support') await support(seq);
       else if (name === 'subscription') await subscription(seq);
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
