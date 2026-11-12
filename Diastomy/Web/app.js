@@ -163,6 +163,100 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#home-data'), error)); }
   }
+  function installFilterChoices(form) {
+    const refresh = [];
+    let openMenu;
+    function closeMenu() {
+      if (!openMenu) return;
+      openMenu.list.hidden = true;
+      openMenu.toggle.setAttribute('aria-expanded', 'false');
+      openMenu = null;
+    }
+    for (const select of form.querySelectorAll('select')) {
+      select.hidden = true;
+      if (select.closest('.local-filter-year')) {
+        const wheel = document.createElement('div');
+        wheel.className = 'filter-year-wheel';
+        wheel.tabIndex = 0;
+        wheel.setAttribute('role', 'listbox');
+        wheel.setAttribute('aria-label', select.name === 'year_from' ? 'از سال' : 'تا سال');
+        const options = [...select.options];
+        options.forEach(option => {
+          const row = document.createElement('div');
+          row.setAttribute('role', 'option');
+          row.textContent = option.text;
+          wheel.append(row);
+        });
+        select.after(wheel);
+        function choose(index) {
+          index = Math.max(0, Math.min(options.length - 1, index));
+          select.selectedIndex = index;
+          wheel.children[index].setAttribute('aria-selected', 'true');
+          for (const row of wheel.querySelectorAll('[aria-selected=true]')) {
+            if (row !== wheel.children[index]) row.removeAttribute('aria-selected');
+          }
+        }
+        choose(0);
+        wheel.onscroll = () => choose(Math.round(wheel.scrollTop / 24));
+        wheel.onkeydown = event => {
+          if (!['ArrowDown','ArrowUp'].includes(event.key)) return;
+          event.preventDefault();
+          choose(select.selectedIndex + (event.key === 'ArrowDown' ? 1 : -1));
+          wheel.scrollTop = select.selectedIndex * 24;
+        };
+        continue;
+      }
+      const toggle = document.createElement('button');
+      const list = document.createElement('div');
+      toggle.type = 'button';
+      toggle.className = 'filter-choice-toggle';
+      toggle.setAttribute('aria-expanded','false');
+      list.className = 'filter-choice-list';
+      list.hidden = true;
+      select.after(toggle, list);
+      const update = () => {
+        toggle.textContent = select.selectedOptions[0]?.text || 'همه';
+        toggle.setAttribute('aria-label', select.parentElement.firstChild.textContent.trim() + ' ' + toggle.textContent);
+      };
+      refresh.push(update);
+      update();
+      toggle.onclick = event => {
+        event.preventDefault();
+        const alreadyOpen = openMenu?.toggle === toggle;
+        closeMenu();
+        if (alreadyOpen) return;
+        openMenu = {list, toggle};
+        list.hidden = false;
+        toggle.setAttribute('aria-expanded','true');
+        list.replaceChildren(...[...select.options].map(option => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = option.text;
+          button.setAttribute('aria-pressed', String(option.selected));
+          button.onclick = event => {
+            event.preventDefault();
+            select.value = option.value;
+            update();
+            closeMenu();
+            toggle.focus();
+          };
+          return button;
+        }));
+      };
+    }
+    form.addEventListener('click', event => {
+      if (!event.target.closest('.filter-choice-toggle,.filter-choice-list')) closeMenu();
+    });
+    form.closest('dialog').addEventListener('cancel', event => {
+      if (!openMenu) return;
+      event.preventDefault();
+      const toggle = openMenu.toggle;
+      closeMenu();
+      toggle.focus();
+    });
+    form.closest('dialog').addEventListener('close', closeMenu);
+    return () => refresh.forEach(update => update());
+  }
   function openFilters() {
     const dialog = $('#local-filters');
     if (dialog.open) return;
@@ -181,8 +275,8 @@
       form.innerHTML = '<header><h2 id="local-filter-title" tabindex="-1" autofocus>اعمال فیلتر</h2><button type="button" data-close-filter aria-label="بستن">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6" stroke-linecap="round"/></svg></button></header>' +
         '<div class="local-filter-fields">' + select('type','نوع',[['movie','فیلم'],['series','سریال']]) +
-        '<label>کارگردان<input name="director" placeholder="نام کارگردان"></label><label>بازیگران<input name="actor" placeholder="نام بازیگر"></label>' +
-        '<div class="local-filter-pair"><label>حداقل امتیاز<input type="text" inputmode="decimal" name="rating" lang="en" placeholder="7.8"></label>' +
+        '<label>کارگردان<span class="filter-text-field"><input name="director" placeholder="نام کارگردان"></span></label><label>بازیگران<span class="filter-text-field"><input name="actor" placeholder="نام بازیگر"></span></label>' +
+        '<div class="local-filter-pair"><label>حداقل امتیاز<span class="filter-text-field"><input type="text" inputmode="decimal" name="rating" lang="en" placeholder="7.8"></span></label>' +
         '<fieldset><legend>سال ساخت</legend><div class="local-filter-years">' + yearSelect('year_from','از') +
         '<span aria-hidden="true">–</span>' + yearSelect('year_to','تا') + '</div></fieldset></div>' +
         select('country','کشور',[['ایالات متحده آمریکا','ایالات متحده آمریکا'],['ایران','ایران'],['ترکیه','ترکیه'],['بریتانیا','بریتانیا'],['فرانسه','فرانسه'],['هند','هند'],['کره جنوبی','کره جنوبی'],['ژاپن','ژاپن']]) +
@@ -191,7 +285,7 @@
         '<fieldset class="local-filter-tags"><legend>انتخاب بر اساس</legend><div>' +
         [['dubbed','دوبله فارسی'],['subtitled','زیرنویس فارسی'],['uncensored','بدون سانسور'],['censored','سانسور شده']]
           .map(([value,label]) => '<label><input type="checkbox" name="tags" value="' + value + '"><span>' + label + '</span></label>').join('') +
-        '</div></fieldset></div><footer><button type="submit">جستجو</button></footer>';
+        '</div></fieldset></div><footer><p id="filter-range-error" role="status"></p><button type="submit">جستجو</button></footer>';
       form.querySelector('[data-close-filter]').onclick = () => dialog.close();
       dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
       const {rating, year_from:fromYear, year_to:toYear} = form.elements;
@@ -200,11 +294,10 @@
           .replace(/[٫,]/g, '.');
         rating.setCustomValidity('');
       };
-      const clearYearError = () => toYear.setCustomValidity('');
-      fromYear.onchange = clearYearError;
-      toYear.onchange = clearYearError;
+      form.refreshChoices = installFilterChoices(form);
       form.onsubmit = event => {
         event.preventDefault();
+        $('#filter-range-error').textContent = '';
         const score = rating.value.trim();
         if (score && (!/^[0-9]+(?:\.[0-9]+)?$/.test(score) || Number(score) > 10)) {
           rating.setCustomValidity('امتیاز را بین 0 تا 10 وارد کنید.');
@@ -212,8 +305,7 @@
           return;
         }
         if (fromYear.value && toYear.value && Number(fromYear.value) > Number(toYear.value)) {
-          toYear.setCustomValidity('سال پایان باید برابر یا بعد از سال شروع باشد.');
-          toYear.reportValidity();
+          $('#filter-range-error').textContent = 'سال پایان باید برابر یا بعد از سال شروع باشد.';
           return;
         }
         const query = new URLSearchParams();
@@ -234,6 +326,7 @@
         select.replaceChildren(new Option('همه',''), ...choices.map(item => new Option(item.name,item.slug)));
         select.value = value;
       }
+      form.refreshChoices();
     }).catch(() => {});
   }
   async function searchPage(seq, initialQuery) {
@@ -1271,7 +1364,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۶ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۳۷ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {

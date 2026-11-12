@@ -815,3 +815,22 @@ body[data-page=local-subscription] #app{padding:0 16px 32px}
 #dm-app-menu .account-identity>strong{overflow-wrap:anywhere}
 #dm-app-menu .account-identity .local-subscription-line{justify-content:flex-start;flex-wrap:wrap}
 #dm-app-menu .dm-app-menu-profile .reference-profile-avatar{flex:none}
+button,a,input,select,textarea{-webkit-tap-highlight-color:transparent}
+:is(button,a,input,select,textarea):focus:not(:focus-visible){outline:none}
+#local-filters header{border-bottom-color:#ffffff18}
+#local-filters select[hidden],#local-filters .filter-choice-list[hidden]{display:none!important}
+#local-filters .filter-choice-toggle,.filter-text-field{display:block;position:relative;width:100%;box-sizing:border-box;min-height:38px;border:1px solid #343434;border-radius:999px;background:#0e0e0e;color:#ddd}
+#local-filters .filter-choice-toggle{padding:6px 14px 6px 34px;text-align:right;font-size:13px}
+.filter-choice-toggle::after{content:"";position:absolute;left:15px;top:calc(50% - 5px);width:6px;height:6px;border:solid #aaa;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+#local-filters .filter-choice-toggle[aria-expanded=true]::after{transform:rotate(225deg)}
+.filter-choice-list{max-height:160px;overflow:auto;padding:4px;border:1px solid #333;border-radius:13px;background:#141414}
+#local-filters .filter-choice-list button{display:block;width:100%;text-align:right;padding:6px 12px;border:0;border-radius:8px;background:none;color:#ddd;font-size:13px}
+#local-filters .filter-choice-list button[aria-pressed=true]{background:#2e1011;color:#fff}
+#local-filters .filter-text-field{overflow:hidden}
+#local-filters .filter-text-field input{display:block;width:123%;max-width:none;border:0;background:transparent;outline:none;box-shadow:none;transform:scale(.8125);transform-origin:right center}
+.filter-year-wheel{height:36px;min-width:0;flex:1;overflow:auto;scroll-snap-type:y mandatory;scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-y;padding-block:6px;box-sizing:border-box;font:12px/24px "PWA Inter","PWA Yekan",sans-serif;text-align:center}
+.filter-year-wheel::-webkit-scrollbar{display:none}
+.filter-year-wheel>div{height:24px;scroll-snap-align:center;color:#999}
+.filter-year-wheel>div[aria-selected=true]{color:white}
+#filter-range-error:empty{display:none}
+#filter-range-error{color:#ff7777;font-size:11px;margin:0 0 5px}
