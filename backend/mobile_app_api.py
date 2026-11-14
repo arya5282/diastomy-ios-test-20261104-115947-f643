@@ -349,7 +349,12 @@ def library(request):
     for row in services.get_user_watch_history(request.user)[:100]:
         item = row.movie or (row.episode.season.series if row.episode else None)
         if item:
-            history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration, 'snapshot': row.snapshot_url, 'history_id': row.pk})
+            source = row.episode or row.movie
+            video = source.videos.order_by('-quality__weight').values_list('pk', flat=True).first()
+            history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration,
+                            'snapshot': row.snapshot_url, 'history_id': row.pk, 'video_id': video,
+                            'history_cover': file_url(row.episode.cover if row.episode_id else item.banner)
+                                             or file_url(item.banner_mobile) or file_url(item.banner)})
     return JsonResponse({'saved': saved, 'history': history})
 
 

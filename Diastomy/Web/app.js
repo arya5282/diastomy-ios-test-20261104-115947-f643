@@ -119,6 +119,33 @@
   }
   function status(id) { return '<div class="status" id="' + id + '" role="status"></div>'; }
   function fail(el, error) { el.innerHTML = empty(error.message); }
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  function closeWithMotion(dialog) {
+    if (!dialog.open || dialog.hasAttribute('data-closing')) return;
+    if (reduceMotion.matches || !dialog.animate) { dialog.close(); return; }
+    dialog.setAttribute('data-closing','');
+    const sheet = dialog.matches('#home-history-menu,#local-filters,#settings-choice');
+    const motion = dialog.animate([
+      {opacity:1, transform:'none'},
+      {opacity:0, transform:sheet ? 'translateY(18px)' : 'translateY(6px) scale(.985)'}
+    ], {duration:125, easing:'ease-in', fill:'forwards'});
+    motion.finished.catch(() => {}).then(() => {
+      dialog.close();
+      dialog.removeAttribute('data-closing');
+      motion.cancel();
+    });
+  }
+  document.addEventListener('submit', event => {
+    const dialog = event.target.closest('#home-history-menu,.film-download-dialog,#local-filters,#settings-choice');
+    if (!dialog || event.target.method !== 'dialog') return;
+    event.preventDefault();
+    closeWithMotion(dialog);
+  });
+  document.addEventListener('cancel', event => {
+    if (!event.target.matches('#home-history-menu,.film-download-dialog,#local-filters,#settings-choice')) return;
+    event.preventDefault();
+    closeWithMotion(event.target);
+  }, true);
   function mount(html) { app.innerHTML = html; }
   function whenCurrent(seq, fn) { if (state.sequence === seq) fn(); }
   function form(name, fields, button) { return '<form id="' + name + '">' + fields + '<button class="primary" type="submit">' + esc(button) + '</button>' + status(name + '-status') + '</form>'; }
@@ -158,7 +185,34 @@
       whenCurrent(seq, () => {
         $('#home-data').innerHTML = PWA.home(data);
         if (state.user) api('/api/app/v1/library/').then(library => {
-          whenCurrent(seq, () => { $('#home-data').innerHTML = PWA.home(data, library.history); loadHistoryFrames($('#home-data')); });
+          whenCurrent(seq, () => {
+            const container = $('#home-data');
+            const entries = library.history || [];
+            container.innerHTML = PWA.home(data, entries) +
+              '<dialog id="home-history-menu" aria-label="گزینه‌های ادامه تماشا"><form method="dialog"><button aria-label="بستن">×</button></form>' +
+              '<button type="button" id="home-history-resume" data-play="" data-resume>ادامه تماشا</button><a>اطلاعات فیلم</a></dialog>';
+            loadHistoryFrames(container);
+            const menu = $('#home-history-menu');
+            container.onclick = event => {
+              const trigger = event.target.closest('[data-history-more]');
+              if (!trigger) return;
+              const item = entries[Number(trigger.dataset.historyMore)];
+              const resume = $('#home-history-resume');
+              const details = menu.querySelector('a');
+              details.href = trigger.closest('article').querySelector('a').href;
+              details.onclick = () => menu.close();
+              resume.dataset.play = item.video_id || '';
+              resume.dataset.kind = item.type;
+              resume.onclick = event => {
+                menu.close();
+                if (!item.video_id) {
+                  event.stopPropagation();
+                  location.href = details.href;
+                }
+              };
+              menu.showModal();
+            };
+          });
         }).catch(() => {});
       });
     } catch (error) { whenCurrent(seq, () => fail($('#home-data'), error)); }
@@ -286,8 +340,8 @@
         [['dubbed','دوبله فارسی'],['subtitled','زیرنویس فارسی'],['uncensored','بدون سانسور'],['censored','سانسور شده']]
           .map(([value,label]) => '<label><input type="checkbox" name="tags" value="' + value + '"><span>' + label + '</span></label>').join('') +
         '</div></fieldset></div><footer><p id="filter-range-error" role="status"></p><button type="submit">جستجو</button></footer>';
-      form.querySelector('[data-close-filter]').onclick = () => dialog.close();
-      dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+      form.querySelector('[data-close-filter]').onclick = () => closeWithMotion(dialog);
+      dialog.addEventListener('click', event => { if (event.target === dialog) closeWithMotion(dialog); });
       const {rating, year_from:fromYear, year_to:toYear} = form.elements;
       rating.oninput = () => {
         rating.value = rating.value.replace(/[۰-۹٠-٩]/g, digit => String(digit.charCodeAt(0) & 15))
@@ -541,7 +595,7 @@
             if (event.target === downloadOptions) {
               const bounds = downloadOptions.getBoundingClientRect();
               if (event.clientX < bounds.left || event.clientX > bounds.right ||
-                  event.clientY < bounds.top || event.clientY > bounds.bottom) downloadOptions.close();
+                  event.clientY < bounds.top || event.clientY > bounds.bottom) closeWithMotion(downloadOptions);
             }
           });
         }
@@ -1178,7 +1232,7 @@
         (key === 'quality' ? '<p class="settings-choice-help">اگر کیفیت انتخابی موجود نباشد، نزدیک‌ترین کیفیت پایین‌تر پخش می‌شود.</p>' : '') +
         '<p class="settings-choice-error" role="status"></p>';
       dialog.showModal();
-      dialog.querySelector('[data-choice-close]').onclick = () => dialog.close();
+      dialog.querySelector('[data-choice-close]').onclick = () => closeWithMotion(dialog);
       const options = [...dialog.querySelectorAll('[data-choice]')];
       for (const button of options) button.onclick = async () => {
         const value = button.dataset.choice;
@@ -1634,7 +1688,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1668,7 +1722,7 @@
         const groups = state.playGroups || [];
         const group = groups.findIndex(options => options.some(option => Number(option.id) === id));
         const position = Number(response.data.position) || 0;
-        const start = room || position <= 0 ? position : await PWAPlayer.chooseResume(position);
+        const start = button.hasAttribute('data-resume') || room || position <= 0 ? position : await PWAPlayer.chooseResume(position);
         if (start === null || sequence !== state.sequence) return;
         document.querySelectorAll('.dm-inline-trailer').forEach(player => player.dmDispose?.());
         PWAPlayer.open({

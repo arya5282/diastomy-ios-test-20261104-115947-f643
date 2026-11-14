@@ -9,14 +9,16 @@ window.PWA = (() => {
     catch (_) { return ''; }
   };
   const logo = '/static/public/assets/icons/diastomy-logo.svg';
+  const rating = value => esc(String(value).replace(/[۰-۹٠-٩]/g, digit =>
+    String(digit.charCodeAt(0) & 15)).replace(/٫/g, '.'));
   const star = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2 2 9.3l6.9-1L12 2Z"/></svg>';
-  const genres = item => (item.genres || []).map(g => esc(typeof g === 'string' ? g : g.name)).slice(0, 3).join(' · ');
+  const genres = (item, limit = 3) => (item.genres || []).map(g => esc(typeof g === 'string' ? g : g.name)).slice(0, limit).join(' · ');
   const name = item => esc(item.english_title_full || item.title);
   function renderCard(item, saved) {
-    const genreText = saved ? (item.genres || []).slice(0,2).map(g => esc(typeof g === "string" ? g : (g.name_en || g.name))).join(", ") : genres(item);
+    const genreText = saved ? (item.genres || []).slice(0,2).map(g => esc(typeof g === "string" ? g : (g.name_en || g.name))).join(", ") : genres(item, 2);
     return '<a href="' + titleURL(item) + '" class="dm54-vcard" dir="ltr"><span class="dm54-poster">' +
       '<img class="dm54-poster-img" src="' + media(item.cover) + '" alt="' + esc(item.title) + '" loading="lazy" decoding="async">' +
-      (item.imdb_rating ? '<span class="dm54-rating"><b>' + esc(item.imdb_rating) + '</b>' + star + '</span>' : '') +
+      (item.imdb_rating ? '<span class="dm54-rating"><b>' + rating(item.imdb_rating) + '</b>' + star + '</span>' : '') +
       (saved ? '<span class="dm54-poster-brand" aria-hidden="true"><img src="/assets/library-mark.svg" alt=""></span>' :
       '<span class="dm54-poster-brand" aria-hidden="true"><svg class="dmf54-poster-mark" width="28" height="24" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg></span>') +
       '</span><span class="dm54-vmeta"><strong>' + name(item) + '</strong><small class="dm54-old-genres">' + (saved ? genreText || "DIASTOMY" : genreText) + '</small></span></a>';
@@ -31,7 +33,7 @@ window.PWA = (() => {
     const actor = data.actor;
     const films = data.filmography.map(item => '<a class="dm-actor-film" href="' + titleURL(item) + '"><div class="dm-actor-poster"><img src="' +
       media(item.cover) + '" alt="' + name(item) + '" loading="lazy" width="180" height="240">' +
-      (item.imdb_rating ? '<span class="dm-actor-rating" dir="ltr">' + esc(item.imdb_rating) + star + '</span>' : '') +
+      (item.imdb_rating ? '<span class="dm-actor-rating" dir="ltr">' + rating(item.imdb_rating) + star + '</span>' : '') +
       '<span class="dm-actor-mark" aria-hidden="true"><img src="' + logo + '" alt=""></span></div><h3 dir="ltr">' +
       name(item) + '</h3><p class="dm-actor-genres" dir="ltr">' + (item.genres || []).map(esc).join(', ') + '</p></a>').join('');
     const href = '#/actor/' + encodeURIComponent(slug) + '/';
@@ -52,7 +54,7 @@ window.PWA = (() => {
     return '<a href="' + titleURL(item) + '" class="dm54-hcard" dir="ltr"><span class="dm54-landscape"><img src="' + media(item.banner || item.cover) +
       '" alt="' + esc(item.title) + '" loading="lazy"><span class="dm54-landscape-shade"></span><span class="dm54-landscape-brand"><img src="' + logo +
       '" alt=""></span></span><span class="dm54-hmeta"><strong>' + name(item) + '</strong><small class="dm54-hdetails"><span class="dm54-hgenres">' +
-      genres(item) + '</span><span>' + esc(item.production_year) + '</span><span class="dm54-hscore">' + esc(item.imdb_rating || '') + star + '</span></small></span></a>';
+      genres(item, 2) + '</span><span>' + esc(item.production_year) + '</span><span class="dm54-hscore">' + esc(item.imdb_rating || '') + star + '</span></small></span></a>';
   }
   function hero(items) {
     if (!items.length) return '';
@@ -99,27 +101,29 @@ window.PWA = (() => {
     };
   function home(data, history = []) {
     const order = [
-      'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series',
+      'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_series',
       'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies', 'pwa_free_movies',
-      'pwa_dubbed_series', 'pwa_free_series', 'pwa_recommended', 'animations'
+      'pwa_dubbed_series', 'pwa_recommended', 'animations'
     ];
     const sections = new Map();
     const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'romance', 'family', 'musical', 'documentary', 'animation', 'art', 'kids'];
     const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
       illustratedGenres.map(slug => '<a class="dm54-genre dm-home-original-genre" href="#/browse/all?genre=' + slug +
-        '"><img loading="lazy" alt="" src="/static/public/assets/images/genre-user-v1/' + slug + '.webp"><span class="dm-home-genre-label">' +
+        '"><img loading="lazy" alt="" src="' + (['action','drama','romance','sci-fi'].includes(slug)
+          ? '/assets/figma-genres/' + slug + '.jpg' : '/static/public/assets/images/genre-user-v1/' + slug + '.webp') + '"><span class="dm-home-genre-label">' +
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
     const continueHTML = history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
-      '<div class="reference-continue">' + history.slice(0, 12).map(item => historyCard(item)).join('') + '</div></section>' : '';
+      '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';
     sections.set('genres', genreHTML);
     sections.set('continue_watching', continueHTML);
     for (const rail of data.rails || []) {
       if (!rail.items.length) continue;
       const key = rail.key || 'pwa_latest_movies';
-      const wide = key === 'pwa_free_movies';
+      const wide = ['pwa_free_movies','pwa_free_series'].includes(key);
+      const heading = ({pwa_turkish_series:'سریال‌های ترکیه‌ای',trending_movies:'ترندترین فیلم‌ها'})[key] || rail.title;
       const link = '#/browse/' + (key.includes('series') ? 'series' : 'movie');
       sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
-        '"><div class="dm54-head"><h2>' + esc(rail.title) + '</h2><a href="' + link +
+        '"><div class="dm54-head"><h2>' + esc(heading) + '</h2><a href="' + link +
         '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
         rail.items.map(wide ? landscape : card).join('') + '</div></section>');
     }
@@ -127,16 +131,18 @@ window.PWA = (() => {
       order.map(key => sections.get(key) || '').join('') +
       [...sections].filter(([key]) => !order.includes(key)).map(([, html]) => html).join('') + '</div>';
   }
-  function historyCard(item, index) {
+  function historyCard(item, index, home = false) {
     const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
     const remaining = Math.max(0, Math.floor((item.total || 0) - (item.position || 0)));
     const time = Math.floor(remaining / 60) + ':' + String(remaining % 60).padStart(2, '0');
+    const minutes = Math.ceil(remaining / 60);
+    const homeTime = (minutes >= 60 ? Math.floor(minutes / 60) + 'h ' : '') + minutes % 60 + 'm left';
     const frame = String(item.snapshot || '').match(/^(?:https:\/\/diastomy\.top)?(\/api\/watch-frame\/[1-9]\d*\/(?:\?v=\d+)?)$/)?.[1];
     return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '" aria-label="ادامه تماشا">' +
-      '<img src="/static/public/assets/img/continue-scene-pending-v1.svg" alt="' + esc(item.title) + '"' +
-      (frame ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
+      '<img src="' + (home ? media(item.history_cover || item.banner || item.cover) : '/static/public/assets/img/continue-scene-pending-v1.svg') + '" alt="' + esc(item.title) + '"' +
+      (frame && (!home || !item.history_cover && !item.banner) ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
       '<progress class="local-library-progress" dir="rtl" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><small dir="ltr">' +
-      time + ' باقی‌مانده</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
+      (home ? homeTime : time + ' باقی‌مانده') + '</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
       index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>') + '</div></article>';
   }
   function downloadOptions(options) {
@@ -373,7 +379,7 @@ window.PWA = (() => {
       else link.removeAttribute('aria-current');
     });
     const current = links.findIndex(link => link.dataset.navSlot === slot);
-    if (current >= 0) nav.style.setProperty('--footer-position', current);
+    if (current >= 0 && !nav.hasAttribute('data-footer-dragging')) nav.style.setProperty('--footer-position', current);
     nav.toggleAttribute('data-footer-selected', current >= 0);
   }
   function installFooterSwipe(nav) {
@@ -383,17 +389,14 @@ window.PWA = (() => {
     function position(value) {
       nav.style.setProperty('--footer-position', value);
     }
-    function finish(event, commit) {
+    function finish(event) {
       if (start?.id !== event.pointerId) return;
-      const {origin, preview, dragging} = start;
+      const {selected, dragging} = start;
       start = undefined;
       if (!dragging) return;
       nav.removeAttribute('data-footer-dragging');
       suppressClick = true;
-      const next = commit ? Math.round(preview) : origin;
-      position(next);
-      const link = links[next];
-      if (commit && link.getAttribute('aria-current') !== 'page') location.hash = link.hash;
+      position(selected);
     }
     nav.addEventListener('pointerdown', event => {
       if (!event.isPrimary || event.button !== 0) return;
@@ -402,7 +405,7 @@ window.PWA = (() => {
       const current = links.findIndex(link => link.getAttribute('aria-current') === 'page');
       const touched = links.indexOf(event.target.closest('[data-nav-slot]'));
       const origin = current >= 0 ? current : Math.max(0, touched);
-      start = {id:event.pointerId, x:event.clientX, y:event.clientY, origin, preview:origin};
+      start = {id:event.pointerId, x:event.clientX, y:event.clientY, origin, selected:origin, navigated:false};
     });
     nav.addEventListener('pointermove', event => {
       if (start?.id !== event.pointerId) return;
@@ -412,13 +415,23 @@ window.PWA = (() => {
         if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy) * 1.3) return;
         start.dragging = true;
         start.step = links[0].getBoundingClientRect().width;
+        nav.setPointerCapture(event.pointerId);
         nav.setAttribute('data-footer-dragging', '');
       }
-      start.preview = Math.max(0, Math.min(links.length - 1, start.origin + dx / start.step));
-      position(start.preview);
+      const preview = Math.max(0, Math.min(links.length - 1, start.origin + dx / start.step));
+      position(preview);
+      if (Math.abs(preview - start.selected) < .55) return;
+      const next = Math.round(preview);
+      const link = links[next];
+      start.selected = next;
+      if (location.hash === link.hash) return;
+      if (start.navigated) location.replace(link.hash);
+      else location.hash = link.hash;
+      start.navigated = true;
     });
-    nav.addEventListener('pointerup', event => finish(event, true));
-    nav.addEventListener('pointercancel', event => finish(event, false));
+    nav.addEventListener('pointerup', finish);
+    nav.addEventListener('pointercancel', finish);
+    nav.addEventListener('lostpointercapture', finish);
     nav.addEventListener('click', event => {
       if (!suppressClick || event.detail === 0) return;
       suppressClick = false;

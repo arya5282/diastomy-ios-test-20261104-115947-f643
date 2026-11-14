@@ -69,5 +69,9 @@
   "/static/pwa/generated/c41b864f57f3eddd4c14.webp": "image/webp",
   "/static/pwa/generated/ca2572136e7c336b6923.ttf": "font/ttf",
   "/static/pwa/generated/dc13c2c87dd3a5be4044.woff2": "font/woff2",
-  "/static/pwa/generated/f11a358bd700e42e0265.png": "image/png"
+  "/static/pwa/generated/f11a358bd700e42e0265.png": "image/png",
+  "/assets/figma-genres/action.jpg": "image/jpeg",
+  "/assets/figma-genres/drama.jpg": "image/jpeg",
+  "/assets/figma-genres/romance.jpg": "image/jpeg",
+  "/assets/figma-genres/sci-fi.jpg": "image/jpeg"
 }
