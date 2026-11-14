@@ -385,12 +385,15 @@ window.PWA = (() => {
   function installFooterSwipe(nav) {
     const links = [...nav.querySelectorAll('[data-nav-slot]')];
     let start;
+    let frame = 0;
     let suppressClick = false;
     function position(value) {
       nav.style.setProperty('--footer-position', value);
     }
     function finish(event) {
       if (start?.id !== event.pointerId) return;
+      cancelAnimationFrame(frame);
+      frame = 0;
       const {selected, dragging} = start;
       start = undefined;
       if (!dragging) return;
@@ -419,15 +422,22 @@ window.PWA = (() => {
         nav.setAttribute('data-footer-dragging', '');
       }
       const preview = Math.max(0, Math.min(links.length - 1, start.origin + dx / start.step));
-      position(preview);
-      if (Math.abs(preview - start.selected) < .55) return;
-      const next = Math.round(preview);
-      const link = links[next];
-      start.selected = next;
-      if (location.hash === link.hash) return;
-      if (start.navigated) location.replace(link.hash);
-      else location.hash = link.hash;
-      start.navigated = true;
+      start.preview = preview;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (!start) return;
+        const value = start.preview;
+        position(value);
+        if (Math.abs(value - start.selected) < .6) return;
+        const next = Math.round(value);
+        const link = links[next];
+        start.selected = next;
+        if (location.hash === link.hash) return;
+        if (start.navigated) location.replace(link.hash);
+        else location.hash = link.hash;
+        start.navigated = true;
+      });
     });
     nav.addEventListener('pointerup', finish);
     nav.addEventListener('pointercancel', finish);
