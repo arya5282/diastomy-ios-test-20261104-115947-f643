@@ -431,7 +431,7 @@ window.PWA = (() => {
     });
     nav.addEventListener('pointerup', finish);
     nav.addEventListener('pointercancel', finish);
-    nav.addEventListener('lostpointercapture', finish);
+    nav.addEventListener('lostpointercapture', event => { if (event.target === nav) finish(event); });
     nav.addEventListener('click', event => {
       if (!suppressClick || event.detail === 0) return;
       suppressClick = false;
