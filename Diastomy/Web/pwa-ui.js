@@ -390,10 +390,26 @@ window.PWA = (() => {
     function position(value) {
       nav.style.setProperty('--footer-position', value);
     }
+    function renderDrag() {
+      frame = 0;
+      const value = start.preview;
+      position(value);
+      if (Math.abs(value - start.selected) < .6) return;
+      const next = Math.round(value);
+      const link = links[next];
+      start.selected = next;
+      if (location.hash === link.hash) return;
+      if (start.navigated) location.replace(link.hash);
+      else location.hash = link.hash;
+      start.navigated = true;
+    }
     function finish(event) {
       if (start?.id !== event.pointerId) return;
-      cancelAnimationFrame(frame);
-      frame = 0;
+      if (frame) {
+        cancelAnimationFrame(frame);
+        if (event.type === 'pointerup') renderDrag();
+        frame = 0;
+      }
       const {selected, dragging} = start;
       start = undefined;
       if (!dragging) return;
@@ -424,20 +440,7 @@ window.PWA = (() => {
       const preview = Math.max(0, Math.min(links.length - 1, start.origin + dx / start.step));
       start.preview = preview;
       if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        if (!start) return;
-        const value = start.preview;
-        position(value);
-        if (Math.abs(value - start.selected) < .6) return;
-        const next = Math.round(value);
-        const link = links[next];
-        start.selected = next;
-        if (location.hash === link.hash) return;
-        if (start.navigated) location.replace(link.hash);
-        else location.hash = link.hash;
-        start.navigated = true;
-      });
+      frame = requestAnimationFrame(renderDrag);
     });
     nav.addEventListener('pointerup', finish);
     nav.addEventListener('pointercancel', finish);
