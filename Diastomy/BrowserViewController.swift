@@ -794,6 +794,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let item = playback.currentItem
         let captionGroup = inlineHasCaptions && item?.status == .readyToPlay
             ? item?.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) : nil
+        let audioGroup = item?.status == .readyToPlay
+            ? item?.asset.mediaSelectionGroup(forMediaCharacteristic: .audible) : nil
         switch command {
         case "toggle":
             if playback.timeControlStatus == .paused { playback.playImmediately(atRate: inlineRate) } else { playback.pause() }
@@ -814,6 +816,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         case "rotate":
             inlineRotated = data["value"] as? Bool == true
             layoutInlinePlayer()
+        case "fill":
+            inlineLayer?.videoGravity = data["value"] as? Bool == true ? .resizeAspectFill : .resizeAspect
+        case "audio":
+            if let audioGroup, let index = data["value"] as? Int, audioGroup.options.indices.contains(index) {
+                item?.select(audioGroup.options[index], in: audioGroup)
+            }
         case "captions":
             if let captionGroup, let index = data["value"] as? Int {
                 if index == -1 {
@@ -829,9 +837,13 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let selectedCaption = captionGroup.flatMap { group in
             item?.currentMediaSelection.selectedMediaOption(in: group).flatMap { group.options.firstIndex(of: $0) }
         } ?? -1
+        let selectedAudio = audioGroup.flatMap { group in
+            item?.currentMediaSelection.selectedMediaOption(in: group).flatMap { group.options.firstIndex(of: $0) }
+        } ?? -1
         return ["ok": true, "duration": duration.isFinite ? duration : 0,
                 "frameReady": inlineLayer?.isReadyForDisplay == true,
                 "captions": captionGroup?.options.map(\.displayName) ?? [], "selectedCaption": selectedCaption,
+                "audio": audioGroup?.options.map(\.displayName) ?? [], "selectedAudio": selectedAudio,
                 "position": position.isFinite ? position : 0, "muted": playback.isMuted,
                 "paused": playback.timeControlStatus == .paused,
                 "failed": playback.status == .failed || playback.currentItem?.status == .failed]

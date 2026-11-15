@@ -46,12 +46,14 @@ window.PWAPlayer = (() => {
       '<label class="local-player-side local-player-volume">' + icons.volume + '<input type="range" min="0" max="1" value="1" step=".01" aria-label="بلندی صدا"></label>' +
       '<div class="local-player-center">' + control('toggle','پخش یا توقف','play') + '</div><div class="local-player-bottom"><div class="local-player-bar">' +
       control('back','۱۰ ثانیه عقب','backward') + control('toggle','پخش یا توقف','play') + control('forward','۱۰ ثانیه جلو','forward') +
-      '<div class="local-player-timeline"><div><output>0:00</output><output>0:00</output></div><input type="range" min="0" max="0" value="0" step=".1" aria-label="موقعیت پخش"></div>' +
-      (kind === 'series' ? control('next','قسمت بعد','forward') : '') + control('captions','زیرنویس','captions') + control('audio','زبان صدا','microphone') + control('settings','تنظیمات پخش','setting-2') + control('fullscreen','تمام‌صفحه','fullscreen') +
+      '<div class="local-player-timeline"><div><output>0:00</output><output>0:00</output></div><div class="local-player-seek"><span aria-hidden="true"></span><input type="range" min="0" max="0" value="0" step=".1" aria-label="موقعیت پخش" disabled></div></div>' +
+      (kind === 'series' ? control('next','قسمت بعد','forward') : '') + control('captions','زیرنویس','captions') + control('audio','زبان صدا','microphone') + control('settings','تنظیمات پخش','setting-2') + control('fullscreen','پر کردن صفحه','fullscreen') +
       '</div></div><div class="local-player-settings dm-ref-settings" hidden></div><div class="local-player-error" hidden role="alert"><p>پخش ویدیو در این حالت ممکن نشد.</p><button type="button" data-player="retry">تلاش دوباره</button></div>';
     const get = selector => overlay.querySelector(selector);
     const video = get('video');
     const seek = get('.local-player-timeline input');
+    const timelineFill = get('.local-player-seek > span');
+    const [elapsed, end] = overlay.querySelectorAll('output');
     const settings = get('.local-player-settings');
     let source = info, selected = id, revision = 0, resume = Number(info.position) || 0, lastSaved = 0, played = false;
     const updateTransport = paused => {
@@ -59,12 +61,21 @@ window.PWAPlayer = (() => {
       overlay.querySelectorAll('[data-player=toggle]').forEach(button => { button.innerHTML = paused ? icons.play : icons.pause; });
     };
     let surface, surfaceStarting = false, polling, startupCheck, lastState, playbackRate = 1;
+    let scrubbing = false;
+    let pendingSeek;
     const controlSurface = (command, value) => native({action:'inlineControl',command,value});
     const time = () => surface ? lastState?.position || 0 : video.currentTime;
     const duration = () => surface ? lastState?.duration || 0 : video.duration;
     function setTime(value) {
-      if (surface) controlSurface('seek', value).catch(() => {});
-      else video.currentTime = value;
+      const total = duration();
+      if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(value)) return;
+      const target = Math.max(0, Math.min(total, value));
+      const request = pendingSeek = {value:target, expires:performance.now() + 2200};
+      paintTimeline(target, total);
+      if (surface) controlSurface('seek', target).then(result => {
+        if (!result.ok && pendingSeek === request) pendingSeek = null;
+      }).catch(() => { if (pendingSeek === request) pendingSeek = null; });
+      else video.currentTime = target;
     }
     function stopSurface() {
       clearTimeout(startupCheck);
@@ -73,6 +84,8 @@ window.PWAPlayer = (() => {
       surface = false;
       surfaceStarting = false;
       lastState = null;
+      pendingSeek = null;
+      scrubbing = false;
       overlay.classList.remove('local-player-native');
       document.body.classList.remove('local-player-native-open');
     }
@@ -97,13 +110,15 @@ window.PWAPlayer = (() => {
         if (!overlay.isConnected || request !== revision) return;
         controlSurface('rate', playbackRate).catch(() => {});
         controlSurface('volume', Number(volume.value)).catch(() => {});
+        controlSurface('fill', overlay.classList.contains('local-player-fill')).catch(() => {});
         if (video.muted) controlSurface('mute').catch(() => {});
         const frameDeadline = Date.now() + 30000;
         const sync = async () => {
           try {
             const state = await controlSurface('status');
             if (!overlay.isConnected || request !== revision || !surface || !state.ok) return;
-            const captionsChanged = (lastState?.captions?.length || 0) !== (state.captions?.length || 0);
+            const optionsChanged = (lastState?.captions?.length || 0) !== (state.captions?.length || 0) ||
+              (lastState?.audio?.length || 0) !== (state.audio?.length || 0);
             lastState = state;
             if (state.frameReady) played = true;
             updateTransport(state.paused || !state.frameReady);
@@ -112,7 +127,7 @@ window.PWAPlayer = (() => {
               get('.local-player-error').hidden = false;
             }
             refresh();
-            if (captionsChanged && !settings.hidden && settings.dataset.panel === 'captions') renderSettings();
+            if (optionsChanged && !settings.hidden && settings.dataset.panel !== 'settings') renderSettings();
           } catch (_) {}
         };
         polling = setInterval(sync, 500);
@@ -135,18 +150,28 @@ window.PWAPlayer = (() => {
     get('h2').textContent = info.title || '';
     function progress(force) {
       if (!played || !Number.isFinite(duration()) || duration() <= 0 || !source.target) return;
+      if (scrubbing || pendingSeek) return;
       if (!force && Date.now() - lastSaved < 15000) return;
       lastSaved = Date.now();
       save({...source.target, watched_duration:Math.floor(time()), total_duration:Math.floor(duration())});
     }
+    function paintTimeline(position, total) {
+      seek.disabled = total <= 0;
+      seek.max = total;
+      seek.value = position;
+      elapsed.textContent = format(position);
+      end.textContent = format(total);
+      timelineFill.style.setProperty('--played', (total ? Number(seek.value) / total * 100 : 0) + '%');
+      seek.setAttribute('aria-valuetext', elapsed.textContent + ' / ' + end.textContent);
+    }
     function refresh() {
       const total = Number.isFinite(duration()) ? duration() : 0;
-      seek.max = total;
-      seek.value = time() || 0;
-      const [elapsed, end] = overlay.querySelectorAll('output');
-      elapsed.textContent = format(time());
-      end.textContent = format(total);
-      seek.style.setProperty('--played', (total ? Number(seek.value) / total * 100 : 0) + '%');
+      if (scrubbing) return;
+      const position = time() || 0;
+      if (pendingSeek && (Math.abs(position - pendingSeek.value) < .8 || performance.now() >= pendingSeek.expires)) {
+        pendingSeek = null;
+      }
+      paintTimeline(pendingSeek?.value ?? position, total);
       progress(false);
     }
     function sourceChanged(next, position) {
@@ -183,36 +208,58 @@ window.PWAPlayer = (() => {
     }
     function renderSettings() {
       settings.replaceChildren();
-      const select = (title, entries, current, change) => {
-        if (!entries.length) return;
-        const row = document.createElement('label');
-        row.textContent = title;
-        const input = document.createElement('select');
-        for (const [value, label] of entries) input.add(new Option(label, value));
-        input.value = current;
-        input.onchange = () => change(input.value);
-        row.append(input);
-        settings.append(row);
+      const options = (title, entries, current, change) => {
+        const group = document.createElement('fieldset');
+        const heading = document.createElement('legend');
+        heading.textContent = title;
+        group.append(heading);
+        for (const [value, label] of entries) {
+          const option = document.createElement('button');
+          option.type = 'button';
+          option.textContent = label;
+          option.setAttribute('aria-pressed', String(value === current));
+          option.onclick = () => {
+            group.querySelector('[aria-pressed=true]')?.setAttribute('aria-pressed','false');
+            option.setAttribute('aria-pressed','true');
+            change(value);
+          };
+          group.append(option);
+        }
+        settings.append(group);
       };
-      if (settings.dataset.panel === 'settings') select('کیفیت پخش', (groups[group] || []).map(v => [v.id,v.quality]), selected,
-        value => changeSource(Number(value), group));
-      if (settings.dataset.panel === 'settings') select('سرعت پخش', [.5,.75,1,1.25,1.5,2].map(rate => [rate,rate + '×']), playbackRate, value => { playbackRate = Number(value); video.playbackRate = playbackRate; if (surface) controlSurface('rate', playbackRate).catch(() => {}); });
-      if (settings.dataset.panel === 'settings') return;
+      if (settings.dataset.panel === 'settings') {
+        const qualities = (groups[group] || []).map(v => [Number(v.id),v.quality]);
+        if (qualities.length) options('کیفیت پخش', qualities, selected, value => {
+          if (value !== selected) changeSource(value, group);
+        });
+        options('سرعت پخش', [.5,.75,1,1.25,1.5,2].map(rate => [rate,rate + '×']), playbackRate, value => {
+          playbackRate = value;
+          video.playbackRate = value;
+          if (surface) controlSurface('rate', value).catch(() => {});
+        });
+        return;
+      }
       if (surface) {
         if (settings.dataset.panel === 'captions') {
           const captions = lastState?.captions || [];
           if (!captions.length) { settings.textContent = 'زیرنویس قابل پخش در دسترس نیست.'; return; }
-          select('زیرنویس', [[-1,'خاموش'], ...captions.map((name,i) =>
+          options('زیرنویس', [[-1,'خاموش'], ...captions.map((name,i) =>
             [i, creditMarker.test(name) ? 'زیرنویس ' + (i + 1) : name])], lastState.selectedCaption,
-          value => controlSurface('captions', Number(value)).catch(() => {}));
+          value => controlSurface('captions', value).catch(() => {}));
           return;
         }
-        settings.textContent = 'این گزینه برای منبع فعلی در دسترس نیست.';
+        const audio = lastState?.audio || [];
+        if (!audio.length) { settings.textContent = 'مسیر صوتی دیگری در دسترس نیست.'; return; }
+        options('زبان صدا', audio.map((name,i) => [i, name || audioLabel(i,audio.length)]), lastState.selectedAudio,
+          value => controlSurface('audio', value).catch(() => {}));
         return;
       }
       const audio = Array.from(video.audioTracks || []);
-      if (settings.dataset.panel === 'audio') select('زبان صدا', audio.map((track,i) => [i,track.label || track.language || String(i+1)]),
-        audio.findIndex(track => track.enabled), value => audio.forEach((track,i) => { track.enabled = i === Number(value); }));
+      if (settings.dataset.panel === 'audio') {
+        if (!audio.length) { settings.textContent = 'مسیر صوتی دیگری در دسترس نیست.'; return; }
+        options('زبان صدا', audio.map((track,i) => [i,track.label || track.language || audioLabel(i,audio.length)]),
+          audio.findIndex(track => track.enabled), value => audio.forEach((track,i) => { track.enabled = i === value; }));
+      }
       if (settings.dataset.panel === 'captions') {
         const tracks = Array.from(video.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
         const captions = tracks.filter(track => {
@@ -220,13 +267,14 @@ window.PWAPlayer = (() => {
           return cleanCaptionTrack(track);
         });
         if (!captions.length) { settings.textContent = 'زیرنویس قابل پخش در دسترس نیست.'; return; }
-        select('زیرنویس', [[-1,'خاموش'], ...captions.map((track,i) => [i,
+        options('زیرنویس', [[-1,'خاموش'], ...captions.map((track,i) => [i,
           track.label && !creditMarker.test(track.label) ? track.label : track.language || 'زیرنویس ' + (i + 1)])],
         captions.findIndex(track => track.mode === 'showing'), value => tracks.forEach(track => {
-          track.mode = captions[Number(value)] === track ? 'showing' : 'hidden';
+          track.mode = captions[value] === track ? 'showing' : 'hidden';
         }));
       }
     }
+    function audioLabel(index, count) { return count === 1 ? 'صدای اصلی' : 'مسیر صوتی ' + (index + 1); }
     function dismiss() {
       progress(true);
       closeCurrent = null;
@@ -267,18 +315,47 @@ window.PWAPlayer = (() => {
       if (!settings.hidden) renderSettings();
     });
     video.addEventListener('timeupdate', refresh);
+    video.addEventListener('seeked', refresh);
     video.addEventListener('click', () => get('.local-player-center button').click());
     video.addEventListener('play', () => { played = true; updateTransport(false); });
     video.addEventListener('pause', () => { updateTransport(true); });
     video.addEventListener('error', () => { if (overlay.isConnected) startSurface(); });
-    seek.oninput = () => { if (Number.isFinite(duration())) setTime(Number(seek.value)); };
+    seek.oninput = () => {
+      scrubbing = true;
+      paintTimeline(Number(seek.value), duration());
+    };
+    seek.onchange = () => {
+      scrubbing = false;
+      setTime(Number(seek.value));
+    };
+    seek.onpointercancel = () => { scrubbing = false; refresh(); };
+    seek.onblur = () => { if (scrubbing) seek.onchange(); };
+    function setPanel(panel) {
+      settings.hidden = !panel;
+      if (panel) settings.dataset.panel = panel;
+      overlay.querySelectorAll('[data-player=captions],[data-player=audio],[data-player=settings]').forEach(trigger => {
+        trigger.setAttribute('aria-expanded', String(panel === trigger.dataset.player));
+      });
+      if (panel) renderSettings();
+    }
+    setPanel(null);
+    overlay.onkeydown = event => {
+      if (event.key === 'Escape' && !settings.hidden) {
+        const trigger = get('[aria-expanded=true]');
+        setPanel(null);
+        trigger?.focus({preventScroll:true});
+      }
+    };
     overlay.onclick = async event => {
       const button = event.target.closest('[data-player]');
-      if (!button) return;
+      if (!button) {
+        if (!settings.contains(event.target)) setPanel(null);
+        return;
+      }
       switch (button.dataset.player) {
         case 'close': dismiss(); break;
-        case 'back': setTime(Math.max(0, time() - 10)); break;
-        case 'forward': if (Number.isFinite(duration())) setTime(Math.min(duration(), time() + 10)); break;
+        case 'back': setTime((pendingSeek?.value ?? time()) - 10); break;
+        case 'forward': setTime((pendingSeek?.value ?? time()) + 10); break;
         case 'mute':
           if (surface) { const state = await controlSurface('mute'); button.setAttribute('aria-pressed', String(state.muted)); break; }
           video.muted = !video.muted;
@@ -294,14 +371,18 @@ window.PWAPlayer = (() => {
         case 'audio':
         case 'settings': {
           const panel = button.dataset.player;
-          settings.hidden = !settings.hidden && settings.dataset.panel === panel;
-          settings.dataset.panel = panel;
-          if (!settings.hidden) renderSettings();
+          setPanel(!settings.hidden && settings.dataset.panel === panel ? null : panel);
           break;
         }
-        case 'fullscreen':
+        case 'fullscreen': {
+          const fill = overlay.classList.toggle('local-player-fill');
+          button.setAttribute('aria-pressed', String(fill));
+          if (surface) await controlSurface('fill', fill);
+          break;
+        }
         case 'rotate': {
           const rotated = overlay.classList.toggle('local-player-rotated');
+          button.setAttribute('aria-pressed', String(rotated));
           if (surface) await controlSurface('rotate', rotated);
           break;
         }
