@@ -1,5 +1,6 @@
 #dm-playback-choice[hidden]{display:none!important;}
-#dm-playback-choice{position:fixed;inset:0;z-index:2147483647;background:#0009;display:grid;place-items:center;padding:24px;box-sizing:border-box;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+#dm-playback-choice{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:24px;box-sizing:border-box;}
+#dm-playback-choice::before{content:"";position:absolute;inset:0;background:#0009;pointer-events:none;}
 #dm-playback-choice [role=dialog]{position:relative;width:min(100%,304px);box-sizing:border-box;background:linear-gradient(145deg,#241013,#111 65%);color:#fff;border:1px solid #ffffff18;border-radius:20px;box-shadow:0 16px 60px #0009;overflow:hidden;text-align:center;padding:26px 18px 18px;}
 #dm-playback-choice h2{font-size:17px;line-height:27px;font-weight:700;margin:4px 8px 9px;}
 #dm-playback-choice p{font-size:12px;line-height:22px;color:#aaa;margin:0 0 19px;}
@@ -17,9 +18,14 @@
 }
 @media(prefers-reduced-motion:reduce){html body[data-page][data-page] :is(.dm-film-topbar,.ds-mobile-header){transition:none!important;}}
 
-/* Replay on every display, including openings from different title sections. */
-#dm-playback-choice:not([hidden]){animation:dmResumeBackdropIn 180ms ease-out both;}
-#dm-playback-choice:not([hidden]) [role=dialog]{animation:dmResumeDialogIn 280ms cubic-bezier(.2,.8,.2,1) both;transform-origin:center;}
-@keyframes dmResumeBackdropIn{from{opacity:0}to{opacity:1}}
-@keyframes dmResumeDialogIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-@media(prefers-reduced-motion:reduce){#dm-playback-choice:not([hidden]),#dm-playback-choice:not([hidden]) [role=dialog]{animation:none!important;}}
+@media(prefers-reduced-motion:no-preference){
+  #dm-playback-choice [role=dialog],#app .film-download-dialog[open]:not([data-closing]){
+    animation:playback-dialog-in 170ms cubic-bezier(.2,.75,.25,1) both;
+  }
+  #dm-playback-choice::before,.film-download-dialog[open]:not([data-closing])::backdrop{
+    animation:playback-backdrop-in 130ms ease-out both;
+  }
+  .film-download-dialog[data-closing]::backdrop{animation:playback-backdrop-in 125ms ease-in reverse both}
+}
+@keyframes playback-dialog-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes playback-backdrop-in{from{opacity:0}to{opacity:1}}

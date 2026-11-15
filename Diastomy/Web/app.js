@@ -124,10 +124,11 @@
   function closeWithMotion(dialog) {
     if (!dialog.open || dialog.hasAttribute('data-closing')) return;
     if (reduceMotion.matches || !dialog.animate) { dialog.close(); return; }
+    const {opacity, transform} = getComputedStyle(dialog);
     dialog.setAttribute('data-closing','');
     const sheet = dialog.matches('#home-history-menu,#local-filters,#settings-choice');
     const motion = dialog.animate([
-      {opacity:1, transform:'none'},
+      {opacity, transform},
       {opacity:0, transform:sheet ? 'translateY(18px)' : 'translateY(6px) scale(.985)'}
     ], {duration:125, easing:'ease-in', fill:'forwards'});
     motion.finished.catch(() => {}).then(() => {
@@ -1822,7 +1823,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۵۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۵۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
