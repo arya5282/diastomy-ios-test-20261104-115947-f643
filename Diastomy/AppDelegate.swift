@@ -43,8 +43,10 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
-final class DiastomyTabController: UITabBarController, UITabBarControllerDelegate {
+final class DiastomyTabController: UITabBarController, UITabBarControllerDelegate, UIGestureRecognizerDelegate {
     private var didPreloadTabs = false
+    private var swipeOrigin: Int?
+    private var swipeTabWidth: CGFloat = 1
     override func viewDidLoad() {
         super.viewDidLoad()
         delegate = self
@@ -67,6 +69,45 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
         if #available(iOS 26.0, *) {
             tabBarMinimizeBehavior = .onScrollDown
         }
+        let swipe = UIPanGestureRecognizer(target: self, action: #selector(swipeTabs(_:)))
+        swipe.maximumNumberOfTouches = 1
+        swipe.cancelsTouchesInView = true
+        swipe.delegate = self
+        tabBar.addGestureRecognizer(swipe)
+        updateTabBar()
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let swipe = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+        let speed = swipe.velocity(in: view)
+        return abs(speed.x) > abs(speed.y)
+    }
+
+    @objc private func swipeTabs(_ gesture: UIPanGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            guard let count = viewControllers?.count, count > 1 else { return }
+            swipeOrigin = selectedIndex
+            swipeTabWidth = max(44, tabBar.bounds.width / CGFloat(count))
+            selectTabDuringSwipe(gesture)
+        case .changed:
+            selectTabDuringSwipe(gesture)
+        case .ended, .cancelled, .failed:
+            swipeOrigin = nil
+            updateTabBar()
+        default:
+            break
+        }
+    }
+
+    private func selectTabDuringSwipe(_ gesture: UIPanGestureRecognizer) {
+        guard let origin = swipeOrigin, let count = viewControllers?.count else { return }
+        let direction: CGFloat = tabBar.effectiveUserInterfaceLayoutDirection == .rightToLeft ? -1 : 1
+        let offset = direction * gesture.translation(in: view).x / swipeTabWidth
+        let position = min(CGFloat(count - 1), max(0, CGFloat(origin) + offset))
+        // Hysteresis prevents repeated switches when hovering near a boundary.
+        guard abs(position - CGFloat(selectedIndex)) >= 0.56 else { return }
+        selectedIndex = Int(position.rounded())
         updateTabBar()
     }
 
@@ -74,7 +115,8 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
 
     func updateTabBar() {
         let selected = selectedViewController as? BrowserViewController
-        let hidden = selected?.showsNativeTabBar != true && !(didPreloadTabs && selected?.isLoadingSecondaryTab == true)
+        let hidden = swipeOrigin == nil && selected?.showsNativeTabBar != true &&
+            !(didPreloadTabs && selected?.isLoadingSecondaryTab == true)
         if !hidden, selected?.showsNativeTabBar == true, !didPreloadTabs {
             didPreloadTabs = true
             DispatchQueue.main.async { [weak self] in
