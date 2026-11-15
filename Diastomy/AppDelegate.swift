@@ -44,6 +44,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 
 final class DiastomyTabController: UITabBarController, UITabBarControllerDelegate {
+    private var didPreloadTabs = false
     override func viewDidLoad() {
         super.viewDidLoad()
         delegate = self
@@ -58,6 +59,7 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
         viewControllers = tabs.map { route, title, icon, selectedIcon in
             let controller = BrowserViewController()
             controller.initialTabRoute = route
+            controller.isSecondaryTab = route != "home"
             controller.tabBarItem = UITabBarItem(title: title, image: UIImage(systemName: icon),
                                                   selectedImage: UIImage(systemName: selectedIcon))
             return controller
@@ -71,7 +73,20 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
     override var childForStatusBarStyle: UIViewController? { selectedViewController }
 
     func updateTabBar() {
-        let hidden = (selectedViewController as? BrowserViewController)?.showsNativeTabBar != true
+        let selected = selectedViewController as? BrowserViewController
+        let hidden = selected?.showsNativeTabBar != true && !(didPreloadTabs && selected?.isLoadingSecondaryTab == true)
+        if !hidden, selected?.showsNativeTabBar == true, !didPreloadTabs {
+            didPreloadTabs = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self, (self.selectedViewController as? BrowserViewController)?.showsNativeTabBar == true else {
+                    self?.didPreloadTabs = false
+                    return
+                }
+                for case let controller as BrowserViewController in self.viewControllers ?? [] {
+                    controller.loadViewIfNeeded()
+                }
+            }
+        }
         if #available(iOS 18.0, *) {
             if isTabBarHidden != hidden { setTabBarHidden(hidden, animated: false) }
         } else {

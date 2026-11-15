@@ -7,6 +7,9 @@ import CryptoKit
 // Only JSON APIs and explicitly authorized media use the network.
 final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate {
     var initialTabRoute = "home"
+    var isSecondaryTab = false
+    private var waitingForTabRoute = true
+    var isLoadingSecondaryTab: Bool { isSecondaryTab && waitingForTabRoute }
     private(set) var showsNativeTabBar = false
     private var resetOnAppearance = false
 
@@ -90,6 +93,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         configuration.userContentController.addUserScript(WKUserScript(source: """
             document.documentElement.classList.add('diastomy-native-tabs');
+            \(isSecondaryTab ? "document.documentElement.classList.add('diastomy-secondary-tab');" : "")
             """, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         configuration.applicationNameForUserAgent = "DiastomyIOS/2.0"
         webView = WKWebView(frame: .zero, configuration: configuration)
@@ -115,7 +119,13 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         startupNavigation = nil
         startupDocumentCommitted = false
         webView.stopLoading()
-        showStartupPanel(message: "در حال آماده‌سازی دیاستومی…", canRetry: false)
+        waitingForTabRoute = true
+        if !isSecondaryTab {
+            showStartupPanel(message: "در حال آماده‌سازی دیاستومی…", canRetry: false)
+        } else {
+            startupPanel?.removeFromSuperview()
+            startupPanel = nil
+        }
         guard let index = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Web") else {
             startupFailed("فایل‌های رابط برنامه موجود نیستند؛ نسخهٔ کامل را دوباره نصب کنید.")
             return
@@ -276,6 +286,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     @objc private func retryStartup() { loadBundledInterface() }
 
     private func startupFailed(_ message: String) {
+        waitingForTabRoute = false
+        (tabBarController as? DiastomyTabController)?.updateTabBar()
         startupNavigation = nil
         startupTimer?.invalidate()
         showStartupPanel(message: message, canRetry: true)
@@ -447,6 +459,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             replyHandler(nil, "Untrusted document"); return
         }
         if action == "nativeTabVisibility", let visible = data["visible"] as? Bool {
+            waitingForTabRoute = data["starting"] as? Bool == true
             showsNativeTabBar = visible
             (tabBarController as? DiastomyTabController)?.updateTabBar()
             replyHandler(["ok": true], nil)
