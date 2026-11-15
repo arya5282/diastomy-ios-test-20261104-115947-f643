@@ -98,11 +98,12 @@ window.PWAPlayer = (() => {
         controlSurface('rate', playbackRate).catch(() => {});
         controlSurface('volume', Number(volume.value)).catch(() => {});
         if (video.muted) controlSurface('mute').catch(() => {});
-        const frameDeadline = Date.now() + 14000;
+        const frameDeadline = Date.now() + 30000;
         const sync = async () => {
           try {
             const state = await controlSurface('status');
             if (!overlay.isConnected || request !== revision || !surface || !state.ok) return;
+            const captionsChanged = (lastState?.captions?.length || 0) !== (state.captions?.length || 0);
             lastState = state;
             if (state.frameReady) played = true;
             updateTransport(state.paused || !state.frameReady);
@@ -111,6 +112,7 @@ window.PWAPlayer = (() => {
               get('.local-player-error').hidden = false;
             }
             refresh();
+            if (captionsChanged && !settings.hidden && settings.dataset.panel === 'captions') renderSettings();
           } catch (_) {}
         };
         polling = setInterval(sync, 500);
@@ -197,6 +199,14 @@ window.PWAPlayer = (() => {
       if (settings.dataset.panel === 'settings') select('سرعت پخش', [.5,.75,1,1.25,1.5,2].map(rate => [rate,rate + '×']), playbackRate, value => { playbackRate = Number(value); video.playbackRate = playbackRate; if (surface) controlSurface('rate', playbackRate).catch(() => {}); });
       if (settings.dataset.panel === 'settings') return;
       if (surface) {
+        if (settings.dataset.panel === 'captions') {
+          const captions = lastState?.captions || [];
+          if (!captions.length) { settings.textContent = 'زیرنویس قابل پخش در دسترس نیست.'; return; }
+          select('زیرنویس', [[-1,'خاموش'], ...captions.map((name,i) =>
+            [i, creditMarker.test(name) ? 'زیرنویس ' + (i + 1) : name])], lastState.selectedCaption,
+          value => controlSurface('captions', Number(value)).catch(() => {}));
+          return;
+        }
         settings.textContent = 'این گزینه برای منبع فعلی در دسترس نیست.';
         return;
       }

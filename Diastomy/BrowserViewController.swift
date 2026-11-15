@@ -45,6 +45,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var inlineGeneration = 0
     private var inlineRotated = false
     private var inlineRate: Float = 1
+    private var inlineHasCaptions = false
     private var player: AVPlayer?
     private var playerController: AVPlayerViewController?
     private var progressObserver: Any?
@@ -744,6 +745,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         inlineLayer = nil
         inlineRotated = false
         inlineRate = 1
+        inlineHasCaptions = false
         webView.underPageBackgroundColor = .black
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
@@ -768,6 +770,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             playback.seek(to: CMTime(seconds: position, preferredTimescale: 600))
         }
         playback.play()
+        if var subtitle = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            subtitle.path = url.deletingLastPathComponent().appendingPathComponent("subtitles.m3u8").path
+            if let subtitleURL = subtitle.url {
+                api.dataTask(with: subtitleURL) { [weak self, weak layer] _, response, _ in
+                    guard let self, let layer, self.inlineLayer === layer,
+                          let http = response as? HTTPURLResponse, http.statusCode == 200 else { return }
+                    self.inlineHasCaptions = http.value(forHTTPHeaderField: "X-Diastomy-Subtitle-Mode") == "full"
+                }.resume()
+            }
+        }
     }
 
     private func controlInlinePlayer(_ command: String, data: [String: Any]) -> [String: Any] {
@@ -776,6 +788,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             return ["ok": true]
         }
         guard let playback = inlineLayer?.player else { return ["ok": false] }
+        let item = playback.currentItem
+        let captionGroup = inlineHasCaptions && item?.status == .readyToPlay
+            ? item?.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) : nil
         switch command {
         case "toggle":
             if playback.timeControlStatus == .paused { playback.playImmediately(atRate: inlineRate) } else { playback.pause() }
@@ -796,12 +811,24 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         case "rotate":
             inlineRotated = data["value"] as? Bool == true
             layoutInlinePlayer()
+        case "captions":
+            if let captionGroup, let index = data["value"] as? Int {
+                if index == -1 {
+                    item?.select(nil, in: captionGroup)
+                } else if captionGroup.options.indices.contains(index) {
+                    item?.select(captionGroup.options[index], in: captionGroup)
+                }
+            }
         default: break
         }
         let duration = playback.currentItem?.duration.seconds ?? 0
         let position = playback.currentTime().seconds
+        let selectedCaption = captionGroup.flatMap { group in
+            item?.currentMediaSelection.selectedMediaOption(in: group).flatMap { group.options.firstIndex(of: $0) }
+        } ?? -1
         return ["ok": true, "duration": duration.isFinite ? duration : 0,
                 "frameReady": inlineLayer?.isReadyForDisplay == true,
+                "captions": captionGroup?.options.map(\.displayName) ?? [], "selectedCaption": selectedCaption,
                 "position": position.isFinite ? position : 0, "muted": playback.isMuted,
                 "paused": playback.timeControlStatus == .paused,
                 "failed": playback.status == .failed || playback.currentItem?.status == .failed]
