@@ -331,6 +331,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             "/accounts/support/api/messages/", "/accounts/support/api/send/"
         ]
         if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") ||
+            p.range(of: #"^/accounts/notifications/[1-9][0-9]*/dismiss/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/accounts/api/devices/[1-9][0-9]*/terminate/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/api/watch-history/[1-9][0-9]*/remove/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/movie-room/r/[A-Za-z0-9_-]+/delete/$"#, options: .regularExpression) != nil {
@@ -800,6 +801,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let duration = playback.currentItem?.duration.seconds ?? 0
         let position = playback.currentTime().seconds
         return ["ok": true, "duration": duration.isFinite ? duration : 0,
+                "frameReady": inlineLayer?.isReadyForDisplay == true,
                 "position": position.isFinite ? position : 0, "muted": playback.isMuted,
                 "paused": playback.timeControlStatus == .paused,
                 "failed": playback.status == .failed || playback.currentItem?.status == .failed]

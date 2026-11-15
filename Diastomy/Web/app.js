@@ -111,7 +111,7 @@
       'local-room': ['mr-wrap','mr-room-topline'],
       'local-support': ['ar-support-main','ar-support-head']
     }[route] || ['ar-shell','ar-head'];
-    const back = ['local-profile','local-payments','local-settings','local-notifications','local-support','local-subscription','local-about'].includes(route) ? 'account' :
+    const back = ['local-profile','local-payments','local-settings','local-notifications','local-support','local-subscription','local-about','local-followed-actors'].includes(route) ? 'account' :
       route === 'local-room' ? 'rooms' : 'home';
     return '<section class="pwa-internal ' + layout[0] + '"><header class="pwa-internal-head ' + layout[1] + '">' +
       '<h1>' + esc(title) + '</h1><a href="#/' + back + '" aria-label="بازگشت"><svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -531,6 +531,21 @@
           '<dialog id="episode-choice" class="episode-choice"><form method="dialog"><button aria-label="بستن">×</button></form><h2></h2><div></div></dialog><div id="series-episodes"></div>' :
           empty('قسمت یا منبع قابل پخش موجود نیست.');
         mount(PWA.detail({...data,type:kind}, episodes));
+        const summary = $('.dm-film-description');
+        const summaryToggle = $('[data-summary-more]');
+        const checkSummary = () => {
+          if (summary.isConnected && summaryToggle.getAttribute('aria-expanded') === 'false') {
+            summaryToggle.hidden = summary.scrollHeight <= summary.clientHeight + 1;
+          }
+        };
+        requestAnimationFrame(checkSummary);
+        document.fonts?.ready.then(checkSummary);
+        summaryToggle.onclick = () => {
+          const expanded = summaryToggle.getAttribute('aria-expanded') !== 'true';
+          summaryToggle.setAttribute('aria-expanded', String(expanded));
+          summary.classList.toggle('expanded', expanded);
+          summaryToggle.textContent = expanded ? 'کمتر' : 'بیشتر';
+        };
         submit('title-comment', async (values, output) => {
           const result = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/comments/', {
             body:{text:values.text.trim(),is_spoiler:values.spoiler === 'on'}
@@ -1092,10 +1107,28 @@
           }
           return;
         }
-        $('#notifications').innerHTML = notices.filter(n => noticeCategory(n.title) === category).map(n =>
-          '<article class="account-notice-row account-notice-item"><h2>' + esc(n.title) + '</h2><p>' + esc(n.message) +
-          '</p><small>' + esc(n.created_at) + '</small></article>').join('') ||
-          '<p class="account-reference-empty">اعلانی در این بخش ندارید.</p>';
+        let items = notices.filter(n => noticeCategory(n.title) === category);
+        const list = $('#notifications');
+        function render() {
+          list.innerHTML = items.map(n =>
+            '<article class="account-notice-row account-notice-item"><button type="button" data-dismiss-notice="' + esc(n.id) +
+            '" aria-label="حذف اعلان">×</button><h2>' + esc(n.title) + '</h2><p>' + esc(n.message) +
+            '</p><small>' + esc(n.created_at) + '</small></article>').join('') ||
+            '<p class="account-reference-empty">اعلانی در این بخش ندارید.</p>';
+        }
+        list.onclick = async event => {
+          const button = event.target.closest('[data-dismiss-notice]');
+          if (!button || button.disabled) return;
+          button.disabled = true;
+          const id = button.dataset.dismissNotice;
+          try {
+            await api('/accounts/notifications/' + enc(id) + '/dismiss/', {body:{}});
+            items = items.filter(n => String(n.id) !== id);
+            whenCurrent(seq, render);
+          } catch (error) { toast(error.message); }
+          finally { button.disabled = false; }
+        };
+        render();
       });
     } catch (error) {
       if (category) whenCurrent(seq, () => fail($('#notifications'), error));
@@ -1323,19 +1356,16 @@
       };
     };
   }
-  async function settings(seq, params) {
-    const section = params.get('section');
-    if (section === 'following') {
-      mount(shell('دنبال‌شده‌ها', '<p class="account-notice-row settings-follow-help">با اضافه‌شدن قسمت جدید یا اثری از افراد دنبال‌شده، در بخش اعلان‌ها باخبر می‌شوید.</p><div id="settings-follows"><p role="status">در حال دریافت…</p></div>'));
-      $('.pwa-internal-head a').href = '#/settings';
+  async function followedActors(seq) {
+      mount(shell('بازیگران دنبال‌شده', '<p class="account-notice-row settings-follow-help">با اضافه‌شدن اثری از بازیگران دنبال‌شده، در بخش اعلان‌ها باخبر می‌شوید.</p><div id="settings-follows"><p role="status">در حال دریافت…</p></div>'));
       try {
         const data = await api('/api/app/v1/settings/');
         whenCurrent(seq, () => {
-          $('#settings-follows').innerHTML = (data.following || []).map(item =>
-            '<div class="account-notice-row settings-follow-row"><span>' + esc(item.name) +
-            '</span><button type="button" class="settings-pill" aria-pressed="true" data-follow="' + esc(item.id) +
+          $('#settings-follows').innerHTML = (data.following || []).filter(item => item.kind === 'person').map(item =>
+            '<div class="account-notice-row settings-follow-row">' + (item.slug ? '<a href="#/actor/' + enc(item.slug) + '">' + esc(item.name) + '</a>' : '<span>' + esc(item.name) + '</span>') +
+            '<button type="button" class="settings-pill" aria-pressed="true" data-follow="' + esc(item.id) +
             '" data-kind="' + esc(item.kind) + '">' + PWA_SOURCE.detailFollow + ' دنبال‌کردن <span aria-hidden="true">✓</span></button></div>').join('') ||
-            '<p class="account-reference-empty">هنوز کسی یا سریالی را دنبال نکرده‌اید.</p>';
+            '<p class="account-reference-empty">هنوز بازیگری را دنبال نکرده‌اید.</p>';
           for (const button of document.querySelectorAll('[data-follow]')) button.onclick = async () => {
             const following = button.getAttribute('aria-pressed') !== 'true';
             button.disabled = true;
@@ -1348,8 +1378,10 @@
           };
         });
       } catch (error) { whenCurrent(seq, () => fail($('#settings-follows'),error)); }
-      return;
-    }
+  }
+  async function settings(seq, params) {
+    const section = params.get('section');
+    if (section === 'following') { location.replace('#/followed-actors'); return; }
     if (section === 'password') {
       mount(shell('تغییر رمز عبور', form('password', field('old_password','رمز فعلی','password','autocomplete="current-password"') +
         field('new_password','رمز جدید','password','autocomplete="new-password" minlength="8"') +
@@ -1358,7 +1390,7 @@
       submit('password', async (data, output) => { await api('/accounts/api/change-password/', {body:data}); $('#password').reset(); output.textContent = 'رمز تغییر کرد.'; });
       return;
     }
-    mount(shell('تنظیمات', settingsRow('دنبال‌شده‌ها','#/settings?section=following') +
+    mount(shell('تنظیمات',
       '<button type="button" id="settings-spoiler" class="settings-pill" aria-pressed="false" disabled>' + PWA_SOURCE.detailSpoiler + ' بدون اسپویل</button>' +
       settingsRow('شماره تلفن','#/profile?field=phone') + settingsRow('تغییر رمز عبور','#/settings?section=password') + settingsRow('ایمیل','#/profile?field=email') +
       '<details class="settings-section"><summary>دستگاه‌های متصل</summary><div id="devices"><p role="status">در حال دریافت…</p></div></details>' +
@@ -1415,12 +1447,7 @@
         ' aria-label="' + label + '"><span class="mr-exact-image mr-exact-image-' + index + '"></span></button>').join('') +
       '</div><div class="mr-exact-dots">' + slides.map((_,index) => '<button type="button" data-room-dot="' + index +
         '" aria-label="اسلاید ' + (index + 1) + '" aria-pressed="' + (index === 0) + '"></button>').join('') +
-      '</div></section><section class="mr-section"><div class="local-room-section-head"><div><h2>اکسپلور اتاق‌ها</h2>' +
-      '<p>یک اتاق پیدا کن و با بقیه فیلم ببین.</p></div><button type="button" data-room-create>+ ساخت اتاق</button></div>' +
-      '<form id="room-search"><input name="q" type="search" aria-label="جستجوی اتاق" placeholder="جستجوی اتاق، فیلم یا میزبان"><button type="submit">جستجو</button></form>' +
-      '<div id="public-rooms" role="status">در حال دریافت اتاق‌ها…</div>' +
-      '<form id="join-room"><input name="code" required placeholder="کد دعوت اتاق" aria-label="کد دعوت اتاق"><button type="submit">ورود</button></form></section>' +
-      '<section class="mr-section"><h2>اتاق‌های من</h2><div id="my-rooms" role="status"></div></section>' +
+      '</div></section><section class="mr-section"><h2>اتاق‌های من</h2><div id="my-rooms" role="status"></div></section>' +
       '<section class="mr-section" id="local-room-create"><h2>ساخت اتاق جدید</h2><form id="mr-create-form" class="mr-form">' +
       '<fieldset class="mr-visibility"><legend>نوع اتاق</legend><label><input type="radio" name="visibility" value="public" checked> عمومی<small>همه کاربران می‌توانند اتاقت را در اکسپلور پیدا کنند.</small></label>' +
       '<label><input type="radio" name="visibility" value="private"> خصوصی<small>فقط با لینک دعوت وارد می‌شوند.</small></label></fieldset>' +
@@ -1428,7 +1455,12 @@
       '<label>زمان شروع<input name="start" type="datetime-local"></label><label class="local-start-now"><input type="checkbox" name="now"> همین الان شروع شود</label>' +
       '<label>انتخاب فیلم<input name="movie" type="search" placeholder="جستجوی نام فیلم ..."></label>' +
       '<button type="submit" class="mr-create-action">ساخت اتاق</button>' + status('mr-create-form') + '</form>' +
-      '<h2 id="room-movie-heading">پیشنهادی</h2><div class="local-room-movies" id="room-movies"></div></section></section>' +
+      '<h2 id="room-movie-heading">پیشنهادی</h2><div class="local-room-movies" id="room-movies"></div></section>' +
+      '<section class="mr-section"><div class="local-room-section-head"><div><h2>اکسپلور اتاق‌ها</h2>' +
+      '<p>یک اتاق پیدا کن و با بقیه فیلم ببین.</p></div><button type="button" data-room-create>+ ساخت اتاق</button></div>' +
+      '<form id="room-search"><input name="q" type="search" aria-label="جستجوی اتاق" placeholder="جستجوی اتاق، فیلم یا میزبان"><button type="submit">جستجو</button></form>' +
+      '<div id="public-rooms" role="status">در حال دریافت اتاق‌ها…</div>' +
+      '<form id="join-room"><input name="code" required placeholder="کد دعوت اتاق" aria-label="کد دعوت اتاق"><button type="submit">ورود</button></form></section></section>' +
       '<dialog id="room-delete-dialog"><p>اتاق و پیام‌های آن حذف شوند؟</p><button type="button" data-room-cancel>انصراف</button>' +
       '<button type="button" data-room-confirm>حذف اتاق</button></dialog>');
 
@@ -1710,7 +1742,7 @@
     const message = m => '<div class="message"><small>' + esc(m.name) + '</small><p>' + esc(m.text) + '</p></div>';
     if (data.type === 'history') $('#room-chat').innerHTML = data.messages.map(message).join('');
     if (data.type === 'chat') $('#room-chat').insertAdjacentHTML('beforeend', message(data.message));
-    if (data.type === 'presence') $('#room-status').textContent = number(data.users.length) + ' کاربر آنلاین';
+    if (data.type === 'presence') $('#room-status').textContent = data.users.length + ' کاربر آنلاین';
     if (data.type === 'error') { $('#room-status').textContent = 'اتصال قطع شد'; toast(data.message); }
     if (state.handleRoomState) state.handleRoomState(data);
   });
@@ -1774,6 +1806,7 @@
       else if (name === 'otp') otp(params);
       else if (name === 'forgot') forgot();
       else if (name === 'account') account();
+      else if (name === 'followed-actors') await followedActors(seq);
       else if (name === 'profile') {
         profile();
         const field = params.get('field');
@@ -1789,7 +1822,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۵۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۵۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {

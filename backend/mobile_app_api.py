@@ -217,7 +217,7 @@ def detail(request, kind, slug):
                         for trailer in build_detail_trailers(item, kind, limit=3)]
     data['hero_cover'] = file_url(getattr(item, 'trailer_cover', None)) or data['banner']
     data['actors'] = [{'slug': a.slug, 'name': a.name, 'photo': file_url(a.photo)}
-                      for a in item.actors.all()[:30]]
+                      for a in item.actors.all()]
     from django.db.models import Count
     comments = item.comments.filter(is_approved=True, parent__isnull=True)
     data['comment_count'] = comments.count()
@@ -226,12 +226,16 @@ def detail(request, kind, slug):
          'author': comment.user.username, 'created_at': comment.created_at.isoformat()}
         for comment in comments.select_related('user').order_by('-pk')[:30]
     ]
-    related = type(item).objects.filter(genres__in=item.genres.all()).exclude(pk=item.pk)
-    if kind == 'series':
-        related = related.distinct().order_by('-imdb_rating', '-created_at')
-    else:
-        related = related.annotate(shared_genres=Count('genres', distinct=True)).order_by('-shared_genres', '-created_at', '-pk')
-    data['similar'] = [card(related_item) for related_item in related.prefetch_related('genres')[:10]]
+    data['similar'] = []
+    for model in (type(item), Series if kind == 'movie' else Movie):
+        related = model.objects.filter(genres__in=item.genres.all())
+        if model is type(item):
+            related = related.exclude(pk=item.pk)
+        if model is Series:
+            related = related.distinct().order_by('-imdb_rating', '-created_at')
+        else:
+            related = related.annotate(shared_genres=Count('genres', distinct=True)).order_by('-shared_genres', '-created_at', '-pk')
+        data['similar'].extend(card(related_item) for related_item in related.prefetch_related('genres')[:10])
     # Only public metadata here: this response can be retained offline.
     # Media links and entitlement are always obtained afresh from playback().
     if kind == 'movie':
@@ -258,8 +262,13 @@ def detail(request, kind, slug):
             sources.sort(key=lambda video: video.quality.weight, reverse=True)
             videos = [{'id': video.pk, 'quality': video.quality.title}
                       for video in sources if direct_url_usable(video)]
-            downloads = [{'id': video.pk, 'quality': video.quality.title}
-                         for video in sources if is_usable_source_url((video.direct_download_url or '').strip())]
+            downloads = []
+            for video in sources:
+                url = (video.direct_download_url or '').strip()
+                if not is_usable_source_url(url):
+                    continue
+                variant = 'dubbed' if video.download_variant == 'dubbed' else 'subbed'
+                downloads.append({'id': video.pk, 'quality': video.quality.title, 'variant': variant})
             data['episodes'].append({'id': episode.pk, 'season': episode.season.season_number,
                                      'number': episode.episode_number, 'videos': videos, 'download_options': downloads,
                                      'cover': file_url(episode.cover), 'duration': episode.duration,
@@ -376,7 +385,8 @@ def settings(request):
         ],
         'following': [
             {'kind': 'series', 'id': follow.series_id, 'name': follow.series.title} if follow.series_id else
-            {'kind': 'person', 'id': follow.person_id, 'name': follow.person.name}
+            {'kind': 'person', 'id': follow.person_id, 'name': follow.person.name_fa or follow.person.name,
+             'slug': follow.person.slug}
             for follow in follows
         ],
     })
@@ -443,6 +453,8 @@ def actor_profile(request, slug):
         return response
     data = json.loads(response.content)
     actor = get_object_or_404(Person, pk=data['actor']['id'])
+    data['actor']['name'] = actor.name_fa or actor.name
+    data['actor']['bio_fa'] = getattr(actor, 'bio_fa', '') or ''
     data['actor']['summary'] = actor_summary(actor)
     return JsonResponse(data)
 

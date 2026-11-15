@@ -26,7 +26,7 @@ window.PWA = (() => {
   function card(item) { return renderCard(item, false); }
   function actorPage() {
     return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
-      PWA_SOURCE.actorBack + '</a><h1>Actors</h1><button class="dm-actor-menu" type="button" data-local-menu aria-label="منو">' +
+      PWA_SOURCE.actorBack + '</a><h1>بازیگران</h1><button class="dm-actor-menu" type="button" data-local-menu aria-label="منو">' +
       PWA_SOURCE.actorMenu + '</button></header><div class="dm-actor-page" id="actors-data"><div class="loading"></div></div>';
   }
   function actorProfile(data, slug) {
@@ -37,9 +37,10 @@ window.PWA = (() => {
       '<span class="dm-actor-mark" aria-hidden="true"><img src="' + logo + '" alt=""></span></div><h3 dir="ltr">' +
       name(item) + '</h3><p class="dm-actor-genres" dir="ltr">' + (item.genres || []).map(esc).join(', ') + '</p></a>').join('');
     const href = '#/actor/' + encodeURIComponent(slug) + '/';
+    const bio = actor.bio_fa || (/[\u0600-\u06FF]/.test(actor.bio || '') ? actor.bio : '');
     return '<section class="dm-actor-profile" aria-label="معرفی بازیگر"><img class="dm-actor-photo" src="' +
       (actor.photo ? media(actor.photo) : '/static/public/assets/avatars/default/avatar-04.svg') + '" alt="' + esc(actor.name) + '"><div class="dm-actor-bio"><h2 dir="auto">' + esc(actor.name) +
-      '</h2><p id="dm-actor-facts" dir="rtl">' + esc(actor.summary || actor.bio) +
+      '</h2><p id="dm-actor-facts" dir="rtl">' + esc([actor.summary, bio].filter(value => /[\u0600-\u06FF]/.test(value || '')).join('\n\n') || 'زندگی‌نامهٔ فارسی هنوز در دسترس نیست.') +
       '</p><button type="button" class="dm-actor-more" aria-expanded="false" aria-controls="dm-actor-facts" hidden>بیشتر</button></div></section>' +
       '<div class="reference-series-preferences dm-actor-preferences" dir="rtl"><button type="button" data-follow="person" data-id="' +
       esc(actor.id) + '" aria-pressed="false" disabled>' + PWA_SOURCE.detailFollow + 'دنبال‌کردن</button>' +
@@ -216,13 +217,13 @@ window.PWA = (() => {
           '<button type="button" disabled>Play</button>') + download + '</div>' +
       (options.length ? filmDownloadDialog(options, series) : '') +
       '<section class="reference-film-summary"><h2>' + (series ? 'خلاصه سریال' : 'خلاصه فیلم') + '</h2><p class="dm-film-description" dir="auto">' + esc(item.description) +
-      '</p><div class="actions reference-summary-actions"></div></section><section class="reference-film-cast"><div class="film-cast-heading"><h2>بازیگران</h2>' +
+      '</p><button type="button" data-summary-more aria-expanded="false" hidden>بیشتر</button><div class="actions reference-summary-actions"></div></section><section class="reference-film-cast"><div class="film-cast-heading"><h2>بازیگران</h2>' +
       (cast.length > 6 ? '<button type="button" data-cast-more aria-expanded="false">بیشتر</button>' : '') + '</div><div class="rail reference-cast">' +
       cast.map((a,index) => '<a class="person" href="#/actor/' + encodeURIComponent(a.slug) + '"' + (index >= 6 ? ' data-extra-cast hidden' : '') +
         '><img src="' + media(a.photo) + '" alt="' + esc(a.name) + '"><p>' + esc(a.name) + '</p></a>').join('') +
       '</div></section><div class="reference-detail-tabs" aria-label="بخش‌های جزئیات">' +
       '' + (item.type === 'series' ? '<button type="button" data-detail-tab="episodes" aria-pressed="true">قسمت‌ها</button>' : '') + '<button type="button" data-detail-tab="comments" aria-pressed="' + (item.type !== 'series') + '">دیدگاه‌ها</button>' +
-      '<button type="button" data-detail-tab="trailers" aria-pressed="false">تریلرها</button>' +
+      (trailers.length ? '<button type="button" data-detail-tab="trailers" aria-pressed="false">تریلرها</button>' : '') +
       '<button type="button" data-detail-tab="similar" aria-pressed="false">مشابه</button></div>' +
       (item.type === 'series' ? '<div data-detail-panel="episodes">' + episodes + '</div>' : '') +
       '<div data-detail-panel="comments"' + (item.type === 'series' ? ' hidden' : '') + '><div class="local-comments-head"><h2>دیدگاه‌های ' +
@@ -236,12 +237,11 @@ window.PWA = (() => {
         (comment.created_at ? '<time>' + esc(new Date(comment.created_at).toLocaleDateString('fa-IR')) + '</time>' : '') + '</header>' +
         (comment.spoiler ? '<details><summary>دیدگاه حاوی اسپویل</summary><p>' + esc(comment.text) + '</p></details>' :
           '<p>' + esc(comment.text) + '</p>') + '</article>').join('') + '</div>' +
-      '<div data-detail-panel="trailers" hidden>' + (trailers.length ? trailers.map((trailer, index) =>
+      (trailers.length ? '<div data-detail-panel="trailers" hidden>' + trailers.map((trailer, index) =>
         '<article><div class="dm-trailer-thumb"><button type="button" class="local-trailer-preview" data-trailer-index="' + index +
         '" aria-label="' + esc(trailer.title || 'پخش تریلر') + '"><img alt="" loading="lazy" src="' +
         media(trailer.thumbnail || item.hero_cover || item.banner || item.cover) + '">' + PWA_SOURCE.detailTrailer +
-        '</button></div><p>' + esc(trailer.title || 'تریلر ' + (index + 1)) + '</p></article>').join('') :
-        '<p>تریلر در دسترس نیست.</p>') + '</div>' +
+        '</button></div><p>' + esc(trailer.title || 'تریلر ' + (index + 1)) + '</p></article>').join('') + '</div>' : '') +
       '<div data-detail-panel="similar" hidden>' + [['movie','فیلم‌های مشابه'],['series','سریال‌های مشابه']].map(([kind,title]) => {
         const items = (item.similar || []).filter(entry => (entry.type || item.type) === kind);
         return '<section><h2>' + title + '</h2>' + (items.length ? '<div class="local-similar-grid">' + items.map(card).join('') + '</div>' :
@@ -262,7 +262,8 @@ window.PWA = (() => {
       '<div class="ar-menu-heading"><h1>پروفایل کاربری</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<a class="dm-app-menu-close" href="' + esc(back) + '" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a></div>' +
       '<div class="dm-app-menu-profile">' + identity + '</div>' + watchTimeCard() + '<div class="dm-app-menu-nav">' + PWA_SOURCE.accountRows +
-      '</div><button id="logout" type="button">خروج از حساب کاربری' +
+      '<a class="account-notice-row settings-row" href="#/followed-actors"><span>بازیگران دنبال‌شده</span>' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg></a></div><button id="logout" type="button">خروج از حساب کاربری' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5m3-4 4-4-4-4m4 4H8"/></svg></button>' +
       '<footer class="reference-profile-footer"><img src="' + logo + '" alt="Diastomy"><p>برای مطلع شدن از آخرین اخبار و به‌روزرسانی‌ها،<br>دیاستومی را در شبکه‌های اجتماعی دنبال کنید.</p>' +
       PWA_SOURCE.accountSocial + '</footer></div></div>';
@@ -372,7 +373,7 @@ window.PWA = (() => {
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
     document.querySelector('.dmf3-filter').removeAttribute('data-local-search');
     document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
-    document.getElementById('pwa-header').hidden = ['startup','login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments'].includes(name);
+    document.getElementById('pwa-header').hidden = ['startup','login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments','followed-actors'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
     const nav = document.getElementById('dm-app-bottom-nav');
     const links = [...nav.querySelectorAll('[data-nav-slot]')];

@@ -38,9 +38,9 @@ html.dm-trailer-is-fullscreen,html.dm-trailer-is-fullscreen body{overflow:hidden
 
 /* Keep the center control independent of global tap transforms. */
 html body .dm-inline-trailer .dm-trailer-center{inset:0!important;margin:auto!important;transform:none!important;translate:none!important;scale:none!important;animation:none!important;transition:none!important}
-.dm-inline-trailer .dm-inline-trailer-rotate{position:absolute;right:6px;top:40px;width:28px;height:28px;padding:5px;border:1px solid #ffffff60;border-radius:50%;background:#0009;z-index:5}
-.dm-inline-trailer.dm-trailer-fullscreen .dm-inline-trailer-rotate{right:max(16px,env(safe-area-inset-right,0px));top:max(60px,calc(env(safe-area-inset-top,0px) + 54px))}
-@media(min-width:768px){.dm-inline-trailer .dm-inline-trailer-rotate{width:36px;height:36px;right:8px;top:50px}}
+.dm-inline-trailer .dm-inline-trailer-rotate{position:absolute;left:6px;top:6px;width:28px;height:28px;padding:5px;border:1px solid #ffffff60;border-radius:50%;background:#0009;z-index:5}
+.dm-inline-trailer.dm-trailer-fullscreen .dm-inline-trailer-rotate{left:max(16px,env(safe-area-inset-left,0px));top:max(16px,calc(env(safe-area-inset-top,0px) + 10px))}
+@media(min-width:768px){.dm-inline-trailer .dm-inline-trailer-rotate{width:36px;height:36px}}
 html body>.dm-inline-trailer.dm-trailer-fullscreen.dm-trailer-rotated{inset:auto!important;left:50%!important;top:50%!important;width:var(--trailer-rotated-width)!important;height:var(--trailer-rotated-height)!important;transform:translate(-50%,-50%) rotate(90deg)!important}
 
 /* Rotation is available only while the trailer is fullscreen. */

@@ -40,8 +40,8 @@ window.PWAPlayer = (() => {
     overlay.setAttribute('aria-label', 'پلیر فیلم');
     const control = (action, title, icon) => '<button type="button" data-player="' + action + '" aria-label="' + title + '">' + icons[icon] + '</button>';
     overlay.innerHTML = '<video playsinline webkit-playsinline></video><div class="local-player-dim"></div><div class="local-player-top">' +
-      '<button type="button" data-player="close" aria-label="بازگشت"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg></button><h2></h2>' +
-      control('rotate','چرخش تصویر','player-phone-rotate') + '</div>' +
+      control('rotate','چرخش تصویر','player-phone-rotate') + '<h2></h2>' +
+      '<button type="button" data-player="close" aria-label="بستن"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>' +
       '<label class="local-player-side local-player-brightness"><span aria-hidden="true">☼</span><input type="range" min="0" max="1" value="1" step=".01" aria-label="روشنایی تصویر"></label>' +
       '<label class="local-player-side local-player-volume">' + icons.volume + '<input type="range" min="0" max="1" value="1" step=".01" aria-label="بلندی صدا"></label>' +
       '<div class="local-player-center">' + control('toggle','پخش یا توقف','play') + '</div><div class="local-player-bottom"><div class="local-player-bar">' +
@@ -58,7 +58,7 @@ window.PWAPlayer = (() => {
       overlay.classList.toggle('local-player-playing', !paused);
       overlay.querySelectorAll('[data-player=toggle]').forEach(button => { button.innerHTML = paused ? icons.play : icons.pause; });
     };
-    let surface, surfaceStarting = false, polling, lastState, playbackRate = 1;
+    let surface, surfaceStarting = false, polling, startupCheck, lastState, playbackRate = 1;
     const controlSurface = (command, value) => native({action:'inlineControl',command,value});
     const time = () => surface ? lastState?.position || 0 : video.currentTime;
     const duration = () => surface ? lastState?.duration || 0 : video.duration;
@@ -67,6 +67,7 @@ window.PWAPlayer = (() => {
       else video.currentTime = value;
     }
     function stopSurface() {
+      clearTimeout(startupCheck);
       if (surface || surfaceStarting) controlSurface('stop').catch(() => {});
       clearInterval(polling);
       surface = false;
@@ -79,13 +80,17 @@ window.PWAPlayer = (() => {
       if (surface || surfaceStarting) return;
       if (kind === 'trailer') { get('.local-player-error').hidden = false; return; }
       const request = revision;
+      const position = time() || resume;
       surfaceStarting = true;
       try {
-        const response = await native({action:'play',inline:true,surface:true,kind,room,id:selected,position:time() || resume});
+        const response = await native({action:'play',inline:true,surface:true,kind,room,id:selected,position});
         if (!overlay.isConnected || request !== revision) return;
         if (!response.data?.surface) throw Error('پخش ویدیو ممکن نشد.');
         surface = true;
-        played = true;
+        clearTimeout(startupCheck);
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
         overlay.classList.add('local-player-native');
         document.body.classList.add('local-player-native-open');
         await controlSurface('rotate', overlay.classList.contains('local-player-rotated'));
@@ -93,13 +98,18 @@ window.PWAPlayer = (() => {
         controlSurface('rate', playbackRate).catch(() => {});
         controlSurface('volume', Number(volume.value)).catch(() => {});
         if (video.muted) controlSurface('mute').catch(() => {});
+        const frameDeadline = Date.now() + 14000;
         const sync = async () => {
           try {
             const state = await controlSurface('status');
             if (!overlay.isConnected || request !== revision || !surface || !state.ok) return;
             lastState = state;
-            updateTransport(state.paused);
-            if (state.failed) { clearInterval(polling); get('.local-player-error').hidden = false; }
+            if (state.frameReady) played = true;
+            updateTransport(state.paused || !state.frameReady);
+            if (state.failed || (!played && Date.now() > frameDeadline)) {
+              clearInterval(polling);
+              get('.local-player-error').hidden = false;
+            }
             refresh();
           } catch (_) {}
         };
@@ -142,10 +152,14 @@ window.PWAPlayer = (() => {
       source = next;
       resume = position;
       played = false;
+      get('h2').textContent = next.title || '';
       get('.local-player-error').hidden = true;
       video.src = next.url;
       video.playbackRate = playbackRate;
       video.play().catch(() => {});
+      startupCheck = setTimeout(() => {
+        if (overlay.isConnected && (!video.videoWidth || video.readyState < 2)) startSurface();
+      }, 6500);
     }
     async function changeSource(id, nextGroup) {
       const request = ++revision;
@@ -189,9 +203,19 @@ window.PWAPlayer = (() => {
       const audio = Array.from(video.audioTracks || []);
       if (settings.dataset.panel === 'audio') select('زبان صدا', audio.map((track,i) => [i,track.label || track.language || String(i+1)]),
         audio.findIndex(track => track.enabled), value => audio.forEach((track,i) => { track.enabled = i === Number(value); }));
-      const captions = Array.from(video.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
-      if (settings.dataset.panel === 'captions' && captions.length) select('زیرنویس', [[-1,'خاموش'], ...captions.map((track,i) => [i,track.label || track.language || String(i+1)])],
-        captions.findIndex(track => track.mode === 'showing'), value => captions.forEach((track,i) => { track.mode = i === Number(value) ? 'showing' : 'disabled'; }));
+      if (settings.dataset.panel === 'captions') {
+        const tracks = Array.from(video.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
+        const captions = tracks.filter(track => {
+          if (track.mode === 'disabled') track.mode = 'hidden';
+          return cleanCaptionTrack(track);
+        });
+        if (!captions.length) { settings.textContent = 'زیرنویس قابل پخش در دسترس نیست.'; return; }
+        select('زیرنویس', [[-1,'خاموش'], ...captions.map((track,i) => [i,
+          track.label && !creditMarker.test(track.label) ? track.label : track.language || 'زیرنویس ' + (i + 1)])],
+        captions.findIndex(track => track.mode === 'showing'), value => tracks.forEach(track => {
+          track.mode = captions[Number(value)] === track ? 'showing' : 'hidden';
+        }));
+      }
     }
     function dismiss() {
       progress(true);
@@ -205,6 +229,27 @@ window.PWAPlayer = (() => {
       document.body.classList.remove('local-player-open');
     }
     closeCurrent = dismiss;
+    const creditMarker = /king[\s_.-]*movie|movie[\s_.-]*baz/i;
+    function cleanCaptionTrack(track) {
+      const cues = Array.from(track.cues || []);
+      for (const cue of cues) {
+        if (typeof cue.text !== 'string') continue;
+        const lines = cue.text.split('\n');
+        const clean = lines.filter(line => {
+          if (!creditMarker.test(line)) return true;
+          const text = line.replace(/<[^>]+>/g,'').trim();
+          return !/^(?:@|https?:\/\/|www\.|ترجمه|زیرنویس|ارائه|هماهنگ|دانلود|presented\b|subtitles\b|translated\b|credits\b|synced\b)/i.test(text)
+            && !/^(?:@|www\.)?(?:king[\s_.-]*movie|movie[\s_.-]*baz)(?:\.[a-z]+)?[!.]?$/i.test(text);
+        }).join('\n');
+        if (clean !== cue.text) cue.text = clean;
+      }
+      return cues.some(cue => typeof cue.text === 'string' && cue.text.trim() && cue.endTime > cue.startTime);
+    }
+    video.textTracks?.addEventListener('addtrack', event => {
+      const track = event.track;
+      if (!['captions','subtitles'].includes(track.kind)) return;
+      track.addEventListener('cuechange', () => cleanCaptionTrack(track));
+    });
     video.addEventListener('loadedmetadata', () => {
       if (resume > 0 && Number.isFinite(video.duration)) video.currentTime = Math.min(resume, video.duration);
       resume = 0;
@@ -256,7 +301,6 @@ window.PWAPlayer = (() => {
           break;
       }
     };
-    overlay.classList.toggle('local-player-rotated', matchMedia('(orientation: portrait)').matches);
     document.body.append(overlay);
     document.body.classList.add('local-player-open');
     updateNext();
