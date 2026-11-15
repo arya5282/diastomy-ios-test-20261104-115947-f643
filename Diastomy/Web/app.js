@@ -527,9 +527,12 @@
         state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => episode.videos).filter(videos => videos.length) : [data.videos || []];
         const episodeList = data.episodes || [];
         const seasons = [...new Set(episodeList.map(episode => episode.season))];
-        const episodes = seasons.length ? '<div class="reference-season-controls"><button type="button" id="series-season" aria-haspopup="dialog">فصل ' +
-          number(seasons[0]) + '</button><button type="button" id="series-sort" aria-label="مرتب‌سازی بر اساس" aria-haspopup="dialog"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></button></div>' +
-          '<dialog id="episode-choice" class="episode-choice"><form method="dialog"><button aria-label="بستن">×</button></form><h2></h2><div></div></dialog><div id="series-episodes"></div>' :
+        const episodes = seasons.length ? '<div class="reference-season-controls" dir="rtl">' +
+          '<div class="reference-season-picker"><button type="button" id="series-season" aria-expanded="false" aria-controls="series-season-options"><span>فصل ' +
+          number(seasons[0]) + '</span><svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7"/></svg></button>' +
+          '<div class="episode-options" id="series-season-options" hidden></div></div>' +
+          '<div class="reference-sort-picker"><button type="button" id="series-sort" aria-label="مرتب‌سازی قسمت‌ها" aria-expanded="false" aria-controls="series-sort-options"><svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></button>' +
+          '<div class="episode-options" id="series-sort-options" hidden></div></div></div><div id="series-episodes"></div>' :
           empty('قسمت یا منبع قابل پخش موجود نیست.');
         mount(PWA.detail({...data,type:kind}, episodes));
         const summary = $('.dm-film-description');
@@ -564,24 +567,37 @@
             const items = episodeList.filter(episode => episode.season === currentSeason).sort((a,b) => direction * (a.number - b.number));
             $('#series-episodes').innerHTML = PWA.episodeCards(data, items, watchState, slug);
           };
-          function choose(title, options, selected, onSelect) {
-            const dialog = $('#episode-choice');
-            dialog.querySelector('h2').textContent = title;
-            dialog.querySelector('div').replaceChildren(...options.map(([value,label]) => {
+          function setupEpisodeMenu(trigger, options, selected, onSelect) {
+            const list = document.getElementById(trigger.getAttribute('aria-controls'));
+            list.replaceChildren(...options.map(([value,label]) => {
               const button = document.createElement('button');
               button.type = 'button';
               button.textContent = label;
-              button.setAttribute('aria-pressed', String(value === selected));
-              button.onclick = () => { onSelect(value); renderEpisodes(); dialog.close(); };
+              button.setAttribute('aria-pressed', String(value === selected()));
+              button.onclick = () => {
+                onSelect(value);
+                list.querySelector('[aria-pressed=true]')?.setAttribute('aria-pressed', 'false');
+                button.setAttribute('aria-pressed', 'true');
+                renderEpisodes();
+                closeEpisodeMenus();
+                trigger.focus({preventScroll:true});
+              };
               return button;
             }));
-            dialog.showModal();
+            trigger.onclick = () => {
+              const open = list.hidden;
+              closeEpisodeMenus();
+              if (open) {
+                list.hidden = false;
+                trigger.setAttribute('aria-expanded','true');
+              }
+            };
           }
-          season.onclick = () => choose('انتخاب فصل', seasons.map(value => [value, 'فصل ' + number(value)]), currentSeason, value => {
+          setupEpisodeMenu(season, seasons.map(value => [value, 'فصل ' + number(value)]), () => currentSeason, value => {
             currentSeason = value;
-            season.textContent = 'فصل ' + number(value);
+            season.querySelector('span').textContent = 'فصل ' + number(value);
           });
-          sort.onclick = () => choose('مرتب‌سازی بر اساس', [[1,'از قسمت اول'],[-1,'از آخرین قسمت']], direction, value => { direction = value; });
+          setupEpisodeMenu(sort, [[-1,'جدیدترین'],[1,'قدیمی‌ترین']], () => direction, value => { direction = value; });
           renderEpisodes();
           api('/movie/api/watch-state/series/' + enc(slug) + '/').then(result => {
             whenCurrent(seq, () => { watchState = result.items || {}; renderEpisodes(); });
@@ -660,6 +676,21 @@
       });
     } catch (error) { whenCurrent(seq, () => mount(shell('جزئیات عنوان', empty(error.message)))); }
   }
+  function closeEpisodeMenus() {
+    const trigger = $('.reference-season-controls button[aria-expanded=true]');
+    if (!trigger) return;
+    document.getElementById(trigger.getAttribute('aria-controls')).hidden = true;
+    trigger.setAttribute('aria-expanded','false');
+    return trigger;
+  }
+  document.addEventListener('click', event => {
+    if (!event.target.closest('.reference-season-controls')) closeEpisodeMenus();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const trigger = closeEpisodeMenus();
+    if (trigger) { event.preventDefault(); trigger.focus({preventScroll:true}); }
+  });
   document.addEventListener('click', event => {
     const link = event.target.closest('a[href^="#/actor/"]');
     if (link && !location.hash.startsWith('#/actor/')) state.actorBack = location.hash;
@@ -1867,7 +1898,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۴ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۵ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {

@@ -210,7 +210,8 @@ window.PWA = (() => {
       '<div class="dm-film-media">' + (item.age_limit != null ? '<span class="reference-age">' + esc(item.age_limit) + '</span>' : '') +
       (play ? '<button type="button" data-play="' + esc(play.id) + '" data-kind="' + (series ? 'series' : 'movie') + '" class="reference-media-hd" aria-label="پخش HD">' + PWA_SOURCE.detailHD + '</button>' : '') +
       '<button type="button" id="film-comments" aria-label="دیدگاه‌ها">' + esc(item.comment_count ?? (item.comments || []).length) + PWA_SOURCE.detailComments + '</button>' +
-      ((series && options.length || options.some(option => option.variant === 'dubbed')) ? '<button type="button" id="film-audio" aria-label="نسخه دوبله">' + PWA_SOURCE.detailAudio + '</button>' : '') +
+      (options.some(option => option.variant === 'dubbed') ? '<button type="button" id="film-audio" class="reference-ad" aria-label="نسخه دوبله">' + PWA_SOURCE.detailAudio + '</button>' :
+        series ? '<span class="reference-ad" role="img" aria-label="AD">' + PWA_SOURCE.detailAudio + '</span>' : '') +
       (play ? '<span class="reference-media-dolby" role="img" aria-label="Dolby Vision">' + PWA_SOURCE.detailDolby + '</span>' : '') + '</div>' +
       '<div class="dm-film-buttons reference-film-actions" dir="ltr">' +
         (play ? '<button type="button" data-play="' + esc(play.id) + '" data-kind="' + (series ? 'series' : 'movie') + '">Play ' + PWA_SOURCE.detailPlay + '</button>' :
@@ -228,7 +229,8 @@ window.PWA = (() => {
       (item.type === 'series' ? '<div data-detail-panel="episodes">' + episodes + '</div>' : '') +
       '<div data-detail-panel="comments"' + (item.type === 'series' ? ' hidden' : '') + '><div class="local-comments-head"><h2>دیدگاه‌های ' +
       name(item) + '</h2><small>' + esc(item.comment_count ?? (item.comments || []).length) + ' دیدگاه</small></div>' +
-      '<form id="title-comment"><label class="local-comment-spoiler"><input type="checkbox" name="spoiler"> این نظر حاوی اسپویل است</label>' +
+      '<form id="title-comment"><label class="local-comment-spoiler"><input type="checkbox" name="spoiler"><span class="local-spoiler-check" aria-hidden="true">' +
+      '<svg viewBox="0 0 12 12" fill="none"><path d="m2.5 6 2.3 2.3 4.7-4.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> این نظر حاوی اسپویل است</label>' +
       '<div class="local-comment-compose"><textarea name="text" rows="1" aria-label="دیدگاه" placeholder="نظرت رو اینجا بنویس ..." maxlength="2000" required></textarea>' +
       '<button type="submit" aria-label="ارسال دیدگاه"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 3 3 10l8 3 3 8 7-18Z"/><path d="m11 13 10-10"/></svg></button></div>' +
       '<p id="title-comment-status" role="status"></p></form>' +
@@ -287,8 +289,8 @@ window.PWA = (() => {
         '"><img alt="" src="' + genreArt[key] + '"><span>' + key.toUpperCase() + '</span></a>';
     });
     return '<h2>ژانرها</h2><div class="dm-search-genres" dir="ltr">' + tiles.slice(0,12).join('') +
-      '</div><div id="search-genres-extra" aria-hidden="true" inert><div class="dm-search-genres" dir="ltr">' +
-      tiles.slice(12).join('') + '</div></div><button id="search-genres-toggle" type="button" aria-controls="search-genres-extra" aria-expanded="false">' +
+      '</div><div id="search-genres-extra" aria-hidden="true" inert><div class="search-extra-clip"><div class="dm-search-genres" dir="ltr">' +
+      tiles.slice(12).join('') + '</div></div></div><button id="search-genres-toggle" type="button" aria-controls="search-genres-extra" aria-expanded="false">' +
       '── دیدن ژانرهای بیشتر ──</button><h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
       recommendations.map(card).join('') + '</div>';
   }
