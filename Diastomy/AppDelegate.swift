@@ -157,6 +157,16 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
         }
     }
 
+    func openSearchTab(from source: BrowserViewController) -> Bool {
+        guard selectedViewController === source,
+              let search = viewControllers?.first(where: {
+                  ($0 as? BrowserViewController)?.initialTabRoute == "search"
+              }) else { return false }
+        selectedViewController = search
+        updateTabBar()
+        return true
+    }
+
     func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
         if viewController === selectedViewController {
             (viewController as? BrowserViewController)?.scrollTabToTop()

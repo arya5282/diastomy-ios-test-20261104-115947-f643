@@ -487,6 +487,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             showsNativeTabBar = visible
             (tabBarController as? DiastomyTabController)?.updateTabBar()
             replyHandler(["ok": true], nil)
+        } else if action == "openSearchTab" {
+            let opened = (tabBarController as? DiastomyTabController)?.openSearchTab(from: self) ?? false
+            replyHandler(["ok": opened], nil)
         } else if action == "nativeTabSessionEnded" {
             (tabBarController as? DiastomyTabController)?.clearOtherTabs(except: self)
             replyHandler(["ok": true], nil)
