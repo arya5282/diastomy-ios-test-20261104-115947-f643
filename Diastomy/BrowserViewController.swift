@@ -93,8 +93,11 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         configuration.userContentController.addUserScript(WKUserScript(source: """
             document.documentElement.classList.add('diastomy-native-tabs');
-            \(isSecondaryTab ? "document.documentElement.classList.add('diastomy-secondary-tab');" : "")
             """, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+        if isSecondaryTab {
+            configuration.userContentController.addUserScript(WKUserScript(source: "window.diastomySecondaryTab = true;",
+                injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
         configuration.applicationNameForUserAgent = "DiastomyIOS/2.0"
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self

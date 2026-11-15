@@ -1644,7 +1644,7 @@
     const name = parts[0] || 'home';
     if (state.checkingSession || (!state.sessionKnown && !state.user)) {
       PWA.page('startup');
-      if (state.checkingSession && document.documentElement.classList.contains('diastomy-secondary-tab')) {
+      if (state.checkingSession && window.diastomySecondaryTab === true) {
         mount('<div class="loading" role="status" aria-label="در حال بارگذاری"></div>');
         return;
       }
@@ -1663,7 +1663,7 @@
     }
     const footerDrag = $('#dm-app-bottom-nav').hasAttribute('data-footer-dragging');
     const animateRoute = path !== previousRoute && !footerDrag;
-    const firstSecondaryRoute = !previousRoute && document.documentElement.classList.contains('diastomy-secondary-tab');
+    const firstSecondaryRoute = !previousRoute && window.diastomySecondaryTab === true;
     previousRoute = path;
     const loadingTimer = animateRoute && !firstSecondaryRoute && !['login','otp','forgot'].includes(name)
       ? setTimeout(() => whenCurrent(seq, () => { if (!document.activeElement?.matches('.reference-search-form input')) loader.hidden = false; }), 100) : null;
