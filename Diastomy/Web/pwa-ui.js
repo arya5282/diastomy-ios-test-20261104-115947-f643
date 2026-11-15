@@ -109,8 +109,8 @@ window.PWA = (() => {
     const sections = new Map();
     const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'romance', 'family', 'musical', 'documentary', 'animation', 'art', 'kids'];
     const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
-      illustratedGenres.map(slug => '<a class="dm54-genre dm-home-original-genre" href="#/browse/all?genre=' + slug +
-        '"><img loading="lazy" alt="" src="' + genreArt[slug] + '"><span class="dm-home-genre-label">' +
+      illustratedGenres.map((slug,index) => '<a class="home-genre-card" data-genre="' + slug + '" href="#/browse/all?genre=' + slug +
+        '"><img' + (index < 3 ? '' : ' loading="lazy"') + ' decoding="async" draggable="false" alt="" src="' + genreArt[slug] + '"><span>' +
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
     const continueHTML = history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
       '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';

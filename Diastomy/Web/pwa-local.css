@@ -607,9 +607,6 @@ body[data-page=my-library] #app .library-grid{direction:ltr;column-gap:clamp(14p
 #app .local-library-saved .dm54-old-genres{display:block;margin-top:1px;font:8px/12px Arial,sans-serif;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 #app .local-library-saved .library-heart{display:grid;place-items:center;right:4px;top:4px;width:22px;height:22px;min-width:0;min-height:0;padding:0;border:0;border-radius:50%;background:rgba(145,153,160,.60);color:#ed0000}
 #app .local-library-saved .library-heart svg{width:19px;height:19px}
-body[data-page=home] #app .dm54-genre-track{direction:rtl;gap:8px;padding-inline:16px}
-body[data-page=home] #app .dm54-genre-track .dm54-genre{box-sizing:border-box;display:grid!important;place-items:center!important;flex:0 0 113px!important;width:113px!important;height:66px!important;min-height:66px!important;padding:0!important;border:1px solid #ffffff45;border-radius:9px;overflow:hidden}
-body[data-page=home] #app .dm54-genre-track .dm54-genre span{position:relative!important;inset:auto!important;margin:0!important;text-align:center!important;font:750 11px/1.2 "PWA Inter",Arial,sans-serif!important}
 @media(max-width:767px) and (prefers-reduced-motion:no-preference){
   html.dmf3-active body[data-page=home] #app .nyx-prime-slide :is(.nyx-prime-copy > h2,.nyx-prime-meta,.nyx-prime-trend,.nyx-prime-premium,.nyx-prime-brand){
     opacity:var(--hero-text-opacity,1)!important;
@@ -634,9 +631,6 @@ body[data-page=home] #app .dm54-genre-track .dm54-genre span{position:relative!i
 #app .film-download-format{grid-column:1/-1;display:flex;justify-content:space-between;color:#888;font-size:13px}
 #app .film-download-card button{display:flex;justify-content:center;align-items:center;gap:6px;min-height:35px;padding:6px;font-size:12px;line-height:18px}
 #app .film-download-card button svg{display:block;width:18px;height:18px;flex:none}
-body[data-page=home] #app .dm54-genre-track .dm-home-original-genre{position:relative;isolation:isolate;flex-basis:calc((100vw - 64px)/3)!important;width:calc((100vw - 64px)/3)!important;min-width:0!important}
-#app .dm-home-original-genre img{position:absolute;inset:0;display:block!important;width:100%;height:100%;object-fit:cover;z-index:-1}
-#app .dm-home-original-genre .dm-home-genre-label{font:800 10.5px/16px Arial,sans-serif!important;letter-spacing:.3px;text-shadow:0 1px 3px #0006}
 #route-loading[hidden]{display:none}
 #route-loading{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;background:#000;animation:route-slide-in 220ms ease-out}
 #route-loading>div{display:grid;justify-items:center;gap:15px;background:#171719;border:1px solid #29292c;border-radius:14px;padding:17px 26px;color:#bdbdbd;font:12px/18px "PWA Inter",Arial,sans-serif}
@@ -961,7 +955,6 @@ html.dmf3-active body[data-page=home] #pwa-header .dmf3-search{border-color:#850
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots{gap:2px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-hero{margin-bottom:8px!important}
 html.dmf3-active body[data-page=home] #app .dm-pwa-home-v54>section:is(.dm54-section,.dm54-genres){margin-bottom:25px!important}
-body[data-page=home] #app .dm54-genre-track .dm54-genre.dm-home-original-genre{flex-basis:clamp(135px,38vw,195px)!important;width:clamp(135px,38vw,195px)!important;height:auto!important;aspect-ratio:1.73;min-height:0!important}
 #app .dm54-rating b{font-family:Arial,sans-serif!important;font-variant-numeric:tabular-nums}
 #app .dm54-rating{gap:2px!important}
 #app .dm54-rating svg{width:10px!important;height:10px!important}
@@ -988,10 +981,27 @@ body[data-page=home] #app .dm54-genre-track .dm54-genre.dm-home-original-genre{f
 /* UIKit provides the tab bar in the installed app. */
 html.diastomy-native-tabs #pwa-nav{display:none!important}
 
-html.dmf3-active body[data-page="home"] .dmf3-root #app .dm54-genres{height:auto!important}
-html.dmf3-active body[data-page="home"] .dmf3-root #app .dm54-genres .dm54-genre-track{height:auto!important}
-html.dmf3-active body[data-page="home"] .dmf3-root #app .dm54-genres .dm54-genre-track .dm-home-original-genre{
-  max-width:none!important;height:auto!important;min-height:0!important;aspect-ratio:1.73;
+html.dmf3-active body[data-page=home] .dmf3-root #app .dm54-genres{height:auto!important;min-height:0!important}
+html.dmf3-active body[data-page=home] .dmf3-root #app .dm54-genres .dm54-genre-track{
+  height:auto!important;direction:rtl!important;gap:7px!important;
+  scroll-snap-type:x proximity;scroll-padding-inline:16px;
+}
+#app .home-genre-card{
+  position:relative;isolation:isolate;box-sizing:border-box;
+  display:grid;place-items:center;flex:0 0 min(128px,calc((100% - 14px)/3));aspect-ratio:16/9;
+  min-width:0;overflow:hidden;border:1px solid #ffffff32;border-radius:8px;background:#17171a;
+  color:white;scroll-snap-align:start;
+}
+#app .home-genre-card:focus-visible{outline:1px solid white;outline-offset:-3px}
+#app .home-genre-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center var(--genre-crop,50%)}
+#app .home-genre-card[data-genre=drama]{--genre-crop:45%}
+#app .home-genre-card[data-genre=adventure]{--genre-crop:65%}
+#app .home-genre-card[data-genre=fantasy]{--genre-crop:58%}
+#app .home-genre-card::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0000 12%,#0003 60%,#0005)}
+#app .home-genre-card span{
+  position:relative;z-index:1;max-width:100%;padding-inline:3px;
+  font:750 clamp(8.5px,2.65vw,10px)/1.2 "PWA Inter",Arial,sans-serif;
+  letter-spacing:.2px;text-align:center;text-shadow:0 1px 3px #000b;
 }
 
 body[data-page=search] #app{padding-top:0}
