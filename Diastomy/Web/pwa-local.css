@@ -1012,11 +1012,12 @@ body:is([data-page=local-rooms],[data-page=local-room]) #app>.library-header{
 }
 body #app .local-room-landing .mr-exact-viewport{
   position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:100%;direction:ltr;
-  overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:18px;
+  overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:18px;touch-action:auto;
 }
 body #app .local-room-landing .mr-exact-viewport::-webkit-scrollbar{display:none}
 body #app .local-room-landing .mr-exact-slide{
-  display:block;box-sizing:border-box;min-width:0;width:100%;height:auto;aspect-ratio:540/190;
+  position:static;display:block;opacity:1;visibility:visible;pointer-events:auto;
+  box-sizing:border-box;min-width:0;width:100%;height:auto;aspect-ratio:540/190;
   padding:0;border:0;border-radius:0;background:#141414;scroll-snap-align:start;scroll-snap-stop:always;
   -webkit-tap-highlight-color:transparent;
 }
