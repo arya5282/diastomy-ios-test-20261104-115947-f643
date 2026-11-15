@@ -411,7 +411,10 @@ def rooms(request):
             with transaction.atomic():
                 room = services.create_room(request.user, body.get('movie_id'), body.get('title'),
                                             starts_at, is_public=body.get('public') is True)
-                created = room_payload(room, request.user)
+                videos = room_videos(room.movie)
+                if not videos:
+                    raise ValueError('این فیلم فعلاً منبع پخش ندارد. فیلم دیگری انتخاب کن.')
+                created = room_payload(room, request.user, videos=videos)
         except (ValueError, TypeError, AttributeError) as error:
             return JsonResponse({'error': str(error)}, status=400)
         return JsonResponse({'code': room.code, 'room': created})
@@ -436,19 +439,47 @@ def room_detail(request, code):
     return JsonResponse(room_payload(room, request.user))
 
 
-def room_payload(room, user):
+def room_videos(movie):
+    return [{'id': video.pk, 'quality': video.quality.title}
+            for video in movie.videos.select_related('quality').order_by('-quality__weight')
+            if direct_url_usable(video)]
+
+
+def room_payload(room, user, *, videos=None):
     import time
     from watchparty import services
 
     allowed = services.can_watch_room(user, room)
-    videos = [{'id': x.pk, 'quality': x.quality.title}
-              for x in room.movie.videos.select_related('quality').order_by('-quality__weight')
-              if direct_url_usable(x)] if allowed else []
+    if allowed and videos is None:
+        videos = room_videos(room.movie)
     return {'code': room.code, 'title': room.display_title,
             'is_host': room.host_id == user.pk, 'can_watch': allowed,
             'cover': file_url(room.movie.cover), 'starts_at': room.starts_at.isoformat(),
             'host': room.host.full_name or room.host.username,
-            'videos': videos, 'state': room.state_dict(), 'server_ts': time.time()}
+            'videos': videos if allowed else [], 'state': room.state_dict(), 'server_ts': time.time()}
+
+
+@private
+@require_GET
+def room_movies(request):
+    from django.db.models import Prefetch, Q
+    from watchparty.services import playable_movies
+
+    query = request.GET.get('q', '').strip()[:120]
+    movies = playable_movies()
+    if query:
+        movies = movies.filter(Q(title__icontains=query) | Q(english_title_primary__icontains=query) |
+                               Q(english_title_secondary__icontains=query))
+    movies = movies.prefetch_related('genres', Prefetch(
+        'videos', queryset=MovieVideo.objects.exclude(direct_download_url='').only('movie_id', 'direct_download_url'),
+        to_attr='room_sources'))
+    results = []
+    for movie in movies.iterator(chunk_size=48):
+        if any(direct_url_usable(video) for video in movie.room_sources):
+            results.append(card(movie))
+            if len(results) == 12:
+                break
+    return JsonResponse({'results': results})
 
 
 @require_GET
@@ -477,5 +508,5 @@ urlpatterns = [
     path('title/<str:kind>/<slug:slug>/comments/', add_title_comment),
     path('playback/<str:kind>/<int:video_id>/', playback),
     path('library/', library), path('settings/', settings),
-    path('rooms/', rooms), path('rooms/<str:code>/', room_detail),
+    path('rooms/', rooms), path('rooms/movies/', room_movies), path('rooms/<str:code>/', room_detail),
 ]

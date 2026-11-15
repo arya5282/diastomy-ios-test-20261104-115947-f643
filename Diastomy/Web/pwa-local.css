@@ -1003,7 +1003,6 @@ body[data-page=my-library] #app .library-shell{padding-top:0}
 body[data-page=my-library] #app .library-tabs{direction:ltr;margin:0 0 16px!important}
 body[data-page=my-library] #app .library-tabs button{direction:rtl;padding:5px 2px 8px!important;font-size:15px;line-height:20px}
 body[data-page=my-library] #app .library-tabs button[aria-selected=true]::after{inset-inline:12%;height:2px;box-shadow:none}
-.library-downloads-toggle{display:block;margin:18px auto}
 #app :is(.dm-search-recommendations,.local-room-movies) .dm54-rating{left:4px;right:auto;top:4px;padding:2px 5px;border-radius:99px;background:#292b33;color:white;font:9px/12px Arial,sans-serif}
 #app .dm54-rating svg,#app .dm54-rating svg path{fill:#ff671d!important}
 
@@ -1038,6 +1037,20 @@ body #app .local-room-date-field{position:relative;display:flex;align-items:cent
 body #app .local-room-date-field input[type=datetime-local]{position:absolute;inset:0;box-sizing:border-box;width:100%;height:100%;min-width:0;margin:0;opacity:0}
 body #app .local-room-date-field:focus-within{border-color:#888}
 body #app .local-room-date-field:has(:disabled){color:#888}
+#app .local-room-chat{border-radius:16px}
+#app .local-room-chat>header{height:auto;min-height:0;max-height:none;gap:8px;padding:10px 12px}
+#app .local-room-chat>header strong{min-width:0;font-size:13px;overflow-wrap:anywhere}
+#app .local-room-chat>header small{flex:none;font-size:10px}
+#app .local-room-chat #room-chat{min-height:112px;max-height:240px;padding:8px 12px}
+#app .local-room-reactions{gap:1px;padding:3px 7px}
+#app .local-room-reactions button{width:29px;min-width:0;min-height:30px;padding:0;font-size:15px}
+#app #room-chat-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;margin:0;padding:7px 9px;border:0;background:none}
+#app #room-chat-form input{width:100%;min-height:36px;box-sizing:border-box;padding:7px 10px}
+#app #room-chat-form button{min-height:36px;padding:5px 12px;font-size:12px}
+#app #room-chat-form-status:not(:empty){margin:0;padding:0 10px 8px}
+#app .local-room-controls :is(button,select):focus{outline:none!important;border-color:#444;box-shadow:none!important}
+#app .local-room-controls :is(button,select):focus-visible{outline:1px solid #aaa!important;outline-offset:2px}
+#app .local-room-controls select{-webkit-tap-highlight-color:transparent}
 #app .local-room-movies{grid-template-columns:repeat(3,minmax(0,26%));justify-content:space-between;gap:13px 0}
 #app .local-room-movies .dm54-vcard{width:100%;min-width:0}
 #app .local-room-movies .dm54-poster{height:auto;aspect-ratio:4/5}
