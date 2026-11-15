@@ -980,3 +980,9 @@ body[data-page=home] #app .dm54-genre-track .dm54-genre.dm-home-original-genre{f
 
 /* UIKit provides the tab bar in the installed app. */
 html.diastomy-native-tabs #pwa-nav{display:none!important}
+
+html.dmf3-active body[data-page="home"] .dmf3-root #app .dm54-genres{height:auto!important}
+html.dmf3-active body[data-page="home"] .dmf3-root #app .dm54-genres .dm54-genre-track{height:auto!important}
+html.dmf3-active body[data-page="home"] .dmf3-root #app .dm54-genres .dm54-genre-track .dm-home-original-genre{
+  max-width:none!important;height:auto!important;min-height:0!important;aspect-ratio:1.73;
+}
