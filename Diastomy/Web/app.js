@@ -669,9 +669,24 @@
           document.querySelector('.actions').appendChild(create);
           create.onclick = async () => { try { const result = await api('/api/app/v1/rooms/', { body: { movie_id: data.id, title: data.title } }); location.hash = '#/room/' + enc(result.code); } catch (error) { toast(error.message); } };
         }
-        $('#bookmark').onclick = async () => {
-          try { const result = await api('/api/bookmark/toggle/?item_type=' + enc(kind) + '&item_id=' + data.id, { body: {} }); toast(result.message || 'لیست به‌روز شد.'); }
-          catch (error) { toast(error.message); }
+        const bookmark = $('#bookmark');
+        let bookmarkTouched = false;
+        api('/api/app/v1/library/').then(result => whenCurrent(seq, () => {
+          if (!bookmarkTouched) bookmark.setAttribute('aria-pressed', String((result.saved || []).some(item =>
+            item.type === kind && Number(item.id) === Number(data.id))));
+        })).catch(() => {});
+        bookmark.onclick = async () => {
+          if (bookmark.disabled) return;
+          bookmarkTouched = true;
+          bookmark.disabled = true;
+          try {
+            const result = await api('/api/bookmark/toggle/?item_type=' + enc(kind) + '&item_id=' + data.id, {body:{}});
+            whenCurrent(seq, () => {
+              bookmark.setAttribute('aria-pressed', String(result.is_bookmarked === true));
+              toast(result.message || 'لیست به‌روز شد.');
+            });
+          } catch (error) { whenCurrent(seq, () => toast(error.message)); }
+          finally { bookmark.disabled = false; }
         };
       });
     } catch (error) { whenCurrent(seq, () => mount(shell('جزئیات عنوان', empty(error.message)))); }
@@ -1898,7 +1913,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۷ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1978,6 +1993,36 @@
   }
   PWA.install();
   const root = document.documentElement;
+  let lastNativeTitleState, lastNativeTopbar, nativeTitleFrame = 0;
+  function scheduleNativeTitleButtons() {
+    if (!root.classList.contains('diastomy-native-tabs') || nativeTitleFrame) return;
+    nativeTitleFrame = requestAnimationFrame(() => {
+      nativeTitleFrame = 0;
+      const topbar = $('.dm-film-topbar');
+      const bookmark = topbar?.querySelector('#bookmark');
+      const back = topbar?.querySelector('a');
+      let payload = {action:'nativeTitleButtons', visible:false};
+      if (bookmark && back && !document.body.classList.contains('local-player-open') &&
+          !root.classList.contains('dm-trailer-is-fullscreen') && !$('#dm-playback-choice') && !document.querySelector('dialog[open]')) {
+        const bounds = back.getBoundingClientRect();
+        const heart = bookmark.getBoundingClientRect();
+        if (bounds.height && bounds.bottom > 0 && bounds.top < innerHeight) {
+          payload = {...payload, visible:true, y:bounds.top + bounds.height / 2,
+            backX:bounds.left + bounds.width / 2, bookmarkX:heart.left + heart.width / 2,
+            saved:bookmark.getAttribute('aria-pressed') === 'true', busy:bookmark.disabled};
+        }
+      }
+      const key = JSON.stringify(payload);
+      if (key === lastNativeTitleState && topbar === lastNativeTopbar) return;
+      lastNativeTitleState = key;
+      lastNativeTopbar = topbar;
+      native(payload).then(result => {
+        if (topbar?.isConnected && topbar === lastNativeTopbar && key === lastNativeTitleState) {
+          topbar.classList.toggle('native-title-buttons', result.ok === true);
+        }
+      }).catch(() => { lastNativeTitleState = undefined; });
+    });
+  }
   let lastNativeTabState;
   function syncNativeTabBar() {
     if (!root.classList.contains('diastomy-native-tabs')) return;
@@ -1995,6 +2040,12 @@
   nativeTabObserver.observe(root,{attributes:true,attributeFilter:['class']});
   nativeTabObserver.observe(document.body,{attributes:true,attributeFilter:['class','data-page']});
   new MutationObserver(syncNativeTabBar).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']});
+  new MutationObserver(scheduleNativeTitleButtons).observe(document.body,{
+    subtree:true,childList:true,attributes:true,attributeFilter:['class','open','aria-pressed','disabled']
+  });
+  new MutationObserver(scheduleNativeTitleButtons).observe(root,{attributes:true,attributeFilter:['class']});
+  window.addEventListener('scroll',scheduleNativeTitleButtons,{passive:true});
+  window.addEventListener('resize',scheduleNativeTitleButtons,{passive:true});
   syncNativeTabBar();
   checkStartupSession();
 })();

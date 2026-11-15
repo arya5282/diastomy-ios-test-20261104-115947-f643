@@ -35,6 +35,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     private var webView: WKWebView!
+    private var titleBackButton: UIButton?
+    private var titleBookmarkButton: UIButton?
     private let server = URL(string: "https://diastomy.top")!
     private var webRoot: URL!
     private var startupPanel: UIView?
@@ -119,7 +121,71 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         loadBundledInterface()
     }
 
+    private func updateNativeTitleButtons(_ data: [String: Any]) -> Bool {
+        guard #available(iOS 26.0, *) else { return false }
+        let size: CGFloat = 44
+        guard data["visible"] as? Bool == true,
+              let y = data["y"] as? Double, let backX = data["backX"] as? Double,
+              let bookmarkX = data["bookmarkX"] as? Double,
+              [y, backX, bookmarkX].allSatisfy(\.isFinite) else {
+            titleBackButton?.isHidden = true
+            titleBookmarkButton?.isHidden = true
+            return true
+        }
+        let backCenter = webView.convert(CGPoint(x: backX, y: y), to: view)
+        let bookmarkCenter = webView.convert(CGPoint(x: bookmarkX, y: y), to: view)
+        let safeFrame = view.safeAreaLayoutGuide.layoutFrame
+        let visible = backCenter.y >= safeFrame.minY + size / 2 - 1 &&
+            backCenter.y <= safeFrame.maxY - size / 2
+
+        if titleBackButton == nil {
+            titleBackButton = makeTitleButton(id: "title-back", label: "بازگشت", symbol: "chevron.left",
+                                             target: #selector(activateTitleBack))
+            titleBookmarkButton = makeTitleButton(id: "title-bookmark", label: "ذخیره در لیست من", symbol: "heart",
+                                                 target: #selector(activateTitleBookmark))
+        }
+        let saved = data["saved"] as? Bool == true
+        if let bookmark = titleBookmarkButton, bookmark.isSelected != saved {
+            bookmark.isSelected = saved
+            bookmark.configuration?.image = UIImage(systemName: saved ? "heart.fill" : "heart")
+            bookmark.configuration?.baseForegroundColor = saved ? .systemRed : .white
+            bookmark.accessibilityLabel = saved ? "حذف از لیست من" : "ذخیره در لیست من"
+        }
+        titleBookmarkButton?.isEnabled = data["busy"] as? Bool != true
+        for (button, center) in [(titleBackButton, backCenter), (titleBookmarkButton, bookmarkCenter)] {
+            button?.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+            button?.center = CGPoint(x: min(max(center.x, safeFrame.minX + size / 2), safeFrame.maxX - size / 2), y: center.y)
+            button?.isHidden = !visible
+        }
+        return true
+    }
+
+    @available(iOS 26.0, *)
+    private func makeTitleButton(id: String, label: String, symbol: String, target: Selector) -> UIButton {
+        var configuration = UIButton.Configuration.glass()
+        configuration.cornerStyle = .capsule
+        configuration.image = UIImage(systemName: symbol)
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)
+        configuration.baseForegroundColor = .white
+        let button = UIButton(configuration: configuration)
+        button.accessibilityIdentifier = id
+        button.accessibilityLabel = label
+        button.addTarget(self, action: target, for: .touchUpInside)
+        view.addSubview(button)
+        return button
+    }
+
+    @objc private func activateTitleBack() {
+        webView.evaluateJavaScript("document.querySelector('.dm-film-topbar a')?.click()")
+    }
+
+    @objc private func activateTitleBookmark() {
+        webView.evaluateJavaScript("document.querySelector('.dm-film-topbar #bookmark')?.click()")
+    }
+
     private func loadBundledInterface() {
+        titleBackButton?.isHidden = true
+        titleBookmarkButton?.isHidden = true
         startupTimer?.invalidate()
         startupNavigation = nil
         startupDocumentCommitted = false
@@ -487,6 +553,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             showsNativeTabBar = visible
             (tabBarController as? DiastomyTabController)?.updateTabBar()
             replyHandler(["ok": true], nil)
+        } else if action == "nativeTitleButtons" {
+            replyHandler(["ok": updateNativeTitleButtons(data)], nil)
         } else if action == "openSearchTab" {
             let opened = (tabBarController as? DiastomyTabController)?.openSearchTab(from: self) ?? false
             replyHandler(["ok": opened], nil)

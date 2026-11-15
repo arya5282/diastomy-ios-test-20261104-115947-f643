@@ -203,7 +203,7 @@ window.PWA = (() => {
     const download = '<button type="button" class="reference-download" id="film-download"' +
       (options.length ? '' : ' disabled') + '>Download ' + PWA_SOURCE.detailDownload + '</button>';
     const cast = item.actors || [];
-    return '<article class="movie-detail-shell"><div class="dm-film-topbar" dir="ltr"><a href="#/home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a><button id="bookmark" aria-label="ذخیره در لیست من"><svg viewBox="0 0 24 24"><path d="M12 21S2 15 2 8a5.5 5.5 0 0 1 10-3 5.5 5.5 0 0 1 10 3c0 7-10 13-10 13Z"/></svg></button></div>' +
+    return '<article class="movie-detail-shell"><div class="dm-film-topbar" dir="ltr"><a href="#/home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a><button id="bookmark" aria-label="ذخیره در لیست من" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 21S2 15 2 8a5.5 5.5 0 0 1 10-3 5.5 5.5 0 0 1 10 3c0 7-10 13-10 13Z"/></svg></button></div>' +
       '<div class="movie-detail-hero"><img src="' + media(item.hero_cover || item.banner || item.cover) + '" alt="' + esc(item.title) + '">' + trailerButton + '</div>' +
       '<div class="dm-film-reference-info"><div class="dm-film-title-row"><h1>' + name(item) + '</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<div class="dm-film-meta" dir="ltr">' + (series ? '<span>' + new Set(episodeList.map(episode => episode.season)).size + ' Season</span>' : item.duration ? '<span>' + esc(item.duration) + ' Min</span>' : '') + '<span>' + esc(item.production_year) + '</span><span>' + genres(item) + '</span></div>' +

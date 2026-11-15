@@ -277,6 +277,7 @@ window.PWAPlayer = (() => {
     function audioLabel(index, count) { return count === 1 ? 'صدای اصلی' : 'مسیر صوتی ' + (index + 1); }
     function dismiss() {
       progress(true);
+      document.removeEventListener('keydown', closePanelOnEscape);
       closeCurrent = null;
       revision++;
       stopSurface();
@@ -339,13 +340,15 @@ window.PWAPlayer = (() => {
       if (panel) renderSettings();
     }
     setPanel(null);
-    overlay.onkeydown = event => {
+    function closePanelOnEscape(event) {
       if (event.key === 'Escape' && !settings.hidden) {
         const trigger = get('[aria-expanded=true]');
         setPanel(null);
         trigger?.focus({preventScroll:true});
+        event.preventDefault();
       }
-    };
+    }
+    document.addEventListener('keydown', closePanelOnEscape);
     overlay.onclick = async event => {
       const button = event.target.closest('[data-player]');
       if (!button) {
