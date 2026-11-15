@@ -1059,10 +1059,10 @@ body .reference-film-summary .dm-film-description.expanded{-webkit-line-clamp:un
 .account-notice-item [data-dismiss-notice]{position:absolute;top:4px;left:4px;min-width:32px;min-height:32px;padding:0;border:0;background:none;color:#aaa}
 .account-notice-item h2{padding-inline-end:22px}
 #plans .sub-plan input{width:12px;height:12px}
-#settings-choice header button:focus{outline:none;box-shadow:none}
-#settings-choice header button:focus-visible{border-color:#999}
-#settings-choice :is([data-choice=VeryHigh],[data-choice=High],[data-choice=Medium],[data-choice=Low])>span,
-#settings-quality>span:dir(ltr){font-family:Arial,sans-serif}
+#settings-choice h2:focus,#settings-choice [data-choice-close]:focus{outline:none!important;box-shadow:none!important}
+#settings-choice [data-choice-close]{-webkit-tap-highlight-color:transparent}
+#settings-choice [data-choice-close]:focus-visible{border-color:#999}
+.settings-resolution{font-family:Arial,sans-serif}
 .reference-profile-footer{font-size:11px}
 .reference-profile-footer img{width:132px}
 body[data-page=local-followed-actors] #app .settings-follow-row{margin:0 0 8px}

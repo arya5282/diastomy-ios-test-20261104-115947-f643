@@ -1331,12 +1331,22 @@
     const dialog = $('#settings-choice');
     const trigger = $('#settings-' + key);
     const selected = () => choices.find(([value]) => value === state.user[key]) || choices[0];
-    trigger.querySelector('span').textContent = selected()[1];
+    const isResolution = value => key === 'quality' && value !== 'AUTO';
+    const renderTrigger = () => {
+      const [value,label] = selected();
+      const text = trigger.querySelector('span');
+      text.textContent = label;
+      text.dir = isResolution(value) ? 'ltr' : 'auto';
+      text.classList.toggle('settings-resolution', isResolution(value));
+    };
+    renderTrigger();
     trigger.onclick = () => {
-      dialog.innerHTML = '<div class="settings-sheet-handle" aria-hidden="true"></div><header><div><h2>' + title +
+      dialog.innerHTML = '<div class="settings-sheet-handle" aria-hidden="true"></div><header><div><h2 tabindex="-1" autofocus>' + title +
         '</h2>' + (caption ? '<p>' + caption + '</p>' : '') + '</div><button type="button" aria-label="بستن" data-choice-close>×</button></header>' +
         choices.map(([value,label,note]) => '<button type="button" class="settings-choice-option" data-choice="' + value +
-          '" aria-pressed="' + (value === selected()[0]) + '"><span>' + label + '<small>' + note + '</small></span><i aria-hidden="true"></i></button>').join('') +
+          '" aria-pressed="' + (value === selected()[0]) + '"><span>' +
+          (isResolution(value) ? '<bdi class="settings-resolution" dir="ltr">' + label + '</bdi>' : label) +
+          '<small>' + note + '</small></span><i aria-hidden="true"></i></button>').join('') +
         (key === 'quality' ? '<p class="settings-choice-help">اگر کیفیت انتخابی موجود نباشد، نزدیک‌ترین کیفیت پایین‌تر پخش می‌شود.</p>' : '') +
         '<p class="settings-choice-error" role="status"></p>';
       dialog.showModal();
@@ -1350,7 +1360,7 @@
           const result = await api(endpoint, {body:{[key]:value}});
           if (result.success === false) throw Error(result.error || 'ذخیره نشد.');
           state.user[key] = result[key] || value;
-          trigger.querySelector('span').textContent = selected()[1];
+          renderTrigger();
           dialog.close();
         } catch (error) { dialog.querySelector('.settings-choice-error').textContent = error.message; }
         finally { options.forEach(option => { option.disabled = false; }); }
@@ -1823,7 +1833,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۵۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
