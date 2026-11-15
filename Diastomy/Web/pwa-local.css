@@ -145,12 +145,6 @@ body[data-page=search] #app{padding-inline:16px}
 body #app .dmf3-search-discovery{margin-top:14px}
 body #app .dm-search-genre{position:relative;min-width:0;min-height:68px;overflow:hidden}
 body #app .dm-search-genre span{z-index:1}
-body[data-page=archive-reference] #app{padding-inline:16px}
-body #app .archive-reference-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 8px}
-body #app .archive-reference-header{position:relative;inset:auto;background:transparent;display:grid;grid-template-columns:42px minmax(0,1fr) 42px;align-items:center;direction:ltr;text-align:center}
-body #app .archive-reference-header h1{font-size:18px;margin:0}
-body #app .archive-reference-sort{display:flex;gap:8px;align-items:center;margin:16px 0}
-body #app .archive-reference-sort select{width:auto}
 .reference-season{border:0;border-bottom:1px solid #262626;border-radius:0;padding:10px 0}
 .reference-episode{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #222}
 .reference-episode [data-play]{border-radius:20px;color:#fff;background:#dc0000;border:0}
@@ -693,13 +687,19 @@ body[data-page=local-startup]{background:radial-gradient(ellipse at 0 0,#240505,
 #search-suggestion input{display:block;box-sizing:border-box;width:100%;margin:7px 0 12px;background:#181818;border:1px solid #444;border-radius:11px;color:white}
 #search-suggestion button{display:block;margin:0 auto;background:#c90013;color:white;border:0;border-radius:11px;font-size:12px}
 #search-suggestion-status{display:block;text-align:center}
-#app .archive-reference-grid{direction:ltr;gap:24px clamp(14px,8.6vw,34px)}
-#app .archive-reference-header{padding:8px 0;border:0}
-#app .archive-reference-header h1{font:500 14px/24px "PWA Inter",Arial,sans-serif}
-#app .archive-reference-header svg{display:block;width:24px;height:24px}
-#app .archive-reference-header button{background:none;border:0;padding:4px}
-#app .archive-reference-sort{justify-content:flex-start;color:#888;font-size:11px}
-#app .archive-reference-sort select{border:0;background:none;color:#999;font-size:11px}
+body[data-page=archive-reference] .dmf3-root #app{padding:0 0 calc(100px + env(safe-area-inset-bottom,0px))}
+#app .archive-reference-shell{width:100%;max-width:860px;min-height:0;padding:6px 16px 0}
+#app .archive-reference-header{position:relative;inset:auto;min-height:44px;height:auto;padding:0;margin:0 0 10px;border:0;background:transparent;grid-template-columns:44px minmax(0,1fr) 44px;gap:8px}
+#app .archive-reference-header h1{font:650 16px/24px "PWA Yekan","PWA Inter",Arial,sans-serif}
+#app .archive-reference-header :is(a,button){display:grid;place-items:center;width:44px;height:44px;border:0;background:none;padding:0}
+#app .archive-reference-header svg{display:block;width:22px;height:22px}
+#app .archive-reference-sort{min-height:34px;height:auto;justify-content:flex-start;gap:8px;margin:0 0 13px;color:#aaa;font-size:11px}
+#app .archive-reference-sort select{width:auto;min-height:32px;padding:4px 9px;border:1px solid #323232;border-radius:9px;background:#141414;color:#eee;font:inherit}
+#app .archive-reference-grid{grid-template-columns:repeat(3,minmax(0,1fr));direction:ltr;gap:18px clamp(11px,3.6vw,18px)}
+#app .archive-reference-card .dm54-poster{height:auto;aspect-ratio:3/4}
+#app .archive-reference-card .dm54-vmeta strong{font-size:11px;line-height:15px}
+#app .archive-reference-card .dm54-vmeta small{font-size:9px;line-height:13px}
+@media(min-width:650px){#app .archive-reference-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:22px 18px}}
 #app :is(.archive-reference-card,.dm-search-live-results) .dm54-poster{aspect-ratio:3/4;border:1px solid #444;border-radius:8px;box-sizing:border-box}
 #app :is(.archive-reference-card,.dm-search-live-results) .dm54-rating{left:4px;right:auto;top:4px;padding:2px 5px;border-radius:99px;background:#292b33;font:9px/12px Arial,sans-serif}
 #app :is(.archive-reference-card,.dm-search-live-results) .dm54-poster-brand{right:2px;bottom:2px}
@@ -952,7 +952,11 @@ body[data-page=local-support] #app .ar-support-head a{background:none;border:0;w
 #support-feedback:empty,.local-support-chat [hidden]{display:none!important}
 .local-support-empty{align-self:center;color:#aaa;font-size:11px}
 
-html.dmf3-active body[data-page=home] #app .nyx-prime-genres{column-gap:3px!important;font-size:.86em!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-copy .nyx-prime-meta{gap:5px!important;font-size:11px!important;line-height:15px!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-meta :is(.nyx-prime-duration,.nyx-prime-year){font-size:11px!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-meta .nyx-prime-age{min-width:29px!important;width:auto!important;flex:0 0 auto!important;height:15px!important;padding:0 5px!important;font-size:10px!important;line-height:15px!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-genres{column-gap:3px!important;font-size:10px!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-genre-names{gap:4px!important}
 html.dmf3-active body[data-page=home] #pwa-header .dmf3-search{border-color:#850b10!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots{gap:2px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-hero{margin-bottom:8px!important}

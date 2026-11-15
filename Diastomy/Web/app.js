@@ -458,21 +458,22 @@
   }
   async function browse(seq, kind, params) {
     const route = '#/browse/' + enc(kind);
-    const results = '<div id="catalogue"><div class="loading"></div></div>';
-
-      const title = kind === 'movie' ? 'Movies Archive' : kind === 'series' ? 'Series Archive' : 'آرشیو فیلم و سریال';
-      mount('<section class="archive-reference-shell"><header class="archive-reference-header"><a href="#/home" aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</a><h1 data-dm-archive-title dir="auto">' +
-        title + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">' + PWA_SOURCE.actorMenu + '</button></header>' +
-        '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><select id="sort">' +
-        '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="most_viewed">پربازدیدترین</option>' +
-        '<option value="highest_rating">بالاترین امتیاز</option></select></div>' + results + '</section>');
-      $('#sort').value = params.get('sort') || 'newest';
-      $('#sort').onchange = event => {
-        params.set('sort', event.target.value);
-        params.delete('page');
-        location.hash = route + '?' + params;
-      };
-        const query = new URLSearchParams(params); query.set('type', kind || 'all');
+    const titles = state.user?.language === 'en'
+      ? {movie:'Movies', series:'Series', all:'Movies and series'}
+      : {movie:'آرشیو فیلم‌ها', series:'آرشیو سریال‌ها', all:'آرشیو فیلم و سریال'};
+    mount('<section class="archive-reference-shell"><header class="archive-reference-header"><a href="#/home" aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</a><h1 data-dm-archive-title dir="auto">' +
+      esc(titles[kind] || titles.all) + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">' + PWA_SOURCE.actorMenu + '</button></header>' +
+      '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><select id="sort">' +
+      '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="most_viewed">پربازدیدترین</option>' +
+      '<option value="highest_rating">بالاترین امتیاز</option></select></div><div id="catalogue"><div class="loading"></div></div></section>');
+    $('#sort').value = params.get('sort') || 'newest';
+    $('#sort').onchange = event => {
+      params.set('sort', event.target.value);
+      params.delete('page');
+      location.hash = route + '?' + params;
+    };
+    const query = new URLSearchParams(params);
+    query.set('type', kind || 'all');
     try {
       const data = await api('/movie/api/filter/?' + query, { cache: true });
       whenCurrent(seq, () => {
@@ -1913,7 +1914,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
