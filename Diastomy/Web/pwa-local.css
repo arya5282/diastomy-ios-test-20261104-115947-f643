@@ -455,7 +455,7 @@ html.dmf3-active body[data-page=home] #app .nyx-prime-meta{gap:5px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-age{
   display:inline-flex!important;align-items:center;justify-content:center;border-radius:999px;background:#e30000!important;color:#100000!important;font-weight:750;padding:2px 6px!important;
 }
-html.dmf3-active body[data-page=home] #app .nyx-prime-trend>span{color:#ff721c!important;font-size:11px!important;font-weight:900!important;margin-left:5px}
+html.dmf3-active body[data-page=home] #app .nyx-prime-trend>span{color:#ff721c!important;font-size:10px!important;font-weight:900!important;-webkit-text-stroke:.15px currentColor;margin-left:5px}
 html.dmf3-active body[data-page=home] #app .nyx-prime-check{display:inline-grid!important;place-items:center;width:16px!important;height:16px!important;background:none!important;flex:none}
 html.dmf3-active body[data-page=home] #app .nyx-prime-check>.dmf53-verify{display:block!important;width:16px!important;height:16px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots button{min-width:0!important;min-height:0!important;width:4px;height:4px;background:#555}
@@ -965,7 +965,7 @@ body[data-page=local-support] #app .ar-support-head a{background:none;border:0;w
 #support-feedback:empty,.local-support-chat [hidden]{display:none!important}
 .local-support-empty{align-self:center;color:#aaa;font-size:11px}
 
-html.dmf3-active body[data-page=home] #app .nyx-prime-genres{column-gap:0!important;font-size:.94em!important}
+html.dmf3-active body[data-page=home] #app .nyx-prime-genres{column-gap:3px!important;font-size:.86em!important}
 html.dmf3-active body[data-page=home] #pwa-header .dmf3-search{border-color:#850b10!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots{gap:2px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-hero{margin-bottom:8px!important}
