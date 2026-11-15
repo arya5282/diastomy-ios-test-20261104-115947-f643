@@ -47,6 +47,8 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
     private var didPreloadTabs = false
     private var swipeOrigin: Int?
     private var swipeTabWidth: CGFloat = 1
+    private let compactTabBarScale: CGFloat = 0.95
+
     override func viewDidLoad() {
         super.viewDidLoad()
         delegate = self
@@ -78,6 +80,18 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
         updateTabBar()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard #available(iOS 26.0, *), let count = viewControllers?.count, count > 0 else { return }
+        let fitsTouchTargets = tabBar.bounds.width * compactTabBarScale >= 44 * CGFloat(count)
+            && tabBar.bounds.height * compactTabBarScale >= 44
+        let scale = fitsTouchTargets ? compactTabBarScale : 1
+        let transform = CGAffineTransform(scaleX: scale, y: scale)
+        if tabBar.transform != transform {
+            tabBar.transform = transform
+        }
+    }
+
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let swipe = gestureRecognizer as? UIPanGestureRecognizer else { return false }
         let speed = swipe.velocity(in: view)
@@ -89,7 +103,7 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
         case .began:
             guard let count = viewControllers?.count, count > 1 else { return }
             swipeOrigin = selectedIndex
-            swipeTabWidth = max(44, tabBar.bounds.width / CGFloat(count))
+            swipeTabWidth = max(44, tabBar.convert(tabBar.bounds, to: view).width / CGFloat(count))
             selectTabDuringSwipe(gesture)
         case .changed:
             selectTabDuringSwipe(gesture)
