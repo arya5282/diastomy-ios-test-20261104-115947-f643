@@ -21,7 +21,12 @@ for path in [root / 'Diastomy/LaunchScreen.storyboard',
 for catalog in (root / 'Diastomy/Assets.xcassets').glob('*/Contents.json'):
     data = json.loads(catalog.read_text())
     for image in data.get('images', []):
-        png = catalog.parent / image['filename']
+        asset = catalog.parent / image['filename']
+        if asset.suffix == '.svg' and catalog.parent.suffix == '.imageset':
+            svg = ET.parse(asset).getroot()
+            assert svg.tag == '{http://www.w3.org/2000/svg}svg' and svg.get('viewBox'), asset
+            continue
+        png = asset
         content = png.read_bytes()
         assert content[:8] == b'\x89PNG\r\n\x1a\n', png
         if catalog.parent.name == 'AppIcon.appiconset':
