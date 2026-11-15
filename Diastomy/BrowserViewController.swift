@@ -2,6 +2,7 @@ import UIKit
 import WebKit
 import AVKit
 import CryptoKit
+import ImageIO
 
 // All documents, scripts, fonts and styles are shipped in Web/.
 // Only JSON APIs and explicitly authorized media use the network.
@@ -424,13 +425,31 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         request.setValue("image/*", forHTTPHeaderField: "Accept")
         api.downloadTask(with: request) { location, response, _ in
             guard let response = response as? HTTPURLResponse, response.statusCode == 200,
-                  let mime = response.mimeType, ["image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"].contains(mime),
                   let location, let size = try? location.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-                  size <= 5 * 1024 * 1024, let data = try? Data(contentsOf: location) else {
+                  size <= 20 * 1024 * 1024, let data = try? Data(contentsOf: location) else {
                 reply([:], nil)
                 return
             }
-            reply(["image": "data:\(mime);base64," + data.base64EncodedString()], nil)
+            let webFormats = ["public.jpeg": "image/jpeg", "public.png": "image/png",
+                              "com.compuserve.gif": "image/gif", "org.webmproject.webp": "image/webp"]
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+                reply([:], nil)
+                return
+            }
+            if let type = CGImageSourceGetType(source), let mime = webFormats[type as String],
+               data.count <= 5 * 1024 * 1024 {
+                reply(["image": "data:\(mime);base64," + data.base64EncodedString()], nil)
+                return
+            }
+            let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                           kCGImageSourceCreateThumbnailWithTransform: true,
+                                           kCGImageSourceThumbnailMaxPixelSize: 1800]
+            guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
+                  let jpeg = UIImage(cgImage: image).jpegData(compressionQuality: 0.88) else {
+                reply([:], nil)
+                return
+            }
+            reply(["image": "data:image/jpeg;base64," + jpeg.base64EncodedString()], nil)
         }.resume()
     }
 
@@ -471,6 +490,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             replyHandler(["ok": true], nil)
         } else if action == "request", let path = data["path"] as? String {
             send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
+        } else if action == "selectDefaultAvatar", let index = data["index"] as? Int, (1...12).contains(index),
+                  let url = Bundle.main.url(forResource: String(format: "avatar-%02d", index), withExtension: "png",
+                                            subdirectory: "Web/static/public/assets/avatars/default"),
+                  let image = try? Data(contentsOf: url) {
+            uploadAttachment(path: "/accounts/api/update-profile/", field: "avatar", name: "avatar.png",
+                             encoded: image.base64EncodedString(), limit: 3 * 1024 * 1024, reply: replyHandler)
         } else if action == "updateAvatar", let content = data["content"] as? String {
             uploadAttachment(path: "/accounts/api/update-profile/", field: "avatar", name: "avatar",
                              encoded: content, limit: 3 * 1024 * 1024, reply: replyHandler)
