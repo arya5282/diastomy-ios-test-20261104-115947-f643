@@ -53,17 +53,18 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
         overrideUserInterfaceStyle = .dark
         tabBar.tintColor = UIColor(red: 1, green: 0.24, blue: 0.27, alpha: 1)
         let tabs = [
-            ("home", "خانه", "house", "house.fill"),
-            ("rooms", "اتاق فیلم", "square.grid.2x2", "square.grid.2x2.fill"),
-            ("search", "جستجو", "magnifyingglass", "magnifyingglass"),
-            ("library", "کتابخانه", "play.rectangle", "play.rectangle.fill")
+            ("home", "خانه", "tab-home", "tab-home"),
+            ("rooms", "اتاق فیلم", "tab-room", "tab-room-selected"),
+            ("search", "جستجو", "tab-search", "tab-search-selected"),
+            ("library", "کتابخانه", "tab-movies", "tab-movies-selected")
         ]
         viewControllers = tabs.map { route, title, icon, selectedIcon in
             let controller = BrowserViewController()
             controller.initialTabRoute = route
             controller.isSecondaryTab = route != "home"
-            controller.tabBarItem = UITabBarItem(title: title, image: UIImage(systemName: icon),
-                                                  selectedImage: UIImage(systemName: selectedIcon))
+            let item = UITabBarItem(title: nil, image: UIImage(named: icon), selectedImage: UIImage(named: selectedIcon))
+            item.accessibilityLabel = title
+            controller.tabBarItem = item
             return controller
         }
         if #available(iOS 26.0, *) {
