@@ -227,14 +227,6 @@ body[data-page=local-rooms] #app{padding:0 16px calc(100px + env(safe-area-inset
 body #app .local-room-landing{max-width:620px;width:100%;margin:auto;padding:0}
 body #app .local-room-landing h1,body #app .local-room-landing h2{font-size:15px;font-weight:500;margin:16px 0}
 body #app .local-room-landing .mr-section{margin:42px 0}
-body #app .local-room-landing .mr-exact-viewport{position:relative;aspect-ratio:540/190;height:auto;overflow:hidden;border-radius:20px}
-body #app .local-room-landing .mr-exact-slide{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:transparent;padding:0}
-body #app .local-room-landing .mr-exact-slide[hidden]{display:none!important}
-body #app .local-room-landing .mr-exact-image{position:absolute;inset:0;background-size:cover;background-position:center}
-.mr-exact-image-0{background-image:url('/static/public/assets/img/room-slide-0-610dd008bbb4.webp')}
-.mr-exact-image-1{background-image:url('/static/public/assets/img/room-slide-1-0ff3f26b8200.webp')}
-.mr-exact-image-2{background-image:url('/static/public/assets/img/room-slide-2-45f7a35d19c4.webp')}
-body #app .local-room-landing .mr-slide-action{position:absolute;left:6%;bottom:15%;font-size:10px;padding:3px 10px;background:#f65a04;color:white;border-radius:999px;border:1px solid #ffa65f}
 body #app .local-room-landing .mr-exact-dots{display:flex;justify-content:center;gap:6px;margin:10px 0}
 body #app .local-room-landing .mr-exact-dots button{width:5px;height:5px;min-width:0;min-height:0;border-radius:9px;border:0;padding:0;background:#666}
 body #app .local-room-landing .mr-exact-dots button[aria-pressed=true]{width:18px;background:#fff}
@@ -1015,8 +1007,20 @@ body[data-page=my-library] #app .library-tabs button[aria-selected=true]::after{
 #app :is(.dm-search-recommendations,.local-room-movies) .dm54-rating{left:4px;right:auto;top:4px;padding:2px 5px;border-radius:99px;background:#292b33;color:white;font:9px/12px Arial,sans-serif}
 #app .dm54-rating svg,#app .dm54-rating svg path{fill:#ff671d!important}
 
-body #app .local-room-landing .mr-exact-viewport{display:flex;direction:ltr;overflow:auto hidden;scroll-snap-type:x mandatory;scrollbar-width:none}
-body #app .local-room-landing .mr-exact-slide{position:relative;inset:auto;flex:0 0 100%;scroll-snap-align:start;scroll-snap-stop:always;-webkit-tap-highlight-color:transparent}
+body:is([data-page=local-rooms],[data-page=local-room]) #app>.library-header{
+  box-sizing:border-box;height:28px;margin:0 0 24px;padding:0;max-width:620px;margin-inline:auto;
+}
+body #app .local-room-landing .mr-exact-viewport{
+  position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:100%;direction:ltr;
+  overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:18px;
+}
+body #app .local-room-landing .mr-exact-viewport::-webkit-scrollbar{display:none}
+body #app .local-room-landing .mr-exact-slide{
+  display:block;box-sizing:border-box;min-width:0;width:100%;height:auto;aspect-ratio:540/190;
+  padding:0;border:0;border-radius:0;background:#141414;scroll-snap-align:start;scroll-snap-stop:always;
+  -webkit-tap-highlight-color:transparent;
+}
+body #app .local-room-landing .mr-exact-slide img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
 body #app .local-room-landing .mr-exact-dots{gap:1px;margin:2px 0}
 body #app .local-room-landing .mr-exact-dots button{width:14px;height:24px;background:none}
 body #app .local-room-landing .mr-exact-dots button::after{content:"";display:block;margin:auto;width:3px;height:3px;border-radius:9px;background:#666}
@@ -1027,9 +1031,15 @@ body #app .local-room-landing .local-room-card{gap:8px;padding:6px 9px;border-ra
 .local-room-landing .local-room-cover{width:44px;height:58px;border-radius:7px}
 .local-room-landing .local-room-actions :is(button,a){min-width:66px;min-height:23px;padding:3px 7px;line-height:1.3;box-sizing:border-box}
 body #app .mr-visibility input[type=radio]{width:12px;height:12px;padding:0;margin:0 0 0 4px;vertical-align:middle}
-body #app .mr-form input[type=datetime-local]{font-family:Arial,sans-serif}
-.local-room-movies{gap:16px clamp(10px,5vw,20px)}
-.local-room-movies .dm54-poster{aspect-ratio:3/4}
+body #app .mr-form{grid-template-columns:minmax(0,1fr)}
+body #app .local-room-start{display:grid;gap:6px;min-width:0}
+body #app .local-room-date-field{position:relative;display:flex;align-items:center;box-sizing:border-box;min-width:0;min-height:40px;padding:8px 14px;border:1px solid #333;border-radius:99px;background:#0d0d0d;color:#ddd}
+body #app .local-room-date-field input[type=datetime-local]{position:absolute;inset:0;box-sizing:border-box;width:100%;height:100%;min-width:0;margin:0;opacity:0}
+body #app .local-room-date-field:focus-within{border-color:#888}
+body #app .local-room-date-field:has(:disabled){color:#888}
+#app .local-room-movies{grid-template-columns:repeat(3,minmax(0,26%));justify-content:space-between;gap:13px 0}
+#app .local-room-movies .dm54-vcard{width:100%;min-width:0}
+#app .local-room-movies .dm54-poster{height:auto;aspect-ratio:4/5}
 
 body .reference-film-summary .dm-film-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
 #app .dm-film-meta,#app .dm-film-media :is(button,span){font-size:10px}

@@ -398,6 +398,7 @@ def rooms(request):
     from watchparty import services
     if request.method == 'POST':
         import json
+        from django.db import transaction
         from django.utils import timezone
         from django.utils.dateparse import parse_datetime
         try:
@@ -407,11 +408,13 @@ def rooms(request):
                 starts_at = parse_datetime(body['starts_at'])
                 if starts_at is None or timezone.is_naive(starts_at) or starts_at <= timezone.now():
                     raise ValueError('زمان شروع باید در آینده باشد.')
-            room = services.create_room(request.user, body.get('movie_id'), body.get('title'),
-                                        starts_at, is_public=body.get('public') is True)
+            with transaction.atomic():
+                room = services.create_room(request.user, body.get('movie_id'), body.get('title'),
+                                            starts_at, is_public=body.get('public') is True)
+                created = room_payload(room, request.user)
         except (ValueError, TypeError, AttributeError) as error:
             return JsonResponse({'error': str(error)}, status=400)
-        return JsonResponse({'code': room.code})
+        return JsonResponse({'code': room.code, 'room': created})
     def row(room):
         return {'code': room.code, 'title': room.display_title, 'status': room.status(),
                 'cover': file_url(room.movie.cover), 'public': room.is_public,
@@ -425,22 +428,27 @@ def rooms(request):
 @private
 @require_GET
 def room_detail(request, code):
-    import time
     from watchparty.models import MovieRoom
-    from watchparty import services
     room = get_object_or_404(MovieRoom.objects.select_related('movie', 'host', 'free_guest'), code=code)
     if room.is_closed:
         return JsonResponse({'error': 'این اتاق بسته شده است.'}, status=410)
     room.members.add(request.user)
-    allowed = services.can_watch_room(request.user, room)
+    return JsonResponse(room_payload(room, request.user))
+
+
+def room_payload(room, user):
+    import time
+    from watchparty import services
+
+    allowed = services.can_watch_room(user, room)
     videos = [{'id': x.pk, 'quality': x.quality.title}
               for x in room.movie.videos.select_related('quality').order_by('-quality__weight')
               if direct_url_usable(x)] if allowed else []
-    return JsonResponse({'code': room.code, 'title': room.display_title,
-                         'is_host': room.host_id == request.user.pk, 'can_watch': allowed,
-                         'cover': file_url(room.movie.cover), 'starts_at': room.starts_at.isoformat(),
-                         'host': room.host.full_name or room.host.username,
-                         'videos': videos, 'state': room.state_dict(), 'server_ts': time.time()})
+    return {'code': room.code, 'title': room.display_title,
+            'is_host': room.host_id == user.pk, 'can_watch': allowed,
+            'cover': file_url(room.movie.cover), 'starts_at': room.starts_at.isoformat(),
+            'host': room.host.full_name or room.host.username,
+            'videos': videos, 'state': room.state_dict(), 'server_ts': time.time()}
 
 
 @require_GET

@@ -1450,20 +1450,25 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#devices'),error)); }
   }
+  let newlyCreatedRoom;
   function rooms(seq) {
-    const slides = ['ساخت اتاق', 'تنظیم ساعت پخش', 'دعوت'];
+    const slides = [
+      ['ساخت اتاق', 'room-slide-0-610dd008bbb4.webp'],
+      ['تنظیم ساعت پخش', 'room-slide-1-0ff3f26b8200.webp'],
+      ['دعوت', 'room-slide-2-45f7a35d19c4.webp']
+    ];
     mount(PWA_SOURCE.libraryHeader + '<section class="mr-wrap local-room-landing"><h1>به اتاق فیلم دیاستومی خوش‌ اومدی !</h1>' +
-      '<section class="mr-exact-slider" aria-label="معرفی اتاق فیلم"><div class="mr-exact-viewport">' + slides.map((label,index) =>
-        '<button type="button" class="mr-exact-slide" data-room-slide="' + index + '"' +
-        ' aria-label="' + label + '"><span class="mr-exact-image mr-exact-image-' + index + '"></span></button>').join('') +
+      '<section class="mr-exact-slider" aria-label="معرفی اتاق فیلم"><div class="mr-exact-viewport">' + slides.map(([label,file]) =>
+        '<button type="button" class="mr-exact-slide" data-room-slide aria-label="' + label +
+        '"><img draggable="false" alt="" src="/static/public/assets/img/' + file + '"></button>').join('') +
       '</div><div class="mr-exact-dots">' + slides.map((_,index) => '<button type="button" data-room-dot="' + index +
         '" aria-label="اسلاید ' + (index + 1) + '" aria-pressed="' + (index === 0) + '"></button>').join('') +
-      '</div></section><section class="mr-section"><h2>اتاق‌های من</h2><div id="my-rooms" role="status"></div></section>' +
+      '</div></section><section class="mr-section"><h2>اتاق‌های من</h2><div id="my-rooms" role="status">در حال دریافت اتاق‌ها…</div></section>' +
       '<section class="mr-section" id="local-room-create"><h2>ساخت اتاق جدید</h2><form id="mr-create-form" class="mr-form">' +
       '<fieldset class="mr-visibility"><legend>نوع اتاق</legend><label><input type="radio" name="visibility" value="public" checked> عمومی<small>همه کاربران می‌توانند اتاقت را در اکسپلور پیدا کنند.</small></label>' +
       '<label><input type="radio" name="visibility" value="private"> خصوصی<small>فقط با لینک دعوت وارد می‌شوند.</small></label></fieldset>' +
       '<label>عنوان اتاق (اختیاری)<input name="title" maxlength="120" placeholder="مثلاً: شب فیلم جمعه"></label>' +
-      '<label>زمان شروع<input name="start" type="datetime-local"></label><label class="local-start-now"><input type="checkbox" name="now"> همین الان شروع شود</label>' +
+      '<label class="local-room-start">زمان شروع<span class="local-room-date-field"><span aria-hidden="true"></span><input name="start" type="datetime-local" aria-label="زمان شروع"></span></label><label class="local-start-now"><input type="checkbox" name="now"> همین الان شروع شود</label>' +
       '<label>انتخاب فیلم<input name="movie" type="search" placeholder="جستجوی نام فیلم ..."></label>' +
       '<button type="submit" class="mr-create-action">ساخت اتاق</button>' + status('mr-create-form') + '</form>' +
       '<h2 id="room-movie-heading">پیشنهادی</h2><div class="local-room-movies" id="room-movies"></div></section>' +
@@ -1483,16 +1488,25 @@
     const date = new Date(Date.now() + 10 * 60000);
     date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
     form.elements.start.value = date.toISOString().slice(0,16);
-    form.elements.now.onchange = () => { form.elements.start.disabled = form.elements.now.checked; };
+    const dateLabel = $('.local-room-date-field > span');
+    const renderDate = () => {
+      const start = form.elements.start.value;
+      dateLabel.textContent = form.elements.now.checked ? 'همین الان' :
+        start ? [roomDate(start), roomDate(start, true)].join('، ') : 'انتخاب تاریخ و ساعت';
+      form.elements.start.disabled = form.elements.now.checked;
+    };
+    form.elements.start.oninput = renderDate;
+    form.elements.now.onchange = renderDate;
+    renderDate();
     const jump = () => $('#local-room-create').scrollIntoView({behavior:'smooth'});
     function openRoom(code) { location.hash = '#/room/' + enc(code); }
     document.querySelectorAll('[data-room-slide]').forEach(button => button.onclick = jump);
     const viewport = $('.mr-exact-viewport');
     const dots = [...document.querySelectorAll('[data-room-dot]')];
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-    dots.forEach((dot, index) => dot.onclick = () => viewport.scrollTo({
-      left: index * viewport.clientWidth, behavior: reduceMotion.matches ? 'auto' : 'smooth'
-    }));
+    dots.forEach((dot, index) => dot.onclick = () => {
+      viewport.scrollTo({left: viewport.children[index].offsetLeft, behavior: reduceMotion.matches ? 'auto' : 'smooth'});
+    });
     viewport.addEventListener('scroll', () => {
       const index = Math.round(viewport.scrollLeft / viewport.clientWidth);
       dots.forEach((dot, i) => dot.setAttribute('aria-pressed', String(i === index)));
@@ -1520,7 +1534,10 @@
       try {
         const data = await api('/api/app/v1/rooms/');
         whenCurrent(seq, () => { roomData = data; renderRooms($('#room-search input').value.trim()); });
-      } catch (error) { whenCurrent(seq, () => fail($('#public-rooms'), error)); }
+      } catch (error) { whenCurrent(seq, () => {
+        fail($('#public-rooms'), error);
+        fail($('#my-rooms'), error);
+      }); }
     }
     $('#room-search').onsubmit = event => { event.preventDefault(); if (roomData) renderRooms(new FormData(event.target).get('q').trim()); };
     $('.local-room-landing').onclick = async event => {
@@ -1581,18 +1598,22 @@
       const query = form.elements.movie.value.trim();
       searchTimer = setTimeout(() => { if (seq === state.sequence) searchMovies(query); }, 250);
     };
-    submit('mr-create-form', async values => {
+    submit('mr-create-form', async (values, output) => {
       if (!selectedMovie) throw Error('یک فیلم از کارت‌های پایین انتخاب کنید.');
-      if (!values.now && !roomData?.supports_scheduling) throw Error('زمان‌بندی اتاق به به‌روزرسانی API سرور نیاز دارد. برای شروع فوری گزینهٔ همین الان را بزنید.');
       const starts = values.now ? null : new Date(values.start);
       if (starts && (!Number.isFinite(starts.getTime()) || starts <= new Date())) throw Error('زمان شروع باید در آینده باشد.');
+      output.textContent = 'در حال ساخت اتاق…';
       const result = await api('/api/app/v1/rooms/', {body:{
         movie_id:selectedMovie.id, title:values.title, public:values.visibility === 'public',
         starts_at:starts ? starts.toISOString() : null
       }});
-      if (seq === state.sequence) openRoom(result.code);
+      if (seq === state.sequence) {
+        newlyCreatedRoom = result.room || null;
+        openRoom(result.code);
+      }
     });
-    return Promise.all([refreshRooms(), searchMovies('')]);
+    refreshRooms();
+    searchMovies('');
   }
   function roomDate(value, time = false) {
     const date = new Date(value);
@@ -1603,10 +1624,12 @@
     return new Intl.DateTimeFormat(language, {calendar, numberingSystem:'latn', ...fields}).format(date);
   }
   async function room(seq, code) {
+    const created = newlyCreatedRoom?.code === code ? newlyCreatedRoom : null;
+    newlyCreatedRoom = null;
     mount(PWA_SOURCE.libraryHeader + '<section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1><a href="#/rooms">← بازگشت</a></div>' +
       '<div id="room-data"><p role="status">اطلاعات اتاق از سرور دریافت می‌شود…</p></div></section>');
     try {
-      const data = await api('/api/app/v1/rooms/' + enc(code) + '/');
+      const data = created || await api('/api/app/v1/rooms/' + enc(code) + '/');
       if (state.sequence !== seq) return;
       state.roomCode = code;
       const videos = data.videos || [];
@@ -1736,8 +1759,9 @@
         sync();
       };
       sync();
-      const connection = await native({action:'roomOpen',code});
-      if (!connection.ok) throw Error('اتصال اتاق برقرار نشد.');
+      native({action:'roomOpen',code}).then(connection => {
+        if (!connection.ok) throw Error('اتصال اتاق برقرار نشد.');
+      }).catch(error => whenCurrent(seq, () => { $('#room-status').textContent = error.message; }));
     } catch (error) {
       whenCurrent(seq, () => {
         if (state.roomCleanup) state.roomCleanup();
@@ -1801,7 +1825,7 @@
     const animateRoute = path !== previousRoute && !footerDrag;
     const firstSecondaryRoute = !previousRoute && window.diastomySecondaryTab === true;
     previousRoute = path;
-    const loadingTimer = animateRoute && !firstSecondaryRoute && !['login','otp','forgot'].includes(name)
+    const loadingTimer = animateRoute && !firstSecondaryRoute && !['login','otp','forgot','rooms','room'].includes(name)
       ? setTimeout(() => whenCurrent(seq, () => { if (!document.activeElement?.matches('.reference-search-form input')) loader.hidden = false; }), 100) : null;
     PWA.page(name);
     document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
@@ -1833,7 +1857,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۱ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
