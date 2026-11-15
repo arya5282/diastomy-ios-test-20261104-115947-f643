@@ -6,6 +6,30 @@ import CryptoKit
 // All documents, scripts, fonts and styles are shipped in Web/.
 // Only JSON APIs and explicitly authorized media use the network.
 final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate {
+    var initialTabRoute = "home"
+    private(set) var showsNativeTabBar = false
+    private var resetOnAppearance = false
+
+    func resetTabOnAppearance() {
+        resetOnAppearance = isViewLoaded
+        showsNativeTabBar = false
+    }
+
+    func scrollTabToTop() {
+        guard let scrollView = webView?.scrollView else { return }
+        scrollView.setContentOffset(CGPoint(x: scrollView.contentOffset.x, y: -scrollView.adjustedContentInset.top),
+                                    animated: !UIAccessibility.isReduceMotionEnabled)
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        if resetOnAppearance {
+            resetOnAppearance = false
+            loadBundledInterface()
+        }
+        (tabBarController as? DiastomyTabController)?.updateTabBar()
+    }
+
     private var webView: WKWebView!
     private let server = URL(string: "https://diastomy.top")!
     private var webRoot: URL!
@@ -64,6 +88,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 );
             }, { once: true });
             """, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        configuration.userContentController.addUserScript(WKUserScript(source: """
+            document.documentElement.classList.add('diastomy-native-tabs');
+            """, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         configuration.applicationNameForUserAgent = "DiastomyIOS/2.0"
         webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = self
@@ -71,6 +98,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        if #available(iOS 26.0, *) { setContentScrollView(webView.scrollView, for: .bottom) }
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
         NSLayoutConstraint.activate([
@@ -105,7 +133,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             self.startupFailed("رابط برنامه آماده نشد. کد: \(code)")
         }
         StartupDiagnostics.record(stage: "loadingLocalDocument", localDocument: isLocal(index))
-        startupNavigation = webView.load(URLRequest(url: URL(string: "diastomy://app/index.html")!))
+        showsNativeTabBar = false
+        (tabBarController as? DiastomyTabController)?.updateTabBar()
+        let url = URL(string: "diastomy://app/index.html#/\(initialTabRoute)")!
+        startupNavigation = webView.load(URLRequest(url: url))
     }
 
     private func isLocal(_ url: URL?) -> Bool {
@@ -415,7 +446,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
               let data = message.body as? [String: Any], let action = data["action"] as? String else {
             replyHandler(nil, "Untrusted document"); return
         }
-        if action == "request", let path = data["path"] as? String {
+        if action == "nativeTabVisibility", let visible = data["visible"] as? Bool {
+            showsNativeTabBar = visible
+            (tabBarController as? DiastomyTabController)?.updateTabBar()
+            replyHandler(["ok": true], nil)
+        } else if action == "nativeTabSessionEnded" {
+            (tabBarController as? DiastomyTabController)?.clearOtherTabs(except: self)
+            replyHandler(["ok": true], nil)
+        } else if action == "request", let path = data["path"] as? String {
             send(path, method: data["method"] as? String ?? "GET", body: data["body"]) { replyHandler($0, nil) }
         } else if action == "updateAvatar", let content = data["content"] as? String {
             uploadAttachment(path: "/accounts/api/update-profile/", field: "avatar", name: "avatar",

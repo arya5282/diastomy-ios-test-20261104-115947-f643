@@ -29,16 +29,72 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         let next = UIWindow(windowScene: windowScene)
         next.backgroundColor = .black
-        next.rootViewController = BrowserViewController()
+        next.rootViewController = DiastomyTabController()
         window = next
         next.makeKeyAndVisible()
     }
 
     func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
-        guard let controller = window?.rootViewController as? BrowserViewController else { return }
+        guard let tabs = window?.rootViewController as? DiastomyTabController,
+              let controller = tabs.selectedViewController as? BrowserViewController else { return }
         for context in contexts {
             controller.completeBrowserSignIn(context.url)
         }
+    }
+}
+
+final class DiastomyTabController: UITabBarController, UITabBarControllerDelegate {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        delegate = self
+        overrideUserInterfaceStyle = .dark
+        tabBar.tintColor = UIColor(red: 1, green: 0.24, blue: 0.27, alpha: 1)
+        let tabs = [
+            ("home", "خانه", "house", "house.fill"),
+            ("rooms", "اتاق فیلم", "square.grid.2x2", "square.grid.2x2.fill"),
+            ("search", "جستجو", "magnifyingglass", "magnifyingglass"),
+            ("library", "کتابخانه", "play.rectangle", "play.rectangle.fill")
+        ]
+        viewControllers = tabs.map { route, title, icon, selectedIcon in
+            let controller = BrowserViewController()
+            controller.initialTabRoute = route
+            controller.tabBarItem = UITabBarItem(title: title, image: UIImage(systemName: icon),
+                                                  selectedImage: UIImage(systemName: selectedIcon))
+            return controller
+        }
+        if #available(iOS 26.0, *) {
+            tabBarMinimizeBehavior = .onScrollDown
+        }
+        updateTabBar()
+    }
+
+    override var childForStatusBarStyle: UIViewController? { selectedViewController }
+
+    func updateTabBar() {
+        let hidden = (selectedViewController as? BrowserViewController)?.showsNativeTabBar != true
+        if #available(iOS 18.0, *) {
+            if isTabBarHidden != hidden { setTabBarHidden(hidden, animated: false) }
+        } else {
+            tabBar.isHidden = hidden
+        }
+    }
+
+    func clearOtherTabs(except current: BrowserViewController) {
+        for case let controller as BrowserViewController in viewControllers ?? [] where controller !== current {
+            controller.resetTabOnAppearance()
+        }
+    }
+
+    func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
+        if viewController === selectedViewController {
+            (viewController as? BrowserViewController)?.scrollTabToTop()
+            return false
+        }
+        return true
+    }
+
+    func tabBarController(_ tabBarController: UITabBarController, didSelect viewController: UIViewController) {
+        updateTabBar()
     }
 }
 

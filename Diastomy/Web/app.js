@@ -77,6 +77,7 @@
     }
     if (response.status === 401 || response.status === 302) {
       if (state.user) {
+        signalNativeTabSessionEnded();
         state.user = null;
         route();
       }
@@ -882,6 +883,7 @@
       event.target.disabled = true;
       try {
         await api('/accounts/api/logout/', {body:{}});
+        signalNativeTabSessionEnded();
         state.user = null;
         state.sessionKnown = true;
         state.nextAfterLogin = '#/home';
@@ -1689,7 +1691,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۷ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۴۸ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1758,6 +1760,28 @@
     route();
     document.querySelector('.reference-search-form input')?.focus();
   });
+  function signalNativeTabSessionEnded() {
+    if (document.documentElement.classList.contains('diastomy-native-tabs')) {
+      native({action:'nativeTabSessionEnded'}).catch(() => {});
+    }
+  }
   PWA.install();
+  const root = document.documentElement;
+  let lastNativeTabVisibility;
+  function syncNativeTabBar() {
+    if (!root.classList.contains('diastomy-native-tabs')) return;
+    const visible = ['home','search','local-rooms','my-library','archive-reference','local-room'].includes(document.body.dataset.page)
+      && !document.body.classList.contains('local-player-open')
+      && !root.classList.contains('dm-trailer-is-fullscreen')
+      && !document.querySelector('dialog[open]');
+    if (lastNativeTabVisibility === visible) return;
+    lastNativeTabVisibility = visible;
+    native({action:'nativeTabVisibility',visible}).catch(() => { lastNativeTabVisibility = undefined; });
+  }
+  const nativeTabObserver = new MutationObserver(syncNativeTabBar);
+  nativeTabObserver.observe(root,{attributes:true,attributeFilter:['class']});
+  nativeTabObserver.observe(document.body,{attributes:true,attributeFilter:['class','data-page']});
+  new MutationObserver(syncNativeTabBar).observe(document.body,{subtree:true,attributes:true,attributeFilter:['open']});
+  syncNativeTabBar();
   checkStartupSession();
 })();
