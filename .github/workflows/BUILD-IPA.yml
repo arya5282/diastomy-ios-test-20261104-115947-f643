@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    runs-on: macos-15
+    runs-on: macos-26-intel
     timeout-minutes: 25
     steps:
       - name: Checkout
@@ -55,3 +55,4 @@ jobs:
             output/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 7
+
