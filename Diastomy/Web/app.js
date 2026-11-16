@@ -1692,7 +1692,7 @@
         '<div class="local-room-card-buttons"><button type="button" id="share-inside-room">دعوت</button><a href="#/rooms">اتاق‌های من</a></div></div></article>' +
         '<h2>پنل مدیریت پخش</h2><div class="local-room-screen"><span id="room-live-badge">● پخش زنده</span><video playsinline hidden></video>' +
         '<div class="local-room-join"><strong>پخش هم‌زمان</strong>' +
-        (videos.length ? '<button type="button" id="room-join-play">ورود به پخش</button>' :
+        (videos.length ? '<button type="button" id="room-join-play">ورود به پخش</button><p id="room-play-status" role="status" hidden></p>' :
           '<p>' + (data.can_watch === false ? 'دسترسی به پخش این فیلم برای حساب شما فعال نیست.' : 'این فیلم فعلاً منبع پخش معتبر ندارد.') + '</p>') + '</div></div>' +
         '<h2>کنترل کاربر</h2><div class="local-room-controls"><div class="local-room-volume">' +
         '<button type="button" id="room-mute" aria-label="قطع یا وصل صدا">' + PWA_PLAYER_ICONS.volume + '</button>' +
@@ -1712,11 +1712,20 @@
 
       const player = $('.local-room-screen video');
       const join = $('#room-join-play');
+      const joinPanel = $('.local-room-join');
+      const playStatus = $('#room-play-status');
       let roomState = data.state;
       let clockOffset = Number.isFinite(data.server_ts) ? data.server_ts - Date.now() / 1000 : 0;
-      let connected = false;
       let mediaRequest = 0;
       let quality;
+      let playbackTimeout;
+      let nativeFallback = false;
+      const setPlayStatus = (message, busy = false) => {
+        playStatus.textContent = message;
+        playStatus.hidden = !message;
+        join.disabled = busy;
+        join.textContent = busy ? 'در حال بارگذاری…' : 'ورود به پخش';
+      };
       function position() {
         return roomState?.paused_position ?? Math.max(0, Date.now() / 1000 + clockOffset - (roomState?.starts_at || Date.now() / 1000));
       }
@@ -1730,13 +1739,18 @@
         const toggle = $('[data-control=toggle]');
         if (toggle) toggle.textContent = upcoming ? 'شروع' : paused ? 'ادامه' : 'توقف';
         if (player.hidden) return;
-        if (connected && player.readyState && Math.abs(player.currentTime - position()) > 1.5) player.currentTime = position();
-        if (!connected || roomState.closed || upcoming || ended || paused) player.pause();
-        else if (player.paused) player.play().catch(() => {});
+        const target = position();
+        if (player.readyState && !player.seeking && Math.abs(player.currentTime - target) > 1.5) player.currentTime = target;
+        if (roomState.closed || upcoming || ended || paused) player.pause();
+        else if (player.paused && !nativeFallback) player.play().catch(error => {
+          if (error.name === 'NotAllowedError' && seq === state.sequence && !player.hidden) playInNativePlayer();
+        });
       }
       const timer = setInterval(sync, 1000);
       state.roomCleanup = () => {
         clearInterval(timer);
+        clearTimeout(playbackTimeout);
+        mediaRequest++;
         player.pause();
         player.removeAttribute('src');
         player.load();
@@ -1753,32 +1767,67 @@
         audioInput.onchange = () => audio.forEach((track,i) => { track.enabled = i === Number(audioInput.value); });
         subtitleInput.onchange = () => subtitles.forEach((track,i) => { track.mode = i === Number(subtitleInput.value) ? 'showing' : 'disabled'; });
       }
+      async function playInNativePlayer() {
+        if (nativeFallback || !quality || seq !== state.sequence) return;
+        nativeFallback = true;
+        const request = mediaRequest;
+        clearTimeout(playbackTimeout);
+        player.pause();
+        player.hidden = true;
+        player.removeAttribute('src');
+        player.load();
+        joinPanel.hidden = false;
+        setPlayStatus('در حال باز کردن پلیر آیفون…', true);
+        try {
+          const response = await native({action:'play', kind:'movie', room:code, id:quality, presentRoom:true});
+          if (seq !== state.sequence || request !== mediaRequest) return;
+          if (!response.data?.presented) throw Error(response.data?.error || 'پخش این کیفیت ممکن نشد. دوباره تلاش کنید یا کیفیت دیگری انتخاب کنید.');
+          setPlayStatus('');
+        } catch (error) {
+          if (seq === state.sequence && request === mediaRequest) setPlayStatus(error.message);
+        } finally {
+          if (request === mediaRequest) nativeFallback = false;
+        }
+      }
       async function playRoom() {
         const selected = Number($('#room-quality').value);
-        if (!selected || !connected) { toast('اتصال اتاق هنوز برقرار نشده.'); return; }
+        if (!selected || nativeFallback) return;
         const request = ++mediaRequest;
+        clearTimeout(playbackTimeout);
+        joinPanel.hidden = false;
+        setPlayStatus('', true);
         try {
           const response = await native({action:'play',kind:'movie',room:code,id:selected,inline:true});
           if (seq !== state.sequence || request !== mediaRequest) return;
-          if (response.status !== 200 || !response.data.url) throw Error(response.data.error || 'پخش ممکن نشد.');
+          if (response.status !== 200 || !response.data?.url) throw Error(response.data?.error || 'پخش ممکن نشد.');
           quality = selected;
           player.src = response.data.url;
           player.hidden = false;
-          $('.local-room-join').hidden = true;
+          playbackTimeout = setTimeout(() => {
+            if (seq === state.sequence && request === mediaRequest) playInNativePlayer();
+          }, 9000);
           sync();
         } catch (error) {
+          if (seq !== state.sequence || request !== mediaRequest) return;
           if (quality) $('#room-quality').value = quality;
-          toast(error.message);
+          setPlayStatus(error.message);
         }
       }
       if (join) join.onclick = playRoom;
       $('#room-quality').onchange = () => { if (!player.hidden) playRoom(); };
       player.addEventListener('loadedmetadata', () => { if (seq === state.sequence) { updateTracks(); sync(); } });
+      const finishBuffering = () => {
+        if (seq !== state.sequence || player.hidden) return;
+        clearTimeout(playbackTimeout);
+        setPlayStatus('');
+        joinPanel.hidden = true;
+      };
+      player.addEventListener('playing', finishBuffering);
+      player.addEventListener('canplay', () => {
+        if (roomState?.paused_position != null || roomState?.starts_at > Date.now() / 1000 + clockOffset) finishBuffering();
+      });
       player.addEventListener('error', () => {
-        if (seq !== state.sequence || !player.isConnected) return;
-        player.hidden = true;
-        $('.local-room-join').hidden = false;
-        toast('پخش ممکن نشد. دوباره تلاش کنید.');
+        if (seq === state.sequence && !player.hidden) playInNativePlayer();
       });
       $('#room-volume').oninput = event => { player.volume = Number(event.target.value); player.muted = Number(event.target.value) === 0; };
       $('#room-mute').onclick = () => { player.muted = !player.muted; };
@@ -1808,7 +1857,6 @@
         catch (error) { toast(error.message); }
       });
       state.handleRoomState = event => {
-        connected = event.type !== 'error';
         if (event.type === 'state') {
           roomState = event.state;
           if (Number.isFinite(event.server_ts)) clockOffset = event.server_ts - Date.now()/1000;
@@ -1816,7 +1864,7 @@
         sync();
       };
       sync();
-      native({action:'roomOpen',code}).then(connection => {
+      native({action:'roomOpen',code,state:roomState,serverTimestamp:data.server_ts}).then(connection => {
         if (!connection.ok) throw Error('اتصال اتاق برقرار نشد.');
       }).catch(error => whenCurrent(seq, () => { $('#room-status').textContent = error.message; }));
     } catch (error) {
@@ -1914,7 +1962,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۷۲ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۷۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {

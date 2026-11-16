@@ -615,6 +615,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                     replyHandler(["status": 200, "data": ["surface": true]], nil)
                     return
                 }
+                if data["presentRoom"] as? Bool == true, let code, code == self.roomCode,
+                   self.presentedViewController == nil {
+                    self.playingRoom = code
+                    var roomInfo = info
+                    roomInfo.removeValue(forKey: "target")
+                    roomInfo["position"] = 0
+                    self.presentPlayer(url, info: roomInfo)
+                    replyHandler(["status": 200, "data": ["presented": true]], nil)
+                    return
+                }
                 if data["inline"] as? Bool == true {
                     let store = self.webView.configuration.websiteDataStore.httpCookieStore
                     let group = DispatchGroup()
@@ -700,6 +710,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                   code.range(of: "^[A-Za-z0-9_-]{1,16}$", options: .regularExpression) != nil {
             socket?.cancel(with: .goingAway, reason: nil)
             roomCode = code
+            roomState = data["state"] as? [String: Any]
+            serverOffset = (data["serverTimestamp"] as? Double).map { $0 - Date().timeIntervalSince1970 } ?? 0
             var request = URLRequest(url: URL(string: "wss://diastomy.top/ws/movie-room/\(code)/")!)
             request.setValue("https://diastomy.top", forHTTPHeaderField: "Origin")
             let cookies = HTTPCookieStorage.shared.cookies(for: server) ?? []

@@ -306,7 +306,9 @@ body .local-room-detail .mr-room-topline h1{font-size:22px;margin:0}
 .local-room-screen{position:relative;aspect-ratio:2.05;display:grid;place-items:center;border:1px solid #292929;border-radius:15px;overflow:hidden;text-align:center}
 .local-room-screen video{width:100%;height:100%;object-fit:contain}
 .local-room-screen [hidden]{display:none!important}
-#room-live-badge{position:absolute;top:10px;right:10px;background:#060606d9;border:1px solid #333;border-radius:22px;padding:4px 10px;font-size:11px}
+#room-live-badge{position:absolute;z-index:2;top:10px;right:10px;background:#060606d9;border:1px solid #333;border-radius:22px;padding:4px 10px;font-size:11px}
+.local-room-join{position:absolute;z-index:1;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:12px;background:#0009}
+.local-room-join p{margin:0}
 .local-room-join p{font-size:12px;color:#999}
 .local-room-join button,#room-chat-form button{background:#df0000;border:1px solid #ef3535;color:#fff;border-radius:999px;padding:8px 15px}
 .local-room-controls,.local-host-controls{background:#101010;border:1px solid #373737;border-radius:13px;padding:10px}
