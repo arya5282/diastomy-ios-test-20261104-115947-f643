@@ -10,7 +10,8 @@
 #dm-playback-choice .dm-resume-actions [data-resume-continue]{background:#df0614;border-color:#f52a35;color:#fff;font-weight:700;}
 #dm-playback-choice button:focus-visible{outline:2px solid #fff;outline-offset:2px;}
 .dm-seen-eye{display:inline-flex;vertical-align:middle;color:#ccc;margin-inline-start:7px;align-items:center;}
-.dm-detail-header-spacer{height:calc(env(safe-area-inset-top,0px) + 50px);}
+.dm-detail-header-spacer{height:50px;}
+body:has(.movie-detail-shell) #app{padding-top:0!important}
 html body[data-page] #app .dm-film-topbar{
   display:flex!important;align-items:center;justify-content:space-between;direction:ltr;
   position:fixed!important;inset:0 0 auto!important;width:100%;box-sizing:border-box;

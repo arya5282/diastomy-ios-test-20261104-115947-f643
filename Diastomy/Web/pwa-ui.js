@@ -51,9 +51,21 @@ window.PWA = (() => {
         (data.has_previous ? '<a href="' + href + (data.page - 1) + '">قبلی</a>' : '') + '<span>' + esc(data.page) + ' / ' +
         esc(data.total_pages) + '</span>' + (data.has_next ? '<a href="' + href + (data.page + 1) + '">بعدی</a>' : '') + '</nav>' : '');
   }
+  // The public web catalog's 1280px landscape assets, for older API responses.
+  const freeMovieArtwork = new Map([
+    ['then-came-you', '/media/_performance/37a569a219007b0981047ced.webp'],
+    ['the-odds', '/media/_performance/6eaad5c9ffec3a036618d1be.webp'],
+    ['with-a-kiss-i-die', '/media/_performance/4fa070c6dd092f103dd03321.webp'],
+    ['unwelcome', '/media/_performance/68259bd477030692e0ae37e6.webp'],
+    ['the-tomorrow-man', '/media/_performance/20db311ef8c8d2a361b76aea.webp'],
+    ['vanquish', '/media/_performance/fac671f177e3a2102bc7d4a4.webp']
+  ]);
   function landscape(item) {
-    return '<a href="' + titleURL(item) + '" class="dm54-hcard" dir="ltr"><span class="dm54-landscape"><img src="' + media(item.landscape_artwork || item.banner || item.cover) +
-      '" alt="' + esc(item.title) + '" loading="lazy"><span class="dm54-landscape-shade"></span><span class="dm54-landscape-brand"><img src="' + logo +
+    const wide = item.landscape_artwork || (item.type === 'movie' && freeMovieArtwork.get(item.slug));
+    const fallback = media(item.banner || item.cover);
+    return '<a href="' + titleURL(item) + '" class="dm54-hcard" dir="ltr"><span class="dm54-landscape"><img src="' + (wide ? media(wide) : fallback) +
+      (wide ? '" data-landscape-fallback="' + fallback : '') +
+      '" alt="' + esc(item.title) + '" loading="lazy" decoding="async"><span class="dm54-landscape-shade"></span><span class="dm54-landscape-brand"><img src="' + logo +
       '" alt=""></span></span><span class="dm54-hmeta"><strong>' + name(item) + '</strong><small class="dm54-hdetails"><span class="dm54-hgenres">' +
       genres(item, 2) + '</span><span>' + esc(item.production_year) + '</span><span class="dm54-hscore">' + esc(item.imdb_rating || '') + star + '</span></small></span></a>';
   }
@@ -309,10 +321,11 @@ window.PWA = (() => {
     document.addEventListener('error', event => {
       const image = event.target;
       if (!(image instanceof HTMLImageElement)) return;
-      const fallback = image.dataset.historyFallback || image.dataset.heroFallback;
+      const fallback = image.dataset.historyFallback || image.dataset.heroFallback || image.dataset.landscapeFallback;
       if (!fallback) return;
       delete image.dataset.historyFallback;
       delete image.dataset.heroFallback;
+      delete image.dataset.landscapeFallback;
       if (image.getAttribute('src') !== fallback) image.src = fallback;
     }, true);
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
