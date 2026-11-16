@@ -17,6 +17,7 @@ from core.content_labels import content_title, genre_name
 from movie.models import Movie, Series, Episode, MovieVideo, EpisodeVideo, Genre, Person, Country
 from movie.access import can_access_content
 from movie.media_sources import direct_url_usable
+from movie.templatetags.image_perf import landscape_artwork
 
 
 def private(view):
@@ -168,7 +169,7 @@ def home(request):
     from django.utils.translation import get_language
     from movie.templatetags.image_perf import hero_artwork
     from movie.templatetags.pwa_ui import pwa_hero_age_rating, pwa_hero_duration
-    key = 'mobile-app-home:v4:' + (get_language() or 'fa')
+    key = 'mobile-app-home:v5:' + (get_language() or 'fa')
     data = cache.get(key)
     if data is None:
         context = _home_public_context()
@@ -190,7 +191,10 @@ def home(request):
                       'hero_duration': pwa_hero_duration(x.duration) if x.duration else '',
                       'hero_trending': x in context.get('trending_movies', [])}
                      for x in context['hero_items']],
-            'rails': [{'key': key, 'title': title, 'items': [card(x) for x in context.get(key, [])]}
+            'rails': [{'key': key, 'title': title, 'items': [
+                {**card(x), 'landscape_artwork': landscape_artwork(x)}
+                if key in ('pwa_free_movies', 'pwa_free_series') else card(x)
+                for x in context.get(key, [])]}
                       for key, title in names],
             'genres': [{'slug': x.slug, 'name': genre_name(x)} for x in context['genres']],
             'countries': list(Country.objects.order_by('name').values('slug', 'name')),
@@ -362,8 +366,8 @@ def library(request):
             video = source.videos.order_by('-quality__weight').values_list('pk', flat=True).first()
             history.append({**card(item), 'position': row.watched_duration, 'total': row.total_duration,
                             'snapshot': row.snapshot_url, 'history_id': row.pk, 'video_id': video,
-                            'history_cover': file_url(row.episode.cover if row.episode_id else item.banner)
-                                             or file_url(item.banner_mobile) or file_url(item.banner)})
+                            'history_cover': file_url(row.episode.cover) if row.episode_id else '',
+                            'landscape_artwork': landscape_artwork(item)})
     return JsonResponse({'saved': saved, 'history': history})
 
 

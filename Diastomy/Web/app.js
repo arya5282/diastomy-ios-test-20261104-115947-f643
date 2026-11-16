@@ -1914,7 +1914,7 @@
       else if (name === 'rooms') await rooms(seq);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
-      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۶۹ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
+      else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۷۰ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
     finally {
@@ -1996,10 +1996,12 @@
   const root = document.documentElement;
   let lastNativeTitleState, lastNativeTopbar, nativeTitleFrame = 0;
   function scheduleNativeTitleButtons() {
-    if (!root.classList.contains('diastomy-native-tabs') || nativeTitleFrame) return;
+    if (nativeTitleFrame) return;
     nativeTitleFrame = requestAnimationFrame(() => {
       nativeTitleFrame = 0;
       const topbar = $('.dm-film-topbar');
+      topbar?.classList.toggle('is-scrolled', window.scrollY > 8);
+      if (!root.classList.contains('diastomy-native-tabs')) return;
       const bookmark = topbar?.querySelector('#bookmark');
       const back = topbar?.querySelector('a');
       let payload = {action:'nativeTitleButtons', visible:false};

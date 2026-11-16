@@ -10,13 +10,25 @@
 #dm-playback-choice .dm-resume-actions [data-resume-continue]{background:#df0614;border-color:#f52a35;color:#fff;font-weight:700;}
 #dm-playback-choice button:focus-visible{outline:2px solid #fff;outline-offset:2px;}
 .dm-seen-eye{display:inline-flex;vertical-align:middle;color:#ccc;margin-inline-start:7px;align-items:center;}
- .dm-detail-header-spacer{height:0;}
-@media(max-width:767px){
- .dm-detail-header-spacer{height:calc(env(safe-area-inset-top,0px) + 58px);width:100%;flex:none;}
- html body[data-page][data-page]:is([data-page="movie-detail"],[data-page="series-detail"]) :is(.dm-film-topbar,.ds-mobile-header){display:flex!important;align-items:center!important;justify-content:space-between!important;direction:ltr!important;position:fixed!important;top:0!important;left:0!important;right:0!important;width:100%!important;box-sizing:border-box!important;height:calc(env(safe-area-inset-top,0px) + 58px)!important;margin:0!important;padding:calc(env(safe-area-inset-top,0px) + 6px) 12px 6px!important;z-index:1005!important;transition:transform .2s ease!important;}
- html body[data-page][data-page]:is([data-page="movie-detail"],[data-page="series-detail"]) :is(.dm-film-topbar,.ds-mobile-header).dm-header-away{transform:translateY(-110%)!important;}
+.dm-detail-header-spacer{height:calc(env(safe-area-inset-top,0px) + 50px);}
+html body[data-page] #app .dm-film-topbar{
+  display:flex!important;align-items:center;justify-content:space-between;direction:ltr;
+  position:fixed!important;inset:0 0 auto!important;width:100%;box-sizing:border-box;
+  height:calc(env(safe-area-inset-top,0px) + 50px)!important;margin:0!important;
+  padding:env(safe-area-inset-top,0px) 12px 0!important;z-index:1005;
+  background:none!important;border:0!important;outline:none!important;box-shadow:none!important;
 }
-@media(prefers-reduced-motion:reduce){html body[data-page][data-page] :is(.dm-film-topbar,.ds-mobile-header){transition:none!important;}}
+.dm-film-topbar::before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(#000 35%,#170504);
+}
+.dm-film-topbar.is-scrolled::before{
+  background:rgba(13,14,18,.86);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+}
+body:has(.movie-detail-shell) #app:focus{outline:none!important;box-shadow:none!important}
+#app .dm-film-topbar :is(a,button){width:44px;height:44px;padding:0;-webkit-tap-highlight-color:transparent}
+#app .dm-film-topbar svg{width:16px;height:16px}
+#app .dm-film-topbar :is(a,button):focus-visible{outline:1px solid #ccc;outline-offset:-5px;border-radius:50%}
 
 @media(prefers-reduced-motion:no-preference){
   #dm-playback-choice [role=dialog],#app .film-download-dialog[open]:not([data-closing]){

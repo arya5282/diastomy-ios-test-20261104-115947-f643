@@ -121,9 +121,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         loadBundledInterface()
     }
 
+    private final class TitleButton: UIButton {
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            let inset = max(0, (44 - bounds.width) / 2)
+            return bounds.insetBy(dx: -inset, dy: -inset).contains(point)
+        }
+    }
+
     private func updateNativeTitleButtons(_ data: [String: Any]) -> Bool {
         guard #available(iOS 26.0, *) else { return false }
-        let size: CGFloat = 44
+        let size: CGFloat = 36
         guard data["visible"] as? Bool == true,
               let y = data["y"] as? Double, let backX = data["backX"] as? Double,
               let bookmarkX = data["bookmarkX"] as? Double,
@@ -165,9 +172,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         var configuration = UIButton.Configuration.glass()
         configuration.cornerStyle = .capsule
         configuration.image = UIImage(systemName: symbol)
-        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 19, weight: .medium)
+        configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 15, weight: .medium)
         configuration.baseForegroundColor = .white
-        let button = UIButton(configuration: configuration)
+        let button = TitleButton(type: .system)
+        button.configuration = configuration
         button.accessibilityIdentifier = id
         button.accessibilityLabel = label
         button.addTarget(self, action: target, for: .touchUpInside)

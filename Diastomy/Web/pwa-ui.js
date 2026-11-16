@@ -52,7 +52,7 @@ window.PWA = (() => {
         esc(data.total_pages) + '</span>' + (data.has_next ? '<a href="' + href + (data.page + 1) + '">بعدی</a>' : '') + '</nav>' : '');
   }
   function landscape(item) {
-    return '<a href="' + titleURL(item) + '" class="dm54-hcard" dir="ltr"><span class="dm54-landscape"><img src="' + media(item.banner || item.cover) +
+    return '<a href="' + titleURL(item) + '" class="dm54-hcard" dir="ltr"><span class="dm54-landscape"><img src="' + media(item.landscape_artwork || item.banner || item.cover) +
       '" alt="' + esc(item.title) + '" loading="lazy"><span class="dm54-landscape-shade"></span><span class="dm54-landscape-brand"><img src="' + logo +
       '" alt=""></span></span><span class="dm54-hmeta"><strong>' + name(item) + '</strong><small class="dm54-hdetails"><span class="dm54-hgenres">' +
       genres(item, 2) + '</span><span>' + esc(item.production_year) + '</span><span class="dm54-hscore">' + esc(item.imdb_rating || '') + star + '</span></small></span></a>';
@@ -139,8 +139,8 @@ window.PWA = (() => {
     const homeTime = (minutes >= 60 ? Math.floor(minutes / 60) + 'h ' : '') + minutes % 60 + 'm left';
     const frame = String(item.snapshot || '').match(/^(?:https:\/\/diastomy\.top)?(\/api\/watch-frame\/[1-9]\d*\/(?:\?v=\d+)?)$/)?.[1];
     return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '" aria-label="ادامه تماشا">' +
-      '<img src="' + (home ? media(item.history_cover || item.banner || item.cover) : '/static/public/assets/img/continue-scene-pending-v1.svg') + '" alt="' + esc(item.title) + '"' +
-      (frame && (!home || !item.history_cover && !item.banner) ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
+      '<img src="' + (home ? media(item.history_cover || item.landscape_artwork || item.banner || item.cover) : '/static/public/assets/img/continue-scene-pending-v1.svg') + '" alt="' + esc(item.title) + '"' +
+      (frame && (!home || !item.history_cover && !item.landscape_artwork && !item.banner) ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
       '<progress class="local-library-progress" dir="rtl" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><small dir="ltr">' +
       (home ? homeTime : time + ' باقی‌مانده') + '</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
       index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>') + '</div></article>';
@@ -203,7 +203,7 @@ window.PWA = (() => {
     const download = '<button type="button" class="reference-download" id="film-download"' +
       (options.length ? '' : ' disabled') + '>Download ' + PWA_SOURCE.detailDownload + '</button>';
     const cast = item.actors || [];
-    return '<article class="movie-detail-shell"><div class="dm-film-topbar" dir="ltr"><a href="#/home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a><button id="bookmark" aria-label="ذخیره در لیست من" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 21S2 15 2 8a5.5 5.5 0 0 1 10-3 5.5 5.5 0 0 1 10 3c0 7-10 13-10 13Z"/></svg></button></div>' +
+    return '<article class="movie-detail-shell"><div class="dm-detail-header-spacer" aria-hidden="true"></div><div class="dm-film-topbar" dir="ltr"><a href="#/home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a><button id="bookmark" aria-label="ذخیره در لیست من" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 21S2 15 2 8a5.5 5.5 0 0 1 10-3 5.5 5.5 0 0 1 10 3c0 7-10 13-10 13Z"/></svg></button></div>' +
       '<div class="movie-detail-hero"><img src="' + media(item.hero_cover || item.banner || item.cover) + '" alt="' + esc(item.title) + '">' + trailerButton + '</div>' +
       '<div class="dm-film-reference-info"><div class="dm-film-title-row"><h1>' + name(item) + '</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<div class="dm-film-meta" dir="ltr">' + (series ? '<span>' + new Set(episodeList.map(episode => episode.season)).size + ' Season</span>' : item.duration ? '<span>' + esc(item.duration) + ' Min</span>' : '') + '<span>' + esc(item.production_year) + '</span><span>' + genres(item) + '</span></div>' +
