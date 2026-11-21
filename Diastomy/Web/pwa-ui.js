@@ -42,6 +42,11 @@ window.PWA = (() => {
       '<svg class="home-poster-mark" aria-hidden="true" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg>' +
       '</span>' + titleCardMetadata(item, false) + '</a>';
   }
+  function featuredPoster(item) {
+    return '<a href="' + titleURL(item) + '" class="dm54-vcard title-card home-featured-poster" aria-label="' + name(item) +
+      '"><span class="dm54-poster"><img class="dm54-poster-img" src="' + media(item.cover) +
+      '" alt="" loading="lazy" decoding="async"></span></a>';
+  }
   function actorPage() {
     return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
       PWA_SOURCE.actorBack + '</a><h1>بازیگران</h1><button class="dm-actor-menu" type="button" data-local-menu aria-label="منو">' +
@@ -82,32 +87,44 @@ window.PWA = (() => {
       '" alt="" loading="lazy" decoding="async"><span class="dm54-landscape-brand" aria-hidden="true"><img src="' + logo +
       '" alt=""></span></span>' + titleCardMetadata(item) + '</a>';
   }
+  function homeHeader(user) {
+    const icon = path => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
+    const avatar = user?.avatar && media(user.avatar);
+    return '<header class="home-glass-header" dir="ltr" aria-label="هدر دیاستومی">' +
+      '<img class="home-glass-logo" src="/static/pwa/generated/25cc514e5be789c9db17.svg" alt="Diastomy" width="106" height="18">' +
+      '<div class="home-header-actions"><a class="home-notifications" href="#/notifications" aria-label="اعلان‌ها">' +
+      icon('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/>') + '</a>' +
+      '<button class="home-glass-control home-avatar" type="button" data-local-menu aria-label="پروفایل کاربری">' +
+      icon('<path fill="currentColor" stroke="none" d="M2 24v-3c0-3 4-4 8-6v-2c-2-2-2-5-1-8 1-3 5-4 8-2 2 1 2 3 2 5l2 3-2 1v2c0 1-2 1-3 1v2c2 1 4 3 4 7Z"/>') +
+      (avatar ? '<img src="' + avatar + '" alt="" data-home-avatar>' : '') + '</button></div>' +
+      '<div class="home-search-row"><button class="home-glass-control home-search" type="button" data-local-search aria-label="جست‌وجو">' +
+      icon('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>') + '<span>Search movies, series…</span></button>' +
+      '<button class="home-glass-control" type="button" data-local-filter aria-label="فیلتر">' +
+      icon('<path d="M4 7h9m4 0h3M4 17h3m4 0h9M13 4v6M7 14v6"/>') + '</button></div></header>';
+  }
   function hero(items) {
     if (!items.length) return '';
-    const dot = '<i class="nyx-prime-genre-dot" aria-hidden="true"></i>';
-    return '<section class="nyx-prime-hero" aria-label="فیلم‌ها و سریال‌های ویژه" dir="ltr"><ul class="nyx-prime-rail" tabindex="0">' +
+    return '<section class="home-hero" aria-label="فیلم‌ها و سریال‌های ویژه" dir="ltr"><ul class="home-hero-rail" tabindex="0">' +
       items.map((item, i) => {
-        const series = item.type === 'series';
-        const age = item.hero_age || (item.age_limit != null ? '+' + item.age_limit : '');
-        const heroGenres = (item.genres || []).slice(0,3).map(g => '<span>' + esc(typeof g === 'string' ? g : g.name) + '</span>').join('');
+        const url = titleURL(item);
         const fallback = media(item.banner || item.cover);
-        return '<li class="nyx-prime-slide"><a class="nyx-prime-card" href="' + titleURL(item) +
-          '"><picture class="nyx-prime-picture"><img src="' + (item.hero_artwork ? media(item.hero_artwork) : fallback) +
-          '" data-hero-fallback="' + fallback + '" alt="' + esc(item.title) + '" loading="' + (i < 2 ? 'eager' : 'lazy') +
-          '"' + (i === 0 ? ' fetchpriority="high"' : '') + ' decoding="async" draggable="false"></picture>' +
-          '<div class="nyx-prime-shade"></div><img class="nyx-prime-brand" src="' + logo + '" alt="Diastomy">' +
-          '<div class="nyx-prime-copy"><h2 dir="auto">' + name(item) + '</h2><div class="nyx-prime-meta">' +
-          (age ? '<span class="nyx-prime-age">' + esc(age) + '</span>' : '') +
-          (item.hero_duration ? '<span class="nyx-prime-duration">' + esc(item.hero_duration) + '</span>' : '') +
-          '<span class="nyx-prime-year">' + esc(item.production_year) + '</span>' +
-          (heroGenres ? '<span class="nyx-prime-genres">' + dot + '<span class="nyx-prime-genre-names">' + heroGenres + '</span>' + dot + '</span>' : '') +
-          '</div><div class="nyx-prime-trend"><b>' + (item.hero_trending ? 'TRENDING' : series ? 'NEW SERIES' : 'NEW MOVIE') +
-          '</b>' + (series ? '<span>all episodes available</span>' : '') + '</div><div class="nyx-prime-premium">' +
-          (!item.is_free ? '<span class="nyx-prime-check" aria-hidden="true">' + PWA_SOURCE.heroPremium + '</span>' : '') +
-          '<span>' + (item.is_free ? 'تماشای رایگان' : 'included with premium') + '</span></div></div></a></li>';
-      }).join('') + '</ul><div class="nyx-prime-dots">' + items.map((_, i) =>
-        '<button type="button" data-slide="' + i + '" data-distance="' + Math.min(i,3) + '" aria-pressed="' + (i === 0) +
-        '" aria-label="اسلاید ' + (i + 1) + '"></button>').join('') + '</div></section>';
+        const labels = [...(item.genres || []).slice(0, 3).map(genre =>
+          typeof genre === 'string' ? genre : genre?.name), item.production_year].filter(Boolean);
+        const badge = item.hero_trending ? 'TRENDING' : item.type === 'series' ? 'NEW SERIES' : 'NEW MOVIE';
+        return '<li class="home-hero-slide"><article class="home-hero-card">' +
+          '<a class="home-hero-art" href="' + url + '" aria-label="' + esc(item.title) + '"><img src="' +
+          ((item.hero_artwork && media(item.hero_artwork)) || fallback) + '" data-hero-fallback="' + fallback +
+          '" alt="" loading="' + (i < 2 ? 'eager' : 'lazy') + '"' + (i === 0 ? ' fetchpriority="high"' : '') +
+          ' decoding="async" draggable="false"></a>' +
+          '<div class="home-hero-copy"><span class="home-hero-badge">' + badge + '</span><h2 dir="auto"><a href="' + url + '">' + name(item) + '</a></h2>' +
+          (labels.length ? '<ul class="home-hero-meta">' + labels.map(label => '<li dir="auto">' + esc(label) + '</li>').join('') + '</ul>' : '') +
+          '<div class="home-hero-actions"><a class="home-watch" href="' + url + '?watch=1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l12-7z" fill="currentColor"/></svg>Watch Now</a>' +
+          '<button class="home-glass-control home-save" type="button" data-home-save aria-pressed="false" aria-label="ذخیره در لیست من">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+          '<path class="home-save-plus" d="M12 5v14M5 12h14"/><path class="home-save-check" d="m5 12 4 4L19 6"/></svg></button></div></div></article></li>';
+      }).join('') + '</ul>' + (items.length > 1 ? '<div class="home-hero-dots">' + items.map((item, i) =>
+        '<button type="button" data-slide="' + i + '" aria-pressed="' + (i === 0) +
+        '" aria-label="اسلاید ' + (i + 1) + '"></button>').join('') + '</div>' : '') + '</section>';
   }
   const genreArt = {
       "action": "/static/public/assets/images/genre-user-v2/action-a19b0e17be35.jpg",
@@ -125,12 +142,15 @@ window.PWA = (() => {
       "romance": "/static/public/assets/images/genre-user-v2/romance-0c130a671b81.jpg",
       "sci-fi": "/static/public/assets/images/genre-user-v2/sci-fi-a837508e6156.jpg"
     };
-  function home(data, history = []) {
-    const order = [
-      'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_series',
+  function homeSections(data, history = []) {
+    const rails = data.rails || [];
+    const seriesRail = ['popular_series', 'trending_series', 'pwa_latest_series']
+      .find(key => rails.some(rail => rail.key === key && rail.items.length));
+    const order = new Set([
+      'continue_watching', 'trending_movies', seriesRail, 'genres', 'pwa_turkish_series', 'pwa_free_series',
       'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies', 'pwa_free_movies',
       'pwa_dubbed_series', 'pwa_recommended', 'animations'
-    ];
+    ]);
     const sections = new Map();
     const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'romance', 'family', 'musical', 'documentary', 'animation', 'art', 'kids'];
     const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
@@ -141,20 +161,21 @@ window.PWA = (() => {
       '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';
     sections.set('genres', genreHTML);
     sections.set('continue_watching', continueHTML);
-    for (const rail of data.rails || []) {
+    for (const rail of rails) {
       const key = rail.key || 'pwa_latest_movies';
       if (!rail.items.length && key !== 'pwa_free_series') continue;
       const wide = ['pwa_free_movies','pwa_free_series'].includes(key);
       const heading = ({pwa_turkish_series:'سریال‌های ترکیه‌ای',pwa_free_series:'سریال‌های بدون نیاز به اشتراک',trending_movies:'ترندترین فیلم‌ها'})[key] || rail.title;
+      const featuredPosters = key === 'trending_movies' || key === seriesRail;
       const link = '#/browse/' + (key.includes('series') ? 'series' : 'movie');
-      sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
+      sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : featuredPosters ? ' home-poster-section' : '') +
         '"><div class="dm54-head"><h2>' + esc(heading) + '</h2><a href="' + link +
         '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
-        (rail.items.length ? rail.items.map(wide ? landscape : homePoster).join('') : '<p>فعلاً سریال رایگانی در دسترس نیست.</p>') + '</div></section>');
+        (rail.items.length ? rail.items.map(wide ? landscape : featuredPosters ? featuredPoster : homePoster).join('') : '<p>فعلاً سریال رایگانی در دسترس نیست.</p>') + '</div></section>');
     }
-    return hero(data.hero || []) + '<div class="dm-pwa-home-v54 dm-figma-home-v2">' +
-      order.map(key => sections.get(key) || '').join('') +
-      [...sections].filter(([key]) => !order.includes(key)).map(([, html]) => html).join('') + '</div>';
+    return '<div class="dm-pwa-home-v54 dm-figma-home-v2">' +
+      [...order].map(key => sections.get(key) || '').join('') +
+      [...sections].filter(([key]) => !order.has(key)).map(([, html]) => html).join('') + '</div>';
   }
   function historyCard(item, index, home = false) {
     const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
@@ -163,12 +184,35 @@ window.PWA = (() => {
     const minutes = Math.ceil(remaining / 60);
     const homeTime = (minutes >= 60 ? Math.floor(minutes / 60) + 'h ' : '') + minutes % 60 + 'm left';
     const frame = String(item.snapshot || '').match(/^(?:https:\/\/diastomy\.top)?(\/api\/watch-frame\/[1-9]\d*\/(?:\?v=\d+)?)$/)?.[1];
+    const options = index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
+      index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>';
+    const progressBar = '<progress class="local-library-progress" dir="' + (home ? 'ltr' : 'rtl') +
+      '" max="100" value="' + progress + '" aria-label="پیشرفت تماشا"></progress>';
+    if (home) {
+      const artwork = item.history_cover || item.landscape_artwork || item.banner;
+      const season = item.season_number ?? item.season;
+      const episode = item.episode_number ?? item.episode;
+      const subtitle = item.type === 'series' && season > 0 && episode > 0
+        ? 'S' + esc(season) + ':E' + esc(episode) + (item.episode_title ? ' – ' + esc(item.episode_title) : '')
+        : item.total > 0 ? homeTime : '';
+      const playIcon = '<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="currentColor" d="M6 3.5v11l8-5.5z"/></svg>';
+      const playLabel = ' aria-label="ادامهٔ تماشای ' + name(item) + '"';
+      const play = Number(item.video_id) > 0
+        ? '<button class="home-history-play" type="button" data-play="' + esc(item.video_id) +
+          '" data-kind="' + esc(item.type || 'movie') + '" data-resume' + playLabel + '>' + playIcon + '</button>'
+        : '<a class="home-history-play" href="' + titleURL(item) + '"' + playLabel + '>' + playIcon + '</a>';
+      return '<article class="library-history-card"><div class="library-history-thumb" dir="ltr">' +
+        '<img src="' + media(artwork || item.cover) + '" alt=""' +
+        (frame && !artwork ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' +
+        '<a class="home-history-copy" href="' + titleURL(item) + '"><strong dir="auto">' + name(item) +
+        '</strong>' + (subtitle ? '<small dir="auto">' + subtitle + '</small>' : '') + '</a>' +
+        play + progressBar + options + '</div></article>';
+    }
     return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '" aria-label="ادامه تماشا">' +
-      '<img src="' + (home ? media(item.history_cover || item.landscape_artwork || item.banner || item.cover) : '/static/public/assets/img/continue-scene-pending-v1.svg') + '" alt="' + esc(item.title) + '"' +
-      (frame && (!home || !item.history_cover && !item.landscape_artwork && !item.banner) ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
-      '<progress class="local-library-progress" dir="rtl" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><small dir="ltr">' +
-      (home ? homeTime : time + ' باقی‌مانده') + '</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
-      index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>') + '</div></article>';
+      '<img src="/static/public/assets/img/continue-scene-pending-v1.svg" alt="' + esc(item.title) + '"' +
+      (frame ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
+      progressBar + '</a><div class="library-history-meta"><small dir="ltr">' +
+      time + ' باقی‌مانده</small>' + options + '</div></article>';
   }
   function downloadOptions(options) {
     return options.map(option => '<button type="button" data-download="' + esc(option.id) + '">' + esc(option.quality) + '</button>').join('');
@@ -334,6 +378,10 @@ window.PWA = (() => {
     document.addEventListener('error', event => {
       const image = event.target;
       if (!(image instanceof HTMLImageElement)) return;
+      if (image.hasAttribute('data-home-avatar')) {
+        image.remove();
+        return;
+      }
       const fallback = image.dataset.historyFallback || image.dataset.heroFallback || image.dataset.landscapeFallback;
       if (!fallback) return;
       delete image.dataset.historyFallback;
@@ -349,9 +397,9 @@ window.PWA = (() => {
     let heroFrame;
     document.addEventListener('scroll', event => {
       const rail = event.target;
-      if (!(rail instanceof Element) || !rail.matches('.nyx-prime-rail')) return;
+      if (!(rail instanceof Element) || !rail.matches('.home-hero-rail')) return;
       cancelAnimationFrame(heroFrame);
-      heroFrame = requestAnimationFrame(() => syncHeroMotion(rail));
+      heroFrame = requestAnimationFrame(() => syncHeroPagination(rail));
     }, true);
     document.addEventListener('click', event => {
       if (event.target.closest('[data-local-menu]')) {
@@ -367,39 +415,23 @@ window.PWA = (() => {
       }
       const dot = event.target.closest('[data-slide]');
       if (dot) {
-        const slide = document.querySelectorAll('.nyx-prime-slide')[Number(dot.dataset.slide)];
-        if (slide) slide.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        const rail = dot.closest('.home-hero').querySelector('.home-hero-rail');
+        const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+        rail.scrollTo({left: Number(dot.dataset.slide) * rail.clientWidth, behavior});
       }
     });
   }
-  function syncHeroMotion(rail) {
+  function syncHeroPagination(rail) {
     if (!rail.isConnected || !rail.clientWidth) return;
     const active = Math.round(rail.scrollLeft / rail.clientWidth);
     rail.parentElement.querySelectorAll('[data-slide]').forEach(dot => {
-      const distance = Math.abs(Number(dot.dataset.slide) - active);
-      dot.setAttribute('aria-pressed', String(distance === 0));
-      dot.dataset.distance = Math.min(distance, 3);
-    });
-    const enabled = matchMedia('(max-width:767px) and (prefers-reduced-motion:no-preference)').matches;
-    const viewport = rail.getBoundingClientRect();
-    const center = viewport.left + viewport.width / 2;
-    rail.querySelectorAll('.nyx-prime-slide').forEach(slide => {
-      const bounds = slide.getBoundingClientRect();
-      const offset = (bounds.left + bounds.width / 2 - center) / Math.max(1, bounds.width);
-      slide.querySelectorAll('.nyx-prime-copy > h2,.nyx-prime-meta,.nyx-prime-trend,.nyx-prime-premium,.nyx-prime-brand')
-        .forEach((row, index) => {
-          const fade = enabled ? Math.max(0, 1 - Math.abs(offset) / (.72 - index * .025)) : 1;
-          row.style.setProperty('--hero-text-opacity', fade * fade * (3 - 2 * fade));
-          if (row.tagName === 'H2') {
-            const x = enabled ? Math.max(-1, Math.min(1, offset)) * 100 : 0;
-            row.style.setProperty('--hero-text-x', x + 'px');
-          }
-        });
+      dot.setAttribute('aria-pressed', String(Number(dot.dataset.slide) === active));
     });
   }
-  function page(name) {
-    document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
-    document.querySelector('.dmf3-filter').removeAttribute('data-local-search');
+  function page(name, user) {
+    const header = document.getElementById('pwa-header');
+    header.innerHTML = name === 'home' ? homeHeader(user) : PWA_SOURCE.header;
+    header.querySelector('.dmf3-filter')?.removeAttribute('data-local-search');
     document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
     document.getElementById('pwa-header').hidden = ['startup','login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments','followed-actors'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
@@ -486,5 +518,5 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, savedCard:card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
+  return {card, savedCard:card, actorPage, actorProfile, hero, homeSections, historyCard, episodeCards, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
 })();

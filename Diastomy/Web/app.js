@@ -185,14 +185,42 @@
     try {
       const data = await api('/api/app/v1/home/', { cache: true });
       whenCurrent(seq, () => {
-        $('#home-data').innerHTML = PWA.home(data);
+        const container = $('#home-data');
+        const featured = data.hero || [];
+        container.innerHTML = PWA.hero(featured) + PWA.homeSections(data);
+        const saveButtons = Array.from(container.querySelectorAll('[data-home-save]'));
+        saveButtons.forEach((button, index) => {
+          const item = featured[index];
+          button.onclick = async () => {
+            if (button.disabled) return;
+            button.disabled = true;
+            button.dataset.saveTouched = '';
+            try {
+              const kind = item.type || 'movie';
+              const id = item.id ?? (await api('/api/app/v1/title/' + enc(kind) + '/' + enc(item.slug) + '/', {cache:true})).id;
+              const result = await api('/api/bookmark/toggle/?item_type=' + enc(kind) + '&item_id=' + enc(id), {body:{}});
+              whenCurrent(seq, () => {
+                button.setAttribute('aria-pressed', String(result.is_bookmarked === true));
+                toast(result.message || 'لیست به‌روز شد.');
+              });
+            } catch (error) { whenCurrent(seq, () => toast(error.message)); }
+            finally { button.disabled = false; }
+          };
+        });
         if (state.user) api('/api/app/v1/library/').then(library => {
           whenCurrent(seq, () => {
-            const container = $('#home-data');
+            saveButtons.forEach((button, index) => {
+              if (button.hasAttribute('data-save-touched')) return;
+              const item = featured[index];
+              const saved = (library.saved || []).some(entry => entry.type === (item.type || 'movie') &&
+                (item.id != null ? Number(entry.id) === Number(item.id) : entry.slug === item.slug));
+              button.setAttribute('aria-pressed', String(saved));
+            });
             const entries = library.history || [];
-            container.innerHTML = PWA.home(data, entries) +
+            container.querySelector('.dm-pwa-home-v54').remove();
+            container.insertAdjacentHTML('beforeend', PWA.homeSections(data, entries) +
               '<dialog id="home-history-menu" aria-label="گزینه‌های ادامه تماشا"><form method="dialog"><button aria-label="بستن">×</button></form>' +
-              '<button type="button" id="home-history-resume" data-play="" data-resume>ادامه تماشا</button><a>اطلاعات فیلم</a></dialog>';
+              '<button type="button" id="home-history-resume" data-play="" data-resume>ادامه تماشا</button><a>اطلاعات فیلم</a></dialog>');
             loadHistoryFrames(container);
             const menu = $('#home-history-menu');
             container.onclick = event => {
@@ -520,7 +548,7 @@
         button.setAttribute('aria-pressed', String(enabled)));
     });
   }
-  async function detail(seq, kind, slug) {
+  async function detail(seq, kind, slug, watch) {
     mount(shell('جزئیات عنوان', '<div id="detail-data" class="loading"></div>'));
     try {
       const data = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/', { cache: true });
@@ -689,6 +717,16 @@
           } catch (error) { whenCurrent(seq, () => toast(error.message)); }
           finally { bookmark.disabled = false; }
         };
+        if (watch) {
+          history.replaceState(history.state, '', location.hash.split('?')[0]);
+          if (kind === 'series') {
+            requestAnimationFrame(() => whenCurrent(seq, () => $('#series-episodes')?.scrollIntoView({block:'center'})));
+          } else {
+            const play = $('.dm-film-buttons [data-play]');
+            if (play) play.click();
+            else toast('منبع قابل پخش موجود نیست.');
+          }
+        }
       });
     } catch (error) { whenCurrent(seq, () => mount(shell('جزئیات عنوان', empty(error.message)))); }
   }
@@ -1932,14 +1970,14 @@
     previousRoute = path;
     const loadingTimer = animateRoute && !firstSecondaryRoute && !['login','otp','forgot','rooms','room'].includes(name)
       ? setTimeout(() => whenCurrent(seq, () => { if (!document.activeElement?.matches('.reference-search-form input')) loader.hidden = false; }), 100) : null;
-    PWA.page(name);
+    PWA.page(name, state.user);
     document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
     window.scrollTo(0,0);
     try {
       if (name === 'home') await home(seq);
       else if (name === 'browse') await browse(seq, parts[1] || 'all', params);
       else if (name === 'search') await searchPage(seq, params.get('q') || '');
-      else if (name === 'title') await detail(seq, parts[1], parts[2]);
+      else if (name === 'title') await detail(seq, parts[1], parts[2], params.get('watch') === '1');
       else if (name === 'actors' || name === 'actor') await actors(seq, parts[1], parts[2]);
       else if (name === 'library') await library(seq, params);
       else if (name === 'login') login();
@@ -2023,7 +2061,7 @@
     route();
   }
   document.addEventListener('click', event => {
-    if (event.target.closest('.dmf3-filter')) { openFilters(); return; }
+    if (event.target.closest('.dmf3-filter,[data-local-filter]')) { openFilters(); return; }
     if (!event.target.closest('[data-local-search]') || !state.user) return;
     event.preventDefault();
     event.stopImmediatePropagation();
