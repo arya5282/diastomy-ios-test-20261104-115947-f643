@@ -42,6 +42,11 @@ window.PWA = (() => {
       '<svg class="home-poster-mark" aria-hidden="true" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg>' +
       '</span>' + titleCardMetadata(item, false) + '</a>';
   }
+  function featuredPoster(item) {
+    return '<a href="' + titleURL(item) + '" class="dm54-vcard title-card home-featured-poster" aria-label="' + name(item) +
+      '"><span class="dm54-poster"><img class="dm54-poster-img" src="' + media(item.cover) +
+      '" alt="" loading="lazy" decoding="async"></span></a>';
+  }
   function actorPage() {
     return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
       PWA_SOURCE.actorBack + '</a><h1>بازیگران</h1><button class="dm-actor-menu" type="button" data-local-menu aria-label="منو">' +
@@ -138,11 +143,14 @@ window.PWA = (() => {
       "sci-fi": "/static/public/assets/images/genre-user-v2/sci-fi-a837508e6156.jpg"
     };
   function homeSections(data, history = []) {
-    const order = [
-      'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_series',
+    const rails = data.rails || [];
+    const seriesRail = ['popular_series', 'trending_series', 'pwa_latest_series']
+      .find(key => rails.some(rail => rail.key === key && rail.items.length));
+    const order = new Set([
+      'continue_watching', 'trending_movies', seriesRail, 'genres', 'pwa_turkish_series', 'pwa_free_series',
       'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies', 'pwa_free_movies',
       'pwa_dubbed_series', 'pwa_recommended', 'animations'
-    ];
+    ]);
     const sections = new Map();
     const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'romance', 'family', 'musical', 'documentary', 'animation', 'art', 'kids'];
     const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
@@ -153,20 +161,21 @@ window.PWA = (() => {
       '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';
     sections.set('genres', genreHTML);
     sections.set('continue_watching', continueHTML);
-    for (const rail of data.rails || []) {
+    for (const rail of rails) {
       const key = rail.key || 'pwa_latest_movies';
       if (!rail.items.length && key !== 'pwa_free_series') continue;
       const wide = ['pwa_free_movies','pwa_free_series'].includes(key);
       const heading = ({pwa_turkish_series:'سریال‌های ترکیه‌ای',pwa_free_series:'سریال‌های بدون نیاز به اشتراک',trending_movies:'ترندترین فیلم‌ها'})[key] || rail.title;
+      const featuredPosters = key === 'trending_movies' || key === seriesRail;
       const link = '#/browse/' + (key.includes('series') ? 'series' : 'movie');
-      sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
+      sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : featuredPosters ? ' home-poster-section' : '') +
         '"><div class="dm54-head"><h2>' + esc(heading) + '</h2><a href="' + link +
         '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
-        (rail.items.length ? rail.items.map(wide ? landscape : homePoster).join('') : '<p>فعلاً سریال رایگانی در دسترس نیست.</p>') + '</div></section>');
+        (rail.items.length ? rail.items.map(wide ? landscape : featuredPosters ? featuredPoster : homePoster).join('') : '<p>فعلاً سریال رایگانی در دسترس نیست.</p>') + '</div></section>');
     }
     return '<div class="dm-pwa-home-v54 dm-figma-home-v2">' +
-      order.map(key => sections.get(key) || '').join('') +
-      [...sections].filter(([key]) => !order.includes(key)).map(([, html]) => html).join('') + '</div>';
+      [...order].map(key => sections.get(key) || '').join('') +
+      [...sections].filter(([key]) => !order.has(key)).map(([, html]) => html).join('') + '</div>';
   }
   function historyCard(item, index, home = false) {
     const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
@@ -175,12 +184,35 @@ window.PWA = (() => {
     const minutes = Math.ceil(remaining / 60);
     const homeTime = (minutes >= 60 ? Math.floor(minutes / 60) + 'h ' : '') + minutes % 60 + 'm left';
     const frame = String(item.snapshot || '').match(/^(?:https:\/\/diastomy\.top)?(\/api\/watch-frame\/[1-9]\d*\/(?:\?v=\d+)?)$/)?.[1];
+    const options = index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
+      index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>';
+    const progressBar = '<progress class="local-library-progress" dir="' + (home ? 'ltr' : 'rtl') +
+      '" max="100" value="' + progress + '" aria-label="پیشرفت تماشا"></progress>';
+    if (home) {
+      const artwork = item.history_cover || item.landscape_artwork || item.banner;
+      const season = item.season_number ?? item.season;
+      const episode = item.episode_number ?? item.episode;
+      const subtitle = item.type === 'series' && season > 0 && episode > 0
+        ? 'S' + esc(season) + ':E' + esc(episode) + (item.episode_title ? ' – ' + esc(item.episode_title) : '')
+        : item.total > 0 ? homeTime : '';
+      const playIcon = '<svg viewBox="0 0 18 18" aria-hidden="true"><path fill="currentColor" d="M6 3.5v11l8-5.5z"/></svg>';
+      const playLabel = ' aria-label="ادامهٔ تماشای ' + name(item) + '"';
+      const play = Number(item.video_id) > 0
+        ? '<button class="home-history-play" type="button" data-play="' + esc(item.video_id) +
+          '" data-kind="' + esc(item.type || 'movie') + '" data-resume' + playLabel + '>' + playIcon + '</button>'
+        : '<a class="home-history-play" href="' + titleURL(item) + '"' + playLabel + '>' + playIcon + '</a>';
+      return '<article class="library-history-card"><div class="library-history-thumb" dir="ltr">' +
+        '<img src="' + media(artwork || item.cover) + '" alt=""' +
+        (frame && !artwork ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' +
+        '<a class="home-history-copy" href="' + titleURL(item) + '"><strong dir="auto">' + name(item) +
+        '</strong>' + (subtitle ? '<small dir="auto">' + subtitle + '</small>' : '') + '</a>' +
+        play + progressBar + options + '</div></article>';
+    }
     return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '" aria-label="ادامه تماشا">' +
-      '<img src="' + (home ? media(item.history_cover || item.landscape_artwork || item.banner || item.cover) : '/static/public/assets/img/continue-scene-pending-v1.svg') + '" alt="' + esc(item.title) + '"' +
-      (frame && (!home || !item.history_cover && !item.landscape_artwork && !item.banner) ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
-      '<progress class="local-library-progress" dir="rtl" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><small dir="ltr">' +
-      (home ? homeTime : time + ' باقی‌مانده') + '</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
-      index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>') + '</div></article>';
+      '<img src="/static/public/assets/img/continue-scene-pending-v1.svg" alt="' + esc(item.title) + '"' +
+      (frame ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
+      progressBar + '</a><div class="library-history-meta"><small dir="ltr">' +
+      time + ' باقی‌مانده</small>' + options + '</div></article>';
   }
   function downloadOptions(options) {
     return options.map(option => '<button type="button" data-download="' + esc(option.id) + '">' + esc(option.quality) + '</button>').join('');
