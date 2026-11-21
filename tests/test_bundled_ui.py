@@ -155,7 +155,7 @@ with sync_playwright() as playwright:
     page.wait_for_selector('.home-hero-card', timeout=1500)
     page.locator('[data-local-menu]').click()
     page.wait_for_function('document.querySelector("h1").textContent === "پروفایل کاربری"', timeout=1500)
-    page.locator('nav a[data-nav-slot="home"]').click()
+    page.locator('.dm-app-menu-close').click()
     page.wait_for_selector('.home-hero-card', timeout=1500)
     print('PASS: footer switching and stale cached content never wait for unresolved API requests')
     # A signed-out or unverified installation must render sign-in, including on a deep link.
