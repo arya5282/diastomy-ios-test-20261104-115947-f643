@@ -21,9 +21,8 @@ window.PWA = (() => {
     const runtime = item.type !== 'series' && Number.isFinite(minutes) && minutes > 0
       ? [minutes >= 60 ? Math.floor(minutes / 60) + 'h' : '', minutes % 60 ? minutes % 60 + 'm' : ''].filter(Boolean).join(' ')
       : '';
-    const season = item.season_number ?? item.season;
     const episode = item.episode_number ?? item.episode;
-    const details = season ? 'Season ' + esc(season) : [esc(item.production_year), genres(item, 2)].filter(Boolean).join(' / ');
+    const details = [esc(item.production_year), genres(item, 1)].filter(Boolean).join('/');
     const trailing = episode ? 'Episode ' + esc(episode) : runtime;
     return '<span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) + '</strong>' + score +
       '</span><small class="title-card-row"><span class="title-card-details">' + details + '</span>' +

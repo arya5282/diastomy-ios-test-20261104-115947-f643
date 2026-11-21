@@ -1143,25 +1143,31 @@ body .reference-film-summary .dm-film-description.expanded{-webkit-line-clamp:un
 body[data-page=local-followed-actors] #app .settings-follow-row{margin:0 0 8px}
 
 /* Catalogue cards share the same typography in rails and grids. */
-html body #app .dm54-vcard.title-card{height:auto!important}
+html body #app .dm54-vcard.title-card{
+  flex:0 0 74px!important;width:100%!important;min-width:0!important;
+  max-width:74px!important;height:auto!important;
+}
+html body #app .local-library-saved:has(.title-card){width:min(100%,74px)}
 html body #app .title-card .dm54-poster{
   box-sizing:border-box;width:100%!important;height:auto!important;aspect-ratio:2/3!important;
   border:0!important;border-radius:7px!important;box-shadow:none!important;
 }
 html body #app .title-card .dm54-poster::after{content:none!important}
-html body #app :is(.dm-search-recommendations,.dm-search-live-results,.dm-actor-grid) .title-card{
-  width:100%!important;min-width:0!important;max-width:none!important;
-}
 html body #app .dm54-vtrack{
   display:flex;gap:8px;align-items:flex-start;overflow-x:auto;scrollbar-width:none;
   padding-inline:16px;
 }
 html body #app .dm54-horizontal-section .dm54-htrack{height:auto!important}
-#app .title-card-meta{display:grid;min-width:0;gap:3px;margin-top:6px;color:white;font:500 11px/1.35 "PWA Inter",Arial,sans-serif}
-#app .title-card-row{display:flex;align-items:baseline;justify-content:space-between;gap:4px;min-width:0}
+html body #app .dm54-horizontal-section .dm54-hcard.title-card{
+  flex:0 0 184px!important;width:184px!important;min-width:0!important;
+  max-width:184px!important;height:auto!important;
+}
+html body #app .title-card .dm54-landscape{width:100%!important;height:auto!important;aspect-ratio:16/9}
+#app .title-card-meta{display:grid;min-width:0;gap:2px;margin-top:4px;color:white;font:500 9px/1.35 "PWA Inter",Arial,sans-serif}
+#app .title-card-row{display:flex;align-items:baseline;justify-content:space-between;gap:3px;min-width:0}
 #app .title-card-row strong,#app .title-card-details{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #app .title-card-row strong{font-weight:650}
-#app small.title-card-row{color:#aaa;font-size:9px}
+#app small.title-card-row{color:#aaa;font-size:7px}
 #app .title-card-score,#app .title-card-trailing{flex:none;font-variant-numeric:tabular-nums;white-space:nowrap}
-#app .title-card-score{display:inline-flex;align-items:center;gap:2px;font-size:9px;color:#eee}
-#app .title-card-score svg{display:block;width:10px;height:10px;fill:#ffd454}
+#app .title-card-score{display:inline-flex;align-items:center;gap:2px;font-size:8px;color:#eee}
+#app .title-card-score svg{display:block;width:8px;height:8px;fill:#ffd454}
