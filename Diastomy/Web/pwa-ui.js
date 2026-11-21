@@ -18,7 +18,7 @@ window.PWA = (() => {
     return item.imdb_rating ? '<span class="' + cssClass + '" aria-label="IMDb ' +
       rating(item.imdb_rating) + '">' + star + rating(item.imdb_rating) + '</span>' : '';
   }
-  function titleCardMetadata(item, showScore = true) {
+  function titleCardMetadata(item) {
     const minutes = Math.floor(Number(item.duration));
     const runtime = item.type !== 'series' && Number.isFinite(minutes) && minutes > 0
       ? [minutes >= 60 ? Math.floor(minutes / 60) + 'h' : '', minutes % 60 ? minutes % 60 + 'm' : ''].filter(Boolean).join(' ')
@@ -26,7 +26,7 @@ window.PWA = (() => {
     const episode = item.episode_number ?? item.episode;
     const details = [esc(item.production_year), genres(item, 1)].filter(Boolean).join('/');
     const trailing = episode ? 'Episode ' + esc(episode) : runtime;
-    return '<span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) + '</strong>' + (showScore ? titleCardScore(item) : '') +
+    return '<span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) + '</strong>' + titleCardScore(item) +
       '</span><small class="title-card-row"><span class="title-card-details">' + details + '</span>' +
       (trailing ? '<span class="title-card-trailing">' + trailing + '</span>' : '') + '</small></span>';
   }
@@ -40,7 +40,8 @@ window.PWA = (() => {
       '<img class="dm54-poster-img" src="' + media(item.cover) + '" alt="" loading="lazy" decoding="async">' +
       titleCardScore(item, 'home-poster-rating') +
       '<svg class="home-poster-mark" aria-hidden="true" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg>' +
-      '</span>' + titleCardMetadata(item, false) + '</a>';
+      '</span>' + '<span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) +
+      '</strong></span><small class="title-card-details">' + genres(item, 2) + '</small></span></a>';
   }
   function actorPage() {
     return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
@@ -127,8 +128,8 @@ window.PWA = (() => {
     };
   function home(data, history = []) {
     const order = [
-      'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_series',
-      'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies', 'pwa_free_movies',
+      'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_movies',
+      'pwa_free_series', 'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies',
       'pwa_dubbed_series', 'pwa_recommended', 'animations'
     ];
     const sections = new Map();
@@ -145,7 +146,8 @@ window.PWA = (() => {
       const key = rail.key || 'pwa_latest_movies';
       if (!rail.items.length && key !== 'pwa_free_series') continue;
       const wide = ['pwa_free_movies','pwa_free_series'].includes(key);
-      const heading = ({pwa_turkish_series:'سریال‌های ترکیه‌ای',pwa_free_series:'سریال‌های بدون نیاز به اشتراک',trending_movies:'ترندترین فیلم‌ها'})[key] || rail.title;
+      const heading = ({pwa_turkish_series: 'سریال‌های ترکیه‌ای', pwa_free_movies: 'بدون نیاز به اشتراک',
+        pwa_free_series: 'سریال‌های بدون نیاز به اشتراک', trending_movies: 'ترندترین‌ها'})[key] || rail.title;
       const link = '#/browse/' + (key.includes('series') ? 'series' : 'movie');
       sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
         '"><div class="dm54-head"><h2>' + esc(heading) + '</h2><a href="' + link +
