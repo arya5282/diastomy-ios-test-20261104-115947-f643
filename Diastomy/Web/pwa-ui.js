@@ -14,16 +14,26 @@ window.PWA = (() => {
   const star = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2 2 9.3l6.9-1L12 2Z"/></svg>';
   const genres = (item, limit = 3) => (item.genres || []).map(g => esc(typeof g === 'string' ? g : g.name)).slice(0, limit).join(' · ');
   const name = item => esc(item.english_title_full || item.title);
-  function renderCard(item, saved) {
-    const genreText = saved ? (item.genres || []).slice(0,2).map(g => esc(typeof g === "string" ? g : (g.name_en || g.name))).join(", ") : genres(item, 2);
-    return '<a href="' + titleURL(item) + '" class="dm54-vcard" dir="ltr"><span class="dm54-poster">' +
-      '<img class="dm54-poster-img" src="' + media(item.cover) + '" alt="' + esc(item.title) + '" loading="lazy" decoding="async">' +
-      (item.imdb_rating ? '<span class="dm54-rating"><b>' + rating(item.imdb_rating) + '</b>' + star + '</span>' : '') +
-      (saved ? '<span class="dm54-poster-brand" aria-hidden="true"><img src="/assets/library-mark.svg" alt=""></span>' :
-      '<span class="dm54-poster-brand" aria-hidden="true"><svg class="dmf54-poster-mark" width="28" height="24" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg></span>') +
-      '</span><span class="dm54-vmeta"><strong>' + name(item) + '</strong><small class="dm54-old-genres">' + (saved ? genreText || "DIASTOMY" : genreText) + '</small></span></a>';
+  function titleCardMetadata(item) {
+    const score = item.imdb_rating ? '<span class="title-card-score" aria-label="IMDb ' +
+      rating(item.imdb_rating) + '">' + star + rating(item.imdb_rating) + '</span>' : '';
+    const minutes = Math.floor(Number(item.duration));
+    const runtime = item.type !== 'series' && Number.isFinite(minutes) && minutes > 0
+      ? [minutes >= 60 ? Math.floor(minutes / 60) + 'h' : '', minutes % 60 ? minutes % 60 + 'm' : ''].filter(Boolean).join(' ')
+      : '';
+    const season = item.season_number ?? item.season;
+    const episode = item.episode_number ?? item.episode;
+    const details = season ? 'Season ' + esc(season) : [esc(item.production_year), genres(item, 2)].filter(Boolean).join(' / ');
+    const trailing = episode ? 'Episode ' + esc(episode) : runtime;
+    return '<span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) + '</strong>' + score +
+      '</span><small class="title-card-row"><span class="title-card-details">' + details + '</span>' +
+      (trailing ? '<span class="title-card-trailing">' + trailing + '</span>' : '') + '</small></span>';
   }
-  function card(item) { return renderCard(item, false); }
+  function card(item) {
+    return '<a href="' + titleURL(item) + '" class="dm54-vcard title-card" dir="ltr"><span class="dm54-poster">' +
+      '<img class="dm54-poster-img" src="' + media(item.cover) + '" alt="" loading="lazy" decoding="async">' +
+      '</span>' + titleCardMetadata(item) + '</a>';
+  }
   function actorPage() {
     return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
       PWA_SOURCE.actorBack + '</a><h1>بازیگران</h1><button class="dm-actor-menu" type="button" data-local-menu aria-label="منو">' +
@@ -31,11 +41,7 @@ window.PWA = (() => {
   }
   function actorProfile(data, slug) {
     const actor = data.actor;
-    const films = data.filmography.map(item => '<a class="dm-actor-film" href="' + titleURL(item) + '"><div class="dm-actor-poster"><img src="' +
-      media(item.cover) + '" alt="' + name(item) + '" loading="lazy" width="180" height="240">' +
-      (item.imdb_rating ? '<span class="dm-actor-rating" dir="ltr">' + rating(item.imdb_rating) + star + '</span>' : '') +
-      '<span class="dm-actor-mark" aria-hidden="true"><img src="' + logo + '" alt=""></span></div><h3 dir="ltr">' +
-      name(item) + '</h3><p class="dm-actor-genres" dir="ltr">' + (item.genres || []).map(esc).join(', ') + '</p></a>').join('');
+    const films = data.filmography.map(card).join('');
     const href = '#/actor/' + encodeURIComponent(slug) + '/';
     const bio = actor.bio_fa || (/[\u0600-\u06FF]/.test(actor.bio || '') ? actor.bio : '');
     return '<section class="dm-actor-profile" aria-label="معرفی بازیگر"><img class="dm-actor-photo" src="' +
@@ -63,11 +69,9 @@ window.PWA = (() => {
   function landscape(item) {
     const wide = item.landscape_artwork || (item.type === 'movie' && freeMovieArtwork.get(item.slug));
     const fallback = media(item.banner || item.cover);
-    return '<a href="' + titleURL(item) + '" class="dm54-hcard" dir="ltr"><span class="dm54-landscape"><img src="' + (wide ? media(wide) : fallback) +
+    return '<a href="' + titleURL(item) + '" class="dm54-hcard title-card" dir="ltr"><span class="dm54-landscape"><img src="' + (wide ? media(wide) : fallback) +
       (wide ? '" data-landscape-fallback="' + fallback : '') +
-      '" alt="' + esc(item.title) + '" loading="lazy" decoding="async"><span class="dm54-landscape-shade"></span><span class="dm54-landscape-brand"><img src="' + logo +
-      '" alt=""></span></span><span class="dm54-hmeta"><strong>' + name(item) + '</strong><small class="dm54-hdetails"><span class="dm54-hgenres">' +
-      genres(item, 2) + '</span><span>' + esc(item.production_year) + '</span><span class="dm54-hscore">' + esc(item.imdb_rating || '') + star + '</span></small></span></a>';
+      '" alt="" loading="lazy" decoding="async"></span>' + titleCardMetadata(item) + '</a>';
   }
   function hero(items) {
     if (!items.length) return '';
@@ -473,5 +477,5 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, savedCard:item => renderCard(item, true), actorPage, actorProfile, home, historyCard, episodeCards, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
+  return {card, savedCard:card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
 })();
