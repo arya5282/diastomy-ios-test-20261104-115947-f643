@@ -14,9 +14,11 @@ window.PWA = (() => {
   const star = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2 2 9.3l6.9-1L12 2Z"/></svg>';
   const genres = (item, limit = 3) => (item.genres || []).map(g => esc(typeof g === 'string' ? g : g.name)).slice(0, limit).join(' · ');
   const name = item => esc(item.english_title_full || item.title);
-  function titleCardMetadata(item) {
-    const score = item.imdb_rating ? '<span class="title-card-score" aria-label="IMDb ' +
+  function titleCardScore(item, cssClass = 'title-card-score') {
+    return item.imdb_rating ? '<span class="' + cssClass + '" aria-label="IMDb ' +
       rating(item.imdb_rating) + '">' + star + rating(item.imdb_rating) + '</span>' : '';
+  }
+  function titleCardMetadata(item, showScore = true) {
     const minutes = Math.floor(Number(item.duration));
     const runtime = item.type !== 'series' && Number.isFinite(minutes) && minutes > 0
       ? [minutes >= 60 ? Math.floor(minutes / 60) + 'h' : '', minutes % 60 ? minutes % 60 + 'm' : ''].filter(Boolean).join(' ')
@@ -24,7 +26,7 @@ window.PWA = (() => {
     const episode = item.episode_number ?? item.episode;
     const details = [esc(item.production_year), genres(item, 1)].filter(Boolean).join('/');
     const trailing = episode ? 'Episode ' + esc(episode) : runtime;
-    return '<span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) + '</strong>' + score +
+    return '<span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) + '</strong>' + (showScore ? titleCardScore(item) : '') +
       '</span><small class="title-card-row"><span class="title-card-details">' + details + '</span>' +
       (trailing ? '<span class="title-card-trailing">' + trailing + '</span>' : '') + '</small></span>';
   }
@@ -32,6 +34,13 @@ window.PWA = (() => {
     return '<a href="' + titleURL(item) + '" class="dm54-vcard title-card" dir="ltr"><span class="dm54-poster">' +
       '<img class="dm54-poster-img" src="' + media(item.cover) + '" alt="" loading="lazy" decoding="async">' +
       '</span>' + titleCardMetadata(item) + '</a>';
+  }
+  function homePoster(item) {
+    return '<a href="' + titleURL(item) + '" class="dm54-vcard title-card home-poster-card" dir="ltr"><span class="dm54-poster">' +
+      '<img class="dm54-poster-img" src="' + media(item.cover) + '" alt="" loading="lazy" decoding="async">' +
+      titleCardScore(item, 'home-poster-rating') +
+      '<svg class="home-poster-mark" aria-hidden="true" viewBox="0 0 28 24"><use href="#dm-poster-mark-v1"/></svg>' +
+      '</span>' + titleCardMetadata(item, false) + '</a>';
   }
   function actorPage() {
     return '<header class="dm-actor-header" dir="ltr"><a class="dm-actor-back" href="#/actors" aria-label="بازگشت">' +
@@ -70,7 +79,8 @@ window.PWA = (() => {
     const fallback = media(item.banner || item.cover);
     return '<a href="' + titleURL(item) + '" class="dm54-hcard title-card" dir="ltr"><span class="dm54-landscape"><img src="' + (wide ? media(wide) : fallback) +
       (wide ? '" data-landscape-fallback="' + fallback : '') +
-      '" alt="" loading="lazy" decoding="async"></span>' + titleCardMetadata(item) + '</a>';
+      '" alt="" loading="lazy" decoding="async"><span class="dm54-landscape-brand" aria-hidden="true"><img src="' + logo +
+      '" alt=""></span></span>' + titleCardMetadata(item) + '</a>';
   }
   function hero(items) {
     if (!items.length) return '';
@@ -140,7 +150,7 @@ window.PWA = (() => {
       sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
         '"><div class="dm54-head"><h2>' + esc(heading) + '</h2><a href="' + link +
         '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
-        (rail.items.length ? rail.items.map(wide ? landscape : card).join('') : '<p>فعلاً سریال رایگانی در دسترس نیست.</p>') + '</div></section>');
+        (rail.items.length ? rail.items.map(wide ? landscape : homePoster).join('') : '<p>فعلاً سریال رایگانی در دسترس نیست.</p>') + '</div></section>');
     }
     return hero(data.hero || []) + '<div class="dm-pwa-home-v54 dm-figma-home-v2">' +
       order.map(key => sections.get(key) || '').join('') +

@@ -439,7 +439,7 @@ html body #dm-auth-reference .reference-sms{
 .reference-episode-head strong{font-family:"PWA Inter",Arial,sans-serif;font-weight:600}
 .reference-episode-seen{vertical-align:middle;margin-left:6px;color:#bbb}
 html.dmf3-active body[data-page=home] #app .nyx-prime-shade{
-  display:block!important;background:linear-gradient(to bottom,transparent 36%,#0004 58%,#10131ce8 86%,var(--home-background) 100%)!important;
+  display:block!important;background:linear-gradient(to bottom,transparent 36%,#0004 58%,#0d0f16e8 86%,var(--home-background) 100%)!important;
 }
 html.dmf3-active body[data-page=home] #app .nyx-prime-meta{gap:5px!important}
 html.dmf3-active body[data-page=home] #app .nyx-prime-age{
@@ -1004,7 +1004,7 @@ html.dmf3-active body[data-page=home] .dmf3-root #app .dm54-genres .dm54-genre-t
   color:white;scroll-snap-align:start;
 }
 
-html.dmf3-active:has(body[data-page=home]){--home-background:#10131c;background:var(--home-background)!important}
+html.dmf3-active:has(body[data-page=home]){--home-background:#0d0f16;background:var(--home-background)!important}
 html.dmf3-active body[data-page=home],
 html.dmf3-active body[data-page=home] .dmf3-root,
 html.dmf3-active body[data-page=home] #pwa-header .dmf3-header,
@@ -1171,3 +1171,29 @@ html body #app .title-card .dm54-landscape{width:100%!important;height:auto!impo
 #app .title-card-score,#app .title-card-trailing{flex:none;font-variant-numeric:tabular-nums;white-space:nowrap}
 #app .title-card-score{display:inline-flex;align-items:center;gap:2px;font-size:8px;color:#eee}
 #app .title-card-score svg{display:block;width:8px;height:8px;fill:#ffd454}
+
+html.dmf3-active body[data-page=home] #app .home-poster-card{
+  --card-width:clamp(72px,23vw,100px);
+  flex-basis:var(--card-width)!important;width:var(--card-width)!important;
+  max-width:var(--card-width)!important;
+}
+body[data-page=home] #app .dm54-vtrack{direction:rtl;gap:8px}
+body[data-page=home] #app .dm54-head{margin-bottom:8px!important}
+body[data-page=home] #app .dm54-head h2{font-size:13px!important}
+body[data-page=home] #app .dm54-head a{font-size:9px!important}
+#app .home-poster-rating{
+  position:absolute;inset:4px auto auto 4px;display:inline-flex;align-items:center;gap:2px;
+  padding:2px 4px;border-radius:20px;background:#1a1c24e8;color:#fff;font:700 8px/1 Arial,sans-serif;
+}
+#app .home-poster-rating svg{width:7px;height:7px;fill:#ff742b}
+#app .home-poster-mark{position:absolute;right:2px;bottom:2px;width:22px;height:19px}
+html.dmf3-active body[data-page=home] .dmf3-root #app .dm54-genre-track .home-genre-card{
+  flex-basis:calc((100% - 2 * var(--genre-gap)) / 3);
+}
+html.dmf3-active body[data-page=home] #app .dm54-horizontal-section .dm54-hcard.title-card{
+  --card-width:clamp(196px,66vw,285px);
+  flex-basis:var(--card-width)!important;width:var(--card-width)!important;max-width:var(--card-width)!important;
+}
+body[data-page=home] #app .reference-continue .library-history-card{
+  flex-basis:calc((100% - 8px) / 2);
+}
