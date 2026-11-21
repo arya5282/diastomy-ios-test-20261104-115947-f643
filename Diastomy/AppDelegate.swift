@@ -47,7 +47,8 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
     private var didPreloadTabs = false
     private var swipeOrigin: Int?
     private var swipeTabWidth: CGFloat = 1
-    private let compactTabBarScale: CGFloat = 0.95
+    private let compactTabBarWidthScale: CGFloat = 0.77
+    private let compactTabBarHeightScale: CGFloat = 0.95
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -83,10 +84,12 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         guard #available(iOS 26.0, *), let count = viewControllers?.count, count > 0 else { return }
-        let fitsTouchTargets = tabBar.bounds.width * compactTabBarScale >= 44 * CGFloat(count)
-            && tabBar.bounds.height * compactTabBarScale >= 44
-        let scale = fitsTouchTargets ? compactTabBarScale : 1
-        let transform = CGAffineTransform(scaleX: scale, y: scale)
+        let width = tabBar.bounds.width
+        let height = tabBar.bounds.height
+        guard width > 0, height > 0 else { return }
+        let widthScale = min(1, max(compactTabBarWidthScale, 44 * CGFloat(count) / width))
+        let heightScale = min(1, max(compactTabBarHeightScale, 44 / height))
+        let transform = CGAffineTransform(scaleX: widthScale, y: heightScale)
         if tabBar.transform != transform {
             tabBar.transform = transform
         }
