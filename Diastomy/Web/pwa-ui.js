@@ -12,7 +12,7 @@ window.PWA = (() => {
   const rating = value => esc(String(value).replace(/[۰-۹٠-٩]/g, digit =>
     String(digit.charCodeAt(0) & 15)).replace(/٫/g, '.'));
   const star = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21 7 14.2 2 9.3l6.9-1L12 2Z"/></svg>';
-  const genres = (item, limit = 3) => (item.genres || []).map(g => esc(typeof g === 'string' ? g : g.name)).slice(0, limit).join(' · ');
+  const genres = (item, limit = 3, separator = ' · ') => (item.genres || []).map(g => esc(typeof g === 'string' ? g : g.name)).slice(0, limit).join(separator);
   const name = item => esc(item.english_title_full || item.title);
   function titleCardScore(item, cssClass = 'title-card-score') {
     return item.imdb_rating ? '<span class="' + cssClass + '" aria-label="IMDb ' +
@@ -78,10 +78,18 @@ window.PWA = (() => {
   function landscape(item) {
     const wide = item.landscape_artwork || (item.type === 'movie' && freeMovieArtwork.get(item.slug));
     const fallback = media(item.banner || item.cover);
+    const genreNames = genres(item, 2, ', ');
+    const details = [
+      genreNames && '<span class="title-card-details">' + genreNames + '</span>',
+      item.production_year && '<span>' + esc(item.production_year) + '</span>',
+      titleCardScore(item)
+    ].filter(Boolean).join('');
     return '<a href="' + titleURL(item) + '" class="dm54-hcard title-card" dir="ltr"><span class="dm54-landscape"><img src="' + (wide ? media(wide) : fallback) +
       (wide ? '" data-landscape-fallback="' + fallback : '') +
       '" alt="" loading="lazy" decoding="async"><span class="dm54-landscape-brand" aria-hidden="true"><img src="' + logo +
-      '" alt=""></span></span>' + titleCardMetadata(item) + '</a>';
+      '" alt=""></span></span><span class="title-card-meta"><span class="title-card-row"><strong>' + name(item) +
+      '</strong></span>' + (details ? '<small class="title-card-row home-landscape-details">' + details + '</small>' : '') +
+      '</span></a>';
   }
   function hero(items) {
     if (!items.length) return '';
