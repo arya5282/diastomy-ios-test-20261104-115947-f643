@@ -43,7 +43,7 @@
           const sequence = state.sequence;
           const refresh = api(path, { cache: true, networkOnly: true }).then(data => {
             if (state.sequence === sequence && location.hash === hash &&
-                JSON.stringify(data) !== JSON.stringify(saved.data)) route();
+                opts.refreshRoute !== false && JSON.stringify(data) !== JSON.stringify(saved.data)) route();
           }).catch(() => {}).finally(() => publicRefresh.delete(path));
           publicRefresh.set(path, refresh);
         }
@@ -867,13 +867,46 @@
     if (initial === 'downloads') loadDownloads();
     return loadCollection();
   }
+  function authPhoneField(name, label, type, attributes) {
+    return '<div class="dm-auth-phone-field"><span class="dm-auth-phone-icon" aria-hidden="true">' +
+      PWA_SOURCE.authPhone + '</span><input name="' + name + '" type="' + type +
+      '" dir="auto" aria-label="' + label + '" placeholder="' + label + '" ' + attributes + ' required></div>';
+  }
+  function authPasswordField(autocomplete, minimum = '') {
+    return '<div class="reference-password-field"><input type="password" name="password" autocomplete="' +
+      autocomplete + '" aria-label="رمز عبور" placeholder="رمز عبور" ' + minimum + ' required>' +
+      '<button type="button" id="toggle-password" aria-label="نمایش رمز عبور" aria-pressed="false">' +
+      PWA_SOURCE.passwordHidden + '</button></div>';
+  }
+  function bindAuthPassword() {
+    const toggle = $('#toggle-password');
+    toggle.onclick = () => {
+      const input = toggle.previousElementSibling;
+      const visible = input.type === 'password';
+      input.type = visible ? 'text' : 'password';
+      toggle.innerHTML = visible ? PWA_SOURCE.passwordVisible : PWA_SOURCE.passwordHidden;
+      toggle.setAttribute('aria-pressed', String(visible));
+      toggle.setAttribute('aria-label', visible ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور');
+    };
+  }
+  function authCodeField() {
+    return '<div class="auth-code-field" dir="ltr"><div class="auth-code-cells" aria-hidden="true">' +
+      '<span></span>'.repeat(6) + '</div><input name="code" aria-label="کد تأیید شش‌رقمی" inputmode="numeric" ' +
+      'autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></div>';
+  }
+  function bindAuthCode() {
+    const input = $('.auth-code-field input');
+    input.addEventListener('input', () => {
+      input.value = input.value.replace(/[۰-۹٠-٩]/g, digit => String(digit.charCodeAt(0) & 15)).replace(/[^0-9]/g, '');
+      const cells = input.previousElementSibling.children;
+      Array.from(cells).forEach((cell, index) => { cell.textContent = input.value[index] || ''; });
+    });
+  }
   function login(previousIdentifier = '') {
-    const identifierField = '<div class="dm-auth-phone-field"><input name="identifier" type="text" dir="ltr" autocomplete="username" inputmode="email" required ' +
-      'aria-label="شماره موبایل یا ایمیل" placeholder="شماره موبایل یا ایمیل"><span class="dm-auth-phone-icon" aria-hidden="true">' +
-      PWA_SOURCE.authPhone + '<i class="dm-auth-phone-separator"></i></span></div>';
-    mount(PWA.auth('Sign in or register', form('identify', identifierField, 'Continue') +
-      '<div class="reference-auth-alternatives"><span class="reference-auth-divider">or</span>' +
-      (state.browserSignIn ? '<button type="button" id="dm-google-id-button" class="dm-google-custom"><img src="/static/public/assets/icons/auth/google-g.svg" alt="">Continue with Google</button>' :
+    const identifierField = authPhoneField('identifier', 'شماره موبایل یا ایمیل', 'text', 'autocomplete="username" inputmode="email"');
+    mount(PWA.auth('ورود یا ثبت‌نام', form('identify', identifierField, 'ادامه') +
+      '<div class="reference-auth-alternatives"><span class="reference-auth-divider">یا</span>' +
+      (state.browserSignIn ? '<button type="button" id="dm-google-id-button" class="dm-google-custom"><img src="/static/public/assets/icons/auth/google-g.svg" alt="">ادامه دادن با گوگل</button>' :
         '<a href="#/otp">ورود با کد یک‌بارمصرف</a>') + '</div>'));
     const google = $('#dm-google-id-button');
     if (google) google.onclick = async () => {
@@ -897,22 +930,13 @@
           return;
         }
         const phone = status.identifier_type === 'phone' ? '?phone=' + enc(identifier) : '';
-        mount(PWA.auth('Enter your password.', form('login', '<input type="hidden" name="identifier" value="' + esc(identifier) + '">' +
-          '<div class="reference-password-field"><input type="password" name="password" autocomplete="current-password" aria-label="Password" placeholder="Password" required>' +
-          '<button type="button" id="toggle-password" aria-label="نمایش رمز عبور" aria-pressed="false">' + PWA_SOURCE.passwordHidden + '</button></div>', 'Continue') +
-          '<div class="reference-password-alternatives"><a class="reference-forgot" href="#/forgot">Forgot password</a>' +
-          '<a class="reference-sms" href="#/otp' + phone + '">' + PWA_SOURCE.smsIcon + '<span>Get a sign-in code by SMS</span>' +
-          PWA_SOURCE.smsChevron + '</a></div>'));
+        mount(PWA.auth('رمز عبور خود را وارد کنید', form('login',
+          '<input type="hidden" name="identifier" value="' + esc(identifier) + '">' + authPasswordField('current-password'), 'ادامه') +
+          '<div class="reference-password-alternatives"><a class="reference-forgot" href="#/forgot' + phone + '">فراموشی رمز عبور</a>' +
+          '<a class="reference-sms" href="#/otp' + phone + '">' + PWA_SOURCE.smsIcon + '<span>دریافت از طریق پیامک</span>' +
+          PWA_SOURCE.smsChevron + '</a></div>', '#/login'));
         $('.reference-auth-back').onclick = event => { event.preventDefault(); login(identifier); };
-        const toggle = $('#toggle-password');
-        toggle.onclick = () => {
-          const input = $('#login [name=password]');
-          const visible = input.type === 'password';
-          input.type = visible ? 'text' : 'password';
-          toggle.innerHTML = visible ? PWA_SOURCE.passwordVisible : PWA_SOURCE.passwordHidden;
-          toggle.setAttribute('aria-pressed', String(visible));
-          toggle.setAttribute('aria-label', visible ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور');
-        };
+        bindAuthPassword();
         submit('login', async data => {
           await api('/accounts/api/login-password/', {body:data});
           await finishLogin(sequence);
@@ -921,16 +945,38 @@
     });
   }
   function otp(params) {
-    mount(PWA.auth('ورود با کد تأیید', '<div class="form-panel">' + form('send-otp', field('phone', 'شماره موبایل', 'tel', 'autocomplete="tel"'), 'ارسال کد') + '<div id="otp-step"></div></div>'));
+    mount(PWA.auth('ورود با کد تأیید', form('send-otp',
+      authPhoneField('phone', 'موبایل خود را وارد کنید', 'tel', 'autocomplete="tel"'), 'ارسال کد'), '#/login'));
     $('#send-otp input').value = params.get('phone') || '';
-    submit('send-otp', async (data, output) => {
-      await api('/api/app/v1/session/'); await api('/accounts/api/send-otp/', { body: data }); output.textContent = 'کد ارسال شد.';
-      $('#otp-step').innerHTML = form('verify-otp', field('code', 'کد تأیید', 'text', 'inputmode="numeric" autocomplete="one-time-code"'), 'تأیید');
-      submit('verify-otp', async value => {
-        const sequence = state.sequence;
-        const result = await api('/accounts/api/verify-otp/', { body: { phone: data.phone, code: value.code } });
-        if (result.needs_registration) whenCurrent(sequence, registration);
-        else await finishLogin(sequence);
+    submit('send-otp', async data => {
+      const sequence = state.sequence;
+      await api('/api/app/v1/session/');
+      await api('/accounts/api/send-otp/', { body: data });
+      whenCurrent(sequence, () => {
+        mount(PWA.auth('کد ارسال شده را وارد کنید', form('verify-otp', authCodeField(), 'ادامه') +
+          '<div class="reference-password-alternatives auth-code-alternatives"><button type="button" class="reference-sms" id="resend-otp">' +
+          PWA_SOURCE.smsIcon + '<span>دریافت دوباره از طریق پیامک</span>' + PWA_SOURCE.smsChevron +
+          '</button>' + status('resend-otp-status') + '</div>', '#/login'));
+        $('.reference-auth-back').onclick = event => {
+          event.preventDefault();
+          otp(new URLSearchParams({phone: data.phone}));
+        };
+        bindAuthCode();
+        const resend = $('#resend-otp');
+        const output = $('#resend-otp-status');
+        resend.onclick = async () => {
+          resend.disabled = true;
+          try {
+            await api('/accounts/api/send-otp/', { body: data });
+            output.textContent = 'کد ارسال شد.';
+          } catch (error) { output.textContent = error.message; }
+          finally { resend.disabled = false; }
+        };
+        submit('verify-otp', async value => {
+          const result = await api('/accounts/api/verify-otp/', { body: { phone: data.phone, code: value.code } });
+          if (result.needs_registration) whenCurrent(sequence, registration);
+          else await finishLogin(sequence);
+        });
       });
     });
   }
@@ -942,16 +988,33 @@
       await finishLogin(sequence);
     });
   }
-  function forgot() {
-    mount(PWA.auth('بازیابی رمز عبور', form('reset-request', field('phone', 'شماره موبایل', 'tel'), 'دریافت کد')));
-    submit('reset-request', async (data, output) => {
-      await api('/api/app/v1/session/'); await api('/accounts/api/forgot-password-request/', { body: data });
-      output.textContent = 'کد ارسال شد.';
-      mount(PWA.auth('تأیید کد بازیابی', form('reset-verify', field('code', 'کد تأیید', 'text', 'inputmode="numeric"'), 'تأیید')));
-      submit('reset-verify', async code => {
-        await api('/accounts/api/forgot-password-verify/', { body: { ...data, ...code } });
-        mount(PWA.auth('رمز جدید', form('reset-save', field('password', 'رمز جدید', 'password', 'minlength="8" autocomplete="new-password"'), 'ذخیره')));
-        submit('reset-save', async password => { await api('/accounts/api/forgot-password-reset/', { body: { ...data, ...password } }); toast('رمز تغییر کرد.'); location.hash = '#/login'; });
+  function forgot(params) {
+    mount(PWA.auth('فراموشی رمز عبور', form('reset-request',
+      authPhoneField('phone', 'موبایل خود را وارد کنید', 'tel', 'autocomplete="tel"'), 'بازیابی رمز عبور'), '#/login'));
+    $('#reset-request input').value = params.get('phone') || '';
+    const sequence = state.sequence;
+    submit('reset-request', async data => {
+      await api('/api/app/v1/session/');
+      await api('/accounts/api/forgot-password-request/', { body: data });
+      whenCurrent(sequence, () => {
+        mount(PWA.auth('کد ارسال شده را وارد کنید', form('reset-verify', authCodeField(), 'ادامه'), '#/login'));
+        $('.reference-auth-back').onclick = event => {
+          event.preventDefault();
+          forgot(new URLSearchParams({phone: data.phone}));
+        };
+        bindAuthCode();
+        submit('reset-verify', async code => {
+          await api('/accounts/api/forgot-password-verify/', { body: { ...data, ...code } });
+          whenCurrent(sequence, () => {
+            mount(PWA.auth('تأیید رمز عبور', form('reset-save', authPasswordField('new-password', 'minlength="8" aria-describedby="reset-password-hint"') +
+              '<small id="reset-password-hint">رمز عبور باید حداقل ۸ کاراکتر باشد.</small>', 'تأیید رمز عبور'), '#/login'));
+            bindAuthPassword();
+            submit('reset-save', async password => {
+              await api('/accounts/api/forgot-password-reset/', { body: { ...data, ...password } });
+              await finishLogin(sequence);
+            });
+          });
+        });
       });
     });
   }
@@ -1499,11 +1562,12 @@
       ['تنظیم ساعت پخش', 'room-slide-1-0ff3f26b8200.webp'],
       ['دعوت', 'room-slide-2-45f7a35d19c4.webp']
     ];
-    mount(PWA_SOURCE.libraryHeader + '<section class="mr-wrap local-room-landing"><h1>به اتاق فیلم دیاستومی خوش‌ اومدی !</h1>' +
+    mount(PWA_SOURCE.libraryHeader + '<section class="mr-wrap local-room-landing"><h1 class="local-room-welcome">به اتاق فیلم دیاستومی خوش اومدی!</h1>' +
       '<section class="mr-exact-slider" aria-label="معرفی اتاق فیلم"><div class="mr-exact-viewport">' + slides.map(([label,file]) =>
         '<button type="button" class="mr-exact-slide" data-room-slide aria-label="' + label +
-        '"><img draggable="false" alt="" src="/static/public/assets/img/' + file + '"></button>').join('') +
-      '</div><div class="mr-exact-dots">' + slides.map((_,index) => '<button type="button" data-room-dot="' + index +
+        '"><img draggable="false" alt="" src="/static/public/assets/img/' + file +
+        '"><span class="room-slide-cta" aria-hidden="true">' + label + '</span></button>').join('') +
+      '</div><div class="mr-exact-dots" dir="rtl">' + slides.map((_,index) => '<button type="button" data-room-dot="' + index +
         '" aria-label="اسلاید ' + (index + 1) + '" aria-pressed="' + (index === 0) + '"></button>').join('') +
       '</div></section><section class="mr-section"><h2>اتاق‌های من</h2><div id="my-rooms" role="status">در حال دریافت اتاق‌ها…</div></section>' +
       '<section class="mr-section" id="local-room-create"><h2>ساخت اتاق جدید</h2><form id="mr-create-form" class="mr-form">' +
@@ -1513,7 +1577,9 @@
       '<label class="local-room-start">زمان شروع<span class="local-room-date-field"><span aria-hidden="true"></span><input name="start" type="datetime-local" aria-label="زمان شروع"></span></label><label class="local-start-now"><input type="checkbox" name="now"> همین الان شروع شود</label>' +
       '<label>انتخاب فیلم<input name="movie" type="search" placeholder="جستجوی نام فیلم ..."></label>' +
       '<button type="submit" class="mr-create-action">ساخت اتاق</button>' + status('mr-create-form-status') + '</form>' +
-      '<h2 id="room-movie-heading">پیشنهادی</h2><div class="local-room-movies" id="room-movies"></div></section>' +
+      '<h2 id="room-movie-heading">پیشنهادی</h2><div class="local-room-movies" id="room-movies"></div>' +
+      '<form id="room-movie-suggestion"><input name="title" maxlength="255" required aria-label="پیشنهاد فیلم" placeholder="پیشنهادات…">' +
+      '<button type="submit">ارسال پیشنهاد</button>' + status('room-movie-suggestion-status') + '</form></section>' +
       '<section class="mr-section"><div class="local-room-section-head"><div><h2>اکسپلور اتاق‌ها</h2>' +
       '<p>یک اتاق پیدا کن و با بقیه فیلم ببین.</p></div><button type="button" data-room-create>+ ساخت اتاق</button></div>' +
       '<form id="room-search"><input name="q" type="search" aria-label="جستجوی اتاق" placeholder="جستجوی اتاق، فیلم یا میزبان"><button type="submit">جستجو</button></form>' +
@@ -1534,8 +1600,10 @@
     const dateLabel = $('.local-room-date-field > span');
     const renderDate = () => {
       const start = form.elements.start.value;
-      dateLabel.textContent = form.elements.now.checked ? 'همین الان' :
+      const label = form.elements.now.checked ? 'همین الان' :
         start ? [roomDate(start), roomDate(start, true)].join('، ') : 'انتخاب تاریخ و ساعت';
+      dateLabel.innerHTML = esc(label).replace(/[0-9]+(?::[0-9]+)?/g,
+        digits => '<bdi class="local-room-latin-digits" lang="en" dir="ltr">' + digits + '</bdi>');
       form.elements.start.disabled = form.elements.now.checked;
     };
     form.elements.start.oninput = renderDate;
@@ -1561,7 +1629,8 @@
         [item.host && 'میزبان: ' + item.host, item.starts_at && roomDate(item.starts_at),
           item.public == null ? '' : item.public ? 'عمومی' : 'خصوصی'].filter(Boolean).map(esc).join(' · ') +
         (item.starts_at ? '<br>ساعت <bdi>' + esc(roomDate(item.starts_at, true)) + '</bdi>' : '') +
-        '</small><span class="mr-status">' + esc(({live:'در حال پخش',upcoming:'برنامه‌ریزی‌شده',paused:'متوقف',ended:'پایان‌یافته'})[item.status] || '') +
+        '</small><span class="mr-status" data-room-status="' + esc(item.status) + '">' +
+        esc(({live:'در حال پخش',upcoming:'در حال انتظار',paused:'متوقف شده',ended:'پایان‌یافته'})[item.status] || '') +
         '</span></div><div class="local-room-actions"><a class="mr-btn" href="#/room/' + enc(item.code) + '">ورود</a><button type="button" data-room-share="' +
         esc(item.code) + '">دعوت</button>' + (owned && item.is_host ? '<button type="button" data-room-delete="' + index + '">حذف اتاق</button>' : '') +
         '</div></article>').join('');
@@ -1607,7 +1676,7 @@
     };
     function renderMovies(items, query) {
       $('#room-movie-heading').textContent = query ? 'نتایج جستجو' : 'پیشنهادی';
-      $('#room-movies').innerHTML = items.length ? items.map(item => card(item)).join('') : empty('فیلمی پیدا نشد.');
+      $('#room-movies').innerHTML = items.length ? items.map(PWA.homePoster).join('') : '<p class="room-movie-message">فیلمی پیدا نشد.</p>';
       $('#room-movies').querySelectorAll('a').forEach((link,index) => {
         link.onclick = event => {
           event.preventDefault();
@@ -1629,14 +1698,43 @@
     }
     async function searchMovies(query) {
       const request = ++requestNumber;
+      const isCurrent = () => request === requestNumber && seq === state.sequence;
+      const cache = {cache:true, refreshRoute:false};
+      let playable = true;
       try {
-        const data = await api('/api/app/v1/rooms/movies/?q=' + enc(query)).catch(error => {
-          if (error.status !== 404) throw error;
-          roomCatalogueAvailable = false;
-          return api('/movie/api/filter/?type=movie&q=' + enc(query));
+        const primary = await api('/api/app/v1/rooms/movies/?q=' + enc(query)).catch(error => {
+          if (![0,404].includes(error.status) && !(error.status >= 500)) throw error;
+          return null;
         });
-        if (request === requestNumber) whenCurrent(seq, () => renderMovies(data.results.slice(0,12), query));
-      } catch (error) { if (request === requestNumber) whenCurrent(seq, () => fail($('#room-movies'), error)); }
+        if (!isCurrent()) return;
+        let items = primary?.results || [];
+        if (!items.length) {
+          playable = false;
+          const catalogueQuery = new URLSearchParams({type:'movie',q:query});
+          const cataloguePath = '/movie/api/filter/?' + catalogueQuery;
+          const catalogue = await api(cataloguePath, cache).catch(error => {
+            if (query || (![0,404].includes(error.status) && !(error.status >= 500))) throw error;
+            return null;
+          });
+          items = catalogue?.results || [];
+          if (!items.length && !query) {
+            const home = await api('/api/app/v1/home/', cache);
+            const movies = [...(home.hero || []), ...(home.rails || []).flatMap(rail => rail.items)];
+            items = [...new Map(movies.filter(item => item.type === 'movie' && item.id)
+              .map(item => [item.id, item])).values()];
+          }
+        }
+        if (!isCurrent()) return;
+        roomCatalogueAvailable = playable;
+        renderMovies(items.slice(0,12), query);
+      } catch (error) {
+        if (!isCurrent()) return;
+        const movies = $('#room-movies');
+        $('#room-movie-heading').textContent = query ? 'نتایج جستجو' : 'پیشنهادی';
+        movies.innerHTML = '<div class="room-movie-message"><p role="status">' + esc(error.message) +
+          '</p><button type="button">تلاش دوباره</button></div>';
+        movies.querySelector('button').onclick = () => searchMovies(query);
+      }
     }
     form.elements.movie.oninput = () => {
       selectedMovie = null;
@@ -1645,6 +1743,13 @@
       const query = form.elements.movie.value.trim();
       searchTimer = setTimeout(() => { if (seq === state.sequence) searchMovies(query); }, 250);
     };
+    submit('room-movie-suggestion', async ({title}, output) => {
+      const suggestion = title.trim();
+      if (!suggestion) throw Error('نام فیلم را وارد کنید.');
+      const result = await api('/api/suggest-content/', {body:{title:suggestion, source_query:form.elements.movie.value.trim()}});
+      output.textContent = result.message || 'پیشنهاد ثبت شد.';
+      output.closest('form').reset();
+    });
     submit('mr-create-form', async (values, output) => {
       if (!selectedMovie) throw Error('یک فیلم از کارت‌های پایین انتخاب کنید.');
       const movie = selectedMovie;
@@ -1944,7 +2049,7 @@
       else if (name === 'library') await library(seq, params);
       else if (name === 'login') login();
       else if (name === 'otp') otp(params);
-      else if (name === 'forgot') forgot();
+      else if (name === 'forgot') forgot(params);
       else if (name === 'account') account();
       else if (name === 'followed-actors') await followedActors(seq);
       else if (name === 'profile') {
