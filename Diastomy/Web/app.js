@@ -459,7 +459,7 @@
         const data = await api('/movie/api/filter/?' + query, {cache:true, refreshRoute:false});
         if (request !== searchRequest || seq !== state.sequence) return;
         catalogue.innerHTML = data.results.length ?
-          '<h2>نتایج جستجو</h2><div class="dm-search-live-results">' + data.results.map(PWA.savedCard).join('') + '</div>' :
+          '<h2>نتایج جستجو</h2><div class="dm-search-live-results">' + data.results.map(PWA.homePoster).join('') + '</div>' :
           '<form id="search-suggestion" aria-label="پیشنهاد عنوان"><span class="search-suggestion-icon" aria-hidden="true"><span>×</span></span>' +
           '<p>جست‌وجوی شما نتیجه‌ای نداشت. عنوان موردنظر رو پیشنهاد بدید تا به مجموعه اضافه کنیم.</p>' +
           '<label><span>نام فیلم یا سریال</span><input name="title" maxlength="255" dir="auto" required></label>' +
