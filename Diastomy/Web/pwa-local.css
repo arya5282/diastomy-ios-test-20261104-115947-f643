@@ -86,14 +86,14 @@ body #app .sub-pay{margin-top:12px}
 body #app .mr-room{display:block;margin-bottom:10px;padding:15px}
 body #app .ar-note{margin-bottom:12px}
 html.dmf3-active body[data-page=local-title] #app .dm-film-reference-info{display:block!important}
-body[data-page=local-login],body[data-page=local-account]{background:radial-gradient(ellipse at 0 0,#220606,transparent 35%),radial-gradient(ellipse at 100% 90%,#250505,transparent 40%),#000}
-body[data-page=local-login] #app{padding-top:clamp(48px,17vh,145px)}
+body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]),body[data-page=local-account]{background:radial-gradient(ellipse at 0 0,#220606,transparent 35%),radial-gradient(ellipse at 100% 90%,#250505,transparent 40%),#000}
+body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #app{padding-top:clamp(48px,17vh,145px)}
 body #dm-auth-reference .dm-auth-shell{padding:0;max-width:298px;margin:auto;gap:32px}
 body #dm-auth-reference .dm-auth-card{position:relative;padding:84px 45px 36px;border-radius:18px}
 body #dm-auth-reference .dm-auth-step{border-radius:18px}
 body #dm-auth-reference .reference-auth-back{position:absolute;top:23px;left:26px;color:#aaa;font-size:12px;direction:ltr}
 body #dm-auth-reference .reference-auth-alternatives{margin-top:26px;border-top:1px solid #292929;padding-top:18px;text-align:center;font-size:12px;color:#aaa}
-body[data-page=local-login] #pwa-nav,body:has(.local-pwa-player) #pwa-nav{display:none}
+body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #pwa-nav,body:has(.local-pwa-player) #pwa-nav{display:none}
 body #dm-app-menu .dm-app-menu-shell{padding:26px 16px;background:transparent}
 body #dm-app-menu .dm-app-menu-profile{flex-direction:row;align-items:center;gap:14px;padding:32px 0 55px}
 .reference-profile-avatar{width:60px;height:60px;border-radius:50%;border:1px solid #444;object-fit:cover}
@@ -193,10 +193,10 @@ body #app .library-history-thumb img{width:100%;height:100%;object-fit:cover}
 .local-library-progress{position:absolute;inset:auto 5px 5px;width:calc(100% - 10px);height:3px;accent-color:#e20000}
 .local-download-card{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #333}
 .local-download-card button{font-size:12px;margin-inline-start:5px}
-html body[data-page=local-login]{margin:0;width:100%;background:radial-gradient(ellipse at 0 0,#260606,transparent 34%),radial-gradient(ellipse at 100% 80%,#240404,transparent 35%),#000}
-html body[data-page=local-login] .dmf3-root{width:100%;margin:0;max-width:none}
-html body[data-page=local-login] #app{padding:0!important;margin:0!important;min-height:0;max-width:none}
-html body[data-page=local-login] #dm-auth-reference{display:block!important;position:relative!important;inset:auto!important;width:100%;min-height:calc(100dvh - env(safe-area-inset-top));height:auto!important;overflow:visible!important;background:transparent!important;padding:clamp(48px,18dvh,154px) 16px 40px;box-sizing:border-box}
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]){margin:0;width:100%;background:radial-gradient(ellipse at 0 0,#260606,transparent 34%),radial-gradient(ellipse at 100% 80%,#240404,transparent 35%),#000}
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) .dmf3-root{width:100%;margin:0;max-width:none}
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #app{padding:0!important;margin:0!important;min-height:0;max-width:none}
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #dm-auth-reference{display:block!important;position:relative!important;inset:auto!important;width:100%;min-height:calc(100dvh - env(safe-area-inset-top));height:auto!important;overflow:visible!important;background:transparent!important;padding:clamp(48px,18dvh,154px) 16px 40px;box-sizing:border-box}
 html body #dm-auth-reference .dm-auth-shell{position:relative!important;inset:auto!important;transform:none!important;display:flex!important;width:min(100%,298px)!important;margin:0 auto!important;padding:0!important;gap:32px!important;box-sizing:border-box}
 html body #dm-auth-reference .dm-auth-logo{margin:0!important}
 html body #dm-auth-reference .dm-auth-step{padding:0!important;margin:0!important;box-sizing:border-box}
@@ -397,20 +397,20 @@ html.dmf3-active body[data-page=search] #pwa-header .reference-search-form input
 .reference-episode-download svg{width:18px;height:18px}
 .reference-episode-download .reference-download-options{position:absolute;right:0;z-index:3;padding:6px;background:#171717;border:1px solid #333;border-radius:8px}
 .spoiler-comment[hidden]{display:none!important}
-html body[data-page=local-login] #dm-auth-reference{
-  isolation:isolate;padding-top:clamp(40px,calc(18dvh - 14px),140px);
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #dm-auth-reference{
+  isolation:isolate;padding-top:clamp(34px,calc(22dvh - env(safe-area-inset-top)),195px);
 }
-html body[data-page=local-login] #dm-auth-reference::before{
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #dm-auth-reference::before{
   content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
-  background:radial-gradient(ellipse at -5% -5%,#260505,transparent 38%),radial-gradient(ellipse at 103% 77%,#240303,transparent 42%),#000;
+  background:var(--auth-background);
 }
-html body[data-page=local-login] #dm-auth-reference .dm-auth-card{
-  padding:86px clamp(24px,11vw,45px) 37px!important;min-height:0;
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #dm-auth-reference .dm-auth-card{
+  padding:86px clamp(22px,10vw,45px) 40px!important;min-height:0;background:#12151f!important;
 }
-html body[data-page=local-login] #dm-auth-reference .dm-auth-card h1{
-  font-family:"PWA Inter",Arial,sans-serif!important;font-size:12px!important;line-height:18px!important;font-weight:600!important;margin:0 0 25px!important;
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #dm-auth-reference .dm-auth-card h1{
+  font-family:"PWA Yekan",Arial,sans-serif!important;font-size:13px!important;line-height:19px!important;font-weight:700!important;margin:0 0 22px!important;
 }
-html body[data-page=local-login] #dm-auth-reference .dm-auth-step{border-color:#373737!important}
+html body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot]) #dm-auth-reference .dm-auth-step{border-color:#373737!important}
 html body #dm-auth-reference #identify,html body #dm-auth-reference #login{position:relative;gap:10px!important}
 html body #dm-auth-reference #identify-status,html body #dm-auth-reference #login-status{
   position:absolute;inset:100% 0 auto;min-height:0!important;margin:4px 0 0!important;padding:0!important;font-size:10px;text-align:center;
@@ -638,12 +638,16 @@ body[data-page=search] #app.route-enter{animation-name:route-search-content-in}
 @keyframes route-search-content-in{from{opacity:0}to{opacity:1}}
 @keyframes route-slide-in{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 @keyframes route-content-in{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
-body[data-page=local-startup]{background:radial-gradient(ellipse at 0 0,#240505,transparent 34%),radial-gradient(ellipse at 102% 86%,#260504,transparent 40%),#000}
-.local-startup-active img{position:fixed;top:50%;left:50%;width:174px;transform:translate(-50%,-50%)}
+body:is([data-page=local-login],[data-page=local-otp],[data-page=local-forgot],[data-page=local-startup]){
+  --auth-background:radial-gradient(ellipse at 0 0,#271015,transparent 38%),
+    radial-gradient(ellipse at 100% 78%,#271016,transparent 44%),#0d1119;
+}
+body[data-page=local-startup]{background:var(--auth-background)}
+.local-startup-active img{position:fixed;top:50%;left:50%;width:clamp(144px,45vw,220px);transform:translate(-50%,-50%)}
 .startup-progress{position:fixed;bottom:calc(15px + env(safe-area-inset-bottom));left:50%;width:73%;transform:translateX(-50%);display:grid;gap:8px;font:10px/16px "PWA Inter",Arial,sans-serif;color:#ddd}
 .startup-progress i{position:relative;display:block;overflow:hidden;height:3px;background:white;border-radius:5px}
-.startup-progress i::before{content:"";position:absolute;left:0;inset-block:0;background:#e00000;border-radius:5px;width:72%;animation:startup-bar 1.2s ease-out}
-@keyframes startup-bar{from{width:12%}to{width:72%}}
+.startup-progress i::before{content:"";position:absolute;left:0;inset-block:0;background:#e00000;border-radius:5px;width:40%;animation:startup-bar 1.2s ease-out}
+@keyframes startup-bar{from{width:12%}to{width:40%}}
 #local-filters{--filter-field-bg:#181a26;--filter-field-border:#303341;box-sizing:border-box;position:fixed;inset:auto 0 0;width:min(100%,520px);max-width:none;max-height:min(78dvh,720px);margin:0 auto;padding:0;overflow:hidden;border:1px solid #ffffff29;border-radius:25px 25px 0 0;background:#101118ed;color:white;direction:rtl}
 #local-filters[open]{animation:filter-rise 300ms cubic-bezier(.2,.8,.2,1)}
 #local-filters::backdrop{background:#0003}
@@ -1043,12 +1047,22 @@ body #app .local-room-landing .mr-exact-slide{
   padding:0;border:0;border-radius:0;background:#141414;scroll-snap-align:start;scroll-snap-stop:always;
   -webkit-tap-highlight-color:transparent;
 }
-body #app .local-room-landing .mr-exact-slide img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
-body #app .local-room-landing .mr-exact-dots{gap:1px;margin:2px 0}
-body #app .local-room-landing .mr-exact-dots button{width:14px;height:24px;background:none}
+body #app .local-room-landing .mr-exact-slide img{
+  display:block;width:100%;height:100%;object-fit:cover;pointer-events:none;
+  filter:brightness(1.16) saturate(1.18) contrast(1.04);
+}
+#app .local-room-landing .mr-exact-slide .room-slide-cta{
+  position:absolute;left:6.35%;top:69.4%;width:19.8%;height:13.2%;
+  display:grid;place-items:center;box-sizing:border-box;
+  background:#f45708;border:1px solid #ffab73;border-radius:999px;
+  color:#fff;font:700 clamp(8px,2.4vw,14px)/1 "PWA Yekan",Arial,sans-serif;
+  white-space:nowrap;pointer-events:none;
+}
+body #app .local-room-landing .mr-exact-dots{gap:0;margin:0}
+body #app .local-room-landing .mr-exact-dots button{width:5px;height:24px;background:none}
 body #app .local-room-landing .mr-exact-dots button::after{content:"";display:block;margin:auto;width:3px;height:3px;border-radius:9px;background:#666}
-body #app .local-room-landing .mr-exact-dots button[aria-pressed=true]{width:16px;background:none}
-body #app .local-room-landing .mr-exact-dots button[aria-pressed=true]::after{width:12px;background:#fff}
+body #app .local-room-landing .mr-exact-dots button[aria-pressed=true]{width:18px;background:none}
+body #app .local-room-landing .mr-exact-dots button[aria-pressed=true]::after{width:16px;height:4px;background:#fff}
 body #app .local-room-landing .mr-section{direction:rtl;margin:28px 0}
 body #app .local-room-landing .local-room-card{gap:8px;padding:6px 9px;border-radius:14px}
 .local-room-landing .local-room-cover{width:44px;height:58px;border-radius:7px}
@@ -1203,7 +1217,7 @@ body[data-page=home] #app .reference-continue .library-history-card{
     padding-inline:10px 14px!important;padding-bottom:18px!important;
   }
   html.dmf3-active body[data-page=home] #pwa-header .dmf3-header .dmf3-logo{
-    width:74px!important;height:auto!important;margin-inline:0!important;
+    width:clamp(88px,27.5vw,120px)!important;height:auto!important;margin-inline:0!important;
   }
   html.dmf3-active body[data-page=home] #pwa-header .dmf3-search-row{
     grid-template-columns:minmax(0,1fr) 49px!important;
@@ -1255,3 +1269,129 @@ html.dmf3-active body[data-page=home] #app .dm54-horizontal-section .dm54-landsc
 #app .home-landscape-details>span:not(.title-card-details){flex:none}
 #app .home-landscape-details .title-card-score{flex-direction:row-reverse;color:inherit;font-size:inherit}
 #app .home-landscape-details .title-card-score svg{width:7px;height:7px;fill:#ff742b}
+
+/* The bundled sign-in screens share the same Persian card and controls. */
+html body #dm-auth-reference .dm-auth-logo img{width:112px;height:auto;display:block}
+html body #dm-auth-reference .reference-auth-back{
+  inset:22px 26px auto auto!important;direction:rtl;color:#eee;font-size:12px;
+}
+html body #dm-auth-reference form{gap:10px}
+html body #dm-auth-reference input:not([type=hidden]),html body #dm-auth-reference button[type=submit]{
+  box-sizing:border-box;width:100%;height:34px!important;min-height:34px!important;
+  margin:0!important;font-size:12px;border-radius:10px;
+}
+html body #dm-auth-reference input:not([type=hidden]){
+  background:#151922!important;border:1px solid #343844;color:white;
+}
+html body #dm-auth-reference button[type=submit]{
+  padding:0!important;background:#d90000!important;border:1px solid #ff4444;color:white;font-weight:700;
+}
+html body #dm-auth-reference .dm-auth-phone-field{position:relative}
+html body #dm-auth-reference .dm-auth-phone-field input{
+  padding:0 46px 0 12px!important;text-align:right;
+}
+html body #dm-auth-reference .dm-auth-phone-field .dm-auth-phone-icon{
+  position:absolute;z-index:1;inset:0 14px 0 auto;display:flex;align-items:center;pointer-events:none;
+}
+#dm-auth-reference .dm-auth-phone-icon svg{box-sizing:content-box;width:15px;height:15px;padding-left:9px;border-left:1px solid #555965}
+html body #dm-auth-reference .reference-password-field input{padding:0 10px 0 36px!important;text-align:right}
+html body #dm-auth-reference .reference-password-alternatives{
+  direction:rtl;font-family:"PWA Yekan",Arial,sans-serif;
+}
+html body #dm-auth-reference .reference-forgot{text-align:left;font-size:10px}
+html body #dm-auth-reference .reference-sms{
+  justify-content:flex-start;gap:12px;min-height:34px;background:#151922!important;
+  border-color:#424754!important;color:white!important;font-size:11px;
+}
+#dm-auth-reference .reference-sms svg:last-child{margin-left:0;margin-right:auto}
+html body #dm-auth-reference .reference-auth-alternatives :is(a,.dm-google-custom){
+  display:flex!important;align-items:center;justify-content:center;gap:9px;
+  min-height:34px;background:#151922!important;border:1px solid #424754!important;
+  border-radius:10px;color:white!important;direction:rtl;font-size:11px;
+}
+#dm-auth-reference .dm-google-custom img{width:17px;height:17px}
+#dm-auth-reference .auth-code-field{position:relative;margin:0 -10px 23px}
+#dm-auth-reference .auth-code-cells{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+#dm-auth-reference .auth-code-cells span{
+  display:grid;place-items:center;min-height:34px;background:#151922;border:1px solid #343844;
+  border-radius:10px;color:white;font:600 16px/1 "PWA Inter",Arial,sans-serif;
+}
+html body #dm-auth-reference .auth-code-field input{
+  position:absolute;inset:0;height:100%!important;opacity:0;
+}
+#dm-auth-reference .auth-code-field:focus-within .auth-code-cells{outline:1px solid #a91620;outline-offset:3px;border-radius:10px}
+html body #dm-auth-reference .auth-code-alternatives{margin-top:5px}
+#dm-auth-reference #reset-password-hint{color:#aaa;font-size:10px}
+#dm-auth-reference form .status:empty,#dm-auth-reference #resend-otp-status:empty{display:none}
+
+html.dmf3-active body[data-page=local-rooms],
+html.dmf3-active body[data-page=local-rooms] .dmf3-root{background:#0d1119!important}
+html.dmf3-active body[data-page=local-rooms] #app{padding-inline:6px}
+body #app .local-room-landing .local-room-welcome{margin:0 0 11px;text-align:right}
+body #app .local-room-landing .mr-exact-viewport{border-radius:24px}
+#my-rooms,#public-rooms{display:grid;gap:8px}
+body #app .local-room-landing .local-room-card{
+  gap:9px;padding:7px 8px 7px 14px;border:1px solid #303441;border-radius:20px;
+  background:#121520;direction:rtl;
+}
+.local-room-landing .local-room-cover{width:clamp(43px,13vw,60px);height:auto;aspect-ratio:3/4;border-radius:13px}
+.local-room-landing .mr-room-body strong{color:white;font-size:13px}
+.local-room-landing .mr-room-body small{color:#abaeb8;font-size:9px;line-height:1.55;margin:3px 0}
+.local-room-landing .local-room-actions :is(a,button){
+  min-width:clamp(59px,19vw,84px);min-height:26px;border:1px solid #343844;background:#161923;color:#fff;
+}
+.local-room-landing .local-room-actions a{background:#d90000;border-color:#ef3c3c}
+.local-room-landing .local-room-actions [data-room-delete]{min-height:20px;padding:0 4px;font-size:8px}
+.local-room-landing .mr-status{
+  display:inline-block;padding:1px 9px;border:1px solid #727580;border-radius:999px;
+  background:#393c45;color:#e3e3e6;font-size:8px;line-height:1.4;
+}
+.local-room-landing .mr-status:empty{display:none}
+.local-room-landing .mr-status[data-room-status=live]{background:#32180e;border-color:#9b4b28;color:#ff9767}
+.local-room-landing .mr-status[data-room-status=upcoming]{background:#300d13;border-color:#901f2b;color:#ff777b}
+body #app .local-room-landing .mr-form input:not([type=checkbox],[type=radio],[type=datetime-local]),
+body #app .local-room-landing .local-room-date-field,
+#app #room-movie-suggestion :is(input,button){
+  min-height:40px;border:1px solid #303441;border-radius:999px;background:#161923;
+}
+body #app .local-room-landing .mr-create-action{
+  box-sizing:border-box;display:grid;place-items:center;
+  width:clamp(86px,24vw,105px);height:34px;min-height:34px;padding:0 10px;
+  background:#d90000;border:1px solid #ef3c3c;border-radius:999px;color:#fff;
+  font-size:12px;font-weight:700;line-height:1;
+}
+#app .local-room-movies{grid-template-columns:repeat(3,minmax(0,27%));justify-content:space-between;gap:24px 0}
+html.dmf3-active body[data-page=local-rooms] #app .local-room-movies .home-poster-card{
+  width:100%!important;max-width:none!important;
+}
+html.dmf3-active body[data-page=local-rooms] #app .local-room-movies .dm54-poster{
+  aspect-ratio:3/4!important;border:1px solid #444651!important;
+}
+#app .local-room-movies .title-card-details{color:#b9bac1;font-size:8px}
+#app #room-movie-suggestion{display:grid;gap:8px;margin:28px 0 0}
+#app #room-movie-suggestion-status:empty{display:none}
+
+#app .local-room-movies .room-movie-message{grid-column:1 / -1;text-align:center;color:#abaeb8}
+body #app .local-room-landing .mr-visibility{width:min(88%,410px);margin:0 auto}
+body #app .local-room-landing .mr-visibility legend{margin-bottom:12px}
+body #app .local-room-landing .mr-visibility label{display:block;padding:7px 9px;border-radius:12px}
+.local-room-landing .mr-visibility small{font-size:10px;line-height:1.55;margin-top:3px}
+body #app .local-room-landing .local-start-now input{
+  appearance:none;-webkit-appearance:none;display:grid;place-items:center;
+  flex:none;width:18px;height:18px;min-height:0;margin:0;padding:0;
+  background:#fff;border:1px solid #d5d6dc;border-radius:3px;
+}
+body #app .local-room-landing .local-start-now input:checked::after{
+  content:"";width:5px;height:9px;border:solid #161923;border-width:0 2px 2px 0;
+  transform:translateY(-1px) rotate(45deg);
+}
+body #app .local-room-landing .local-start-now input:focus-visible{outline:2px solid #ff6565;outline-offset:3px}
+#app .local-room-latin-digits{font-family:"PWA Inter",Arial,sans-serif}
+
+/* iOS WebKit magnifies focused controls when their computed font is below 16px. */
+@layer native-input-accessibility {
+  html.diastomy-native-tabs :is(
+    input:not([type=hidden],[type=checkbox],[type=radio],[type=range],[type=file],[type=button],[type=submit],[type=reset],[type=image],[type=color]),
+    textarea,select,[contenteditable=true],[contenteditable=plaintext-only]
+  ){font-size:max(16px,1em)!important}
+}
