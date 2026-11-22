@@ -13,7 +13,6 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     var isLoadingSecondaryTab: Bool { isSecondaryTab && waitingForTabRoute }
     private(set) var showsNativeTabBar = false
     private var resetOnAppearance = false
-    private var pendingSearchQuery: String?
 
     func resetTabOnAppearance() {
         resetOnAppearance = isViewLoaded
@@ -33,29 +32,6 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             loadBundledInterface()
         }
         (tabBarController as? DiastomyTabController)?.updateTabBar()
-    }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        showPendingSearchResults()
-    }
-
-    override func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-        pendingSearchQuery = nil
-    }
-
-    func showSearchResults(for query: String) {
-        pendingSearchQuery = query
-        showPendingSearchResults()
-    }
-
-    private func showPendingSearchResults() {
-        guard let query = pendingSearchQuery, !waitingForTabRoute, viewIfLoaded?.window != nil,
-              tabBarController?.selectedViewController === self, isLocal(webView.url) else { return }
-        pendingSearchQuery = nil
-        webView.callAsyncJavaScript("window.diastomyShowSearchResults?.(query)",
-                                    arguments: ["query": query], in: nil, in: .page, completionHandler: nil)
     }
 
     private var webView: WKWebView!
@@ -593,13 +569,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             waitingForTabRoute = data["starting"] as? Bool == true
             showsNativeTabBar = visible
             (tabBarController as? DiastomyTabController)?.updateTabBar()
-            if visible { showPendingSearchResults() }
             replyHandler(["ok": true], nil)
         } else if action == "nativeTitleButtons" {
             replyHandler(["ok": updateNativeTitleButtons(data)], nil)
-        } else if action == "openSearchTab", let query = data["query"] as? String, !query.isEmpty {
-            let opened = (tabBarController as? DiastomyTabController)?.openSearchTab(from: self, query: query) ?? false
-            replyHandler(["ok": opened], nil)
         } else if action == "nativeTabSessionEnded" {
             (tabBarController as? DiastomyTabController)?.clearOtherTabs(except: self)
             replyHandler(["ok": true], nil)
