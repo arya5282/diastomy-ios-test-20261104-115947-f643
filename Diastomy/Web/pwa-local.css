@@ -573,13 +573,13 @@ body[data-page=search] #app .dm-search-genre span{font:700 10px Arial,sans-serif
 html.dmf3-active body[data-page=search] #app .dm-search-recommendations{
   grid-template-columns:repeat(3,minmax(0,27%));justify-content:space-between;gap:22px 0;
 }
-html.dmf3-active body[data-page=search] #app .dm-search-recommendations .home-poster-card{
+html.dmf3-active body #app :is(.dm-search-recommendations,.dm-search-live-results) .home-poster-card{
   width:100%!important;max-width:none!important;
 }
-html.dmf3-active body[data-page=search] #app .dm-search-recommendations .dm54-poster{
+html.dmf3-active body #app :is(.dm-search-recommendations,.dm-search-live-results) .dm54-poster{
   aspect-ratio:3/4!important;border:1px solid #444651!important;border-radius:8px!important;
 }
-#app .dm-search-recommendations .title-card-details{color:#b9bac1;font-size:8px}
+#app :is(.dm-search-recommendations,.dm-search-live-results) .title-card-details{color:#b9bac1;font-size:8px}
 #pwa-header .reference-search-form input::placeholder{font-size:12px;color:#9699a5}
 @media(prefers-reduced-motion:reduce){#search-genres-extra{transition:none}}
 body[data-page=my-library] #app{padding:0}
@@ -722,7 +722,7 @@ html.dmf3-active body[data-page=local-startup] #app{background:transparent!impor
 .live-search-loading small{margin-top:5px;color:#bdbdbd;font-size:8px;line-height:14px}
 #pwa-header .reference-search-form input:focus::placeholder{color:transparent}
 #pwa-header .reference-search-form input{caret-color:#e00000}
-.dm-search-live-results{display:grid;direction:ltr;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px clamp(12px,6vw,26px)}
+.dm-search-live-results{display:grid;direction:ltr;grid-template-columns:repeat(3,minmax(0,27%));justify-content:space-between;gap:22px 0}
 #app #search-suggestion{
   display:grid;gap:6px;box-sizing:border-box;width:min(100%,clamp(214px,62vw,265px));
   margin:clamp(32px,17svh,160px) auto 0;padding:11px 16px 13px;
@@ -1105,7 +1105,7 @@ body:is([data-page=local-rooms],[data-page=local-room]) #app>.library-header{
 body #app .local-room-landing .mr-exact-viewport{
   position:relative;display:flex;direction:ltr;aspect-ratio:881/311;gap:10px;
   overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
-  scrollbar-width:none;background:transparent;
+  scrollbar-width:none;background:transparent;touch-action:auto;
 }
 body #app .local-room-landing .mr-exact-slide{
   position:relative;display:block;flex:0 0 100%;min-width:0;opacity:1;visibility:visible;pointer-events:auto;
