@@ -13,6 +13,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     var isLoadingSecondaryTab: Bool { isSecondaryTab && waitingForTabRoute }
     private(set) var showsNativeTabBar = false
     private var resetOnAppearance = false
+    private var pendingSearchFocus = false
 
     func resetTabOnAppearance() {
         resetOnAppearance = isViewLoaded
@@ -32,6 +33,28 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             loadBundledInterface()
         }
         (tabBarController as? DiastomyTabController)?.updateTabBar()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        focusSearchIfReady()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        pendingSearchFocus = false
+    }
+
+    func requestSearchFocus() {
+        pendingSearchFocus = true
+        focusSearchIfReady()
+    }
+
+    private func focusSearchIfReady() {
+        guard pendingSearchFocus, !waitingForTabRoute, viewIfLoaded?.window != nil,
+              tabBarController?.selectedViewController === self, isLocal(webView.url) else { return }
+        pendingSearchFocus = false
+        webView.evaluateJavaScript("window.diastomyFocusSearch?.()")
     }
 
     private var webView: WKWebView!
@@ -327,8 +350,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 logo.widthAnchor.constraint(equalTo: panel.widthAnchor, multiplier: 0.45),
                 logo.heightAnchor.constraint(equalToConstant: 44),
                 footer.centerXAnchor.constraint(equalTo: panel.centerXAnchor),
-                footer.widthAnchor.constraint(equalTo: panel.widthAnchor, multiplier: 0.73),
-                footer.bottomAnchor.constraint(equalTo: panel.safeAreaLayoutGuide.bottomAnchor, constant: -15)
+                footer.widthAnchor.constraint(equalTo: panel.widthAnchor, multiplier: 0.76),
+                footer.bottomAnchor.constraint(equalTo: panel.safeAreaLayoutGuide.bottomAnchor, constant: -2)
             ])
             progress.setProgress(0.40, animated: true)
             startupPanel = panel
@@ -569,6 +592,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             waitingForTabRoute = data["starting"] as? Bool == true
             showsNativeTabBar = visible
             (tabBarController as? DiastomyTabController)?.updateTabBar()
+            if visible { focusSearchIfReady() }
             replyHandler(["ok": true], nil)
         } else if action == "nativeTitleButtons" {
             replyHandler(["ok": updateNativeTitleButtons(data)], nil)
