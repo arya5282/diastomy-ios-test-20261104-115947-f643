@@ -287,9 +287,18 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private func showStartupPanel(message: String, canRetry: Bool) {
         startupPanel?.removeFromSuperview()
         let panel = UIView()
-        panel.backgroundColor = .black
+        panel.backgroundColor = UIColor(red: 13 / 255.0, green: 17 / 255.0, blue: 25 / 255.0, alpha: 1)
         panel.translatesAutoresizingMaskIntoConstraints = false
         if !canRetry {
+            let glow = UIColor(red: 39 / 255.0, green: 16 / 255.0, blue: 22 / 255.0, alpha: 1)
+            for origin in [CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 0.78)] {
+                let gradient = CAGradientLayer()
+                gradient.type = .radial
+                gradient.colors = [glow.cgColor, glow.withAlphaComponent(0).cgColor]
+                gradient.startPoint = origin
+                gradient.endPoint = CGPoint(x: 0.5, y: origin.y + 0.40)
+                panel.layer.addSublayer(gradient)
+            }
             let logo = UIImageView(image: UIImage(named: "LaunchLogo"))
             logo.contentMode = .scaleAspectFit
             logo.translatesAutoresizingMaskIntoConstraints = false
@@ -315,13 +324,13 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 panel.bottomAnchor.constraint(equalTo: view.bottomAnchor),
                 logo.centerXAnchor.constraint(equalTo: panel.centerXAnchor),
                 logo.centerYAnchor.constraint(equalTo: panel.centerYAnchor),
-                logo.widthAnchor.constraint(equalToConstant: 174),
+                logo.widthAnchor.constraint(equalTo: panel.widthAnchor, multiplier: 0.45),
                 logo.heightAnchor.constraint(equalToConstant: 44),
                 footer.centerXAnchor.constraint(equalTo: panel.centerXAnchor),
                 footer.widthAnchor.constraint(equalTo: panel.widthAnchor, multiplier: 0.73),
                 footer.bottomAnchor.constraint(equalTo: panel.safeAreaLayoutGuide.bottomAnchor, constant: -15)
             ])
-            progress.setProgress(0.68, animated: true)
+            progress.setProgress(0.40, animated: true)
             startupPanel = panel
             return
         }
@@ -814,6 +823,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        if let panel = startupPanel {
+            panel.layer.sublayers?.compactMap { $0 as? CAGradientLayer }.forEach { $0.frame = panel.bounds }
+        }
         layoutInlinePlayer()
     }
 
