@@ -137,7 +137,7 @@ window.PWA = (() => {
   function home(data, history = []) {
     const order = [
       'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_movies',
-      'pwa_free_series', 'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies',
+      'pwa_latest_movies', 'pwa_latest_series', 'pwa_dubbed_movies',
       'pwa_dubbed_series', 'pwa_recommended', 'animations'
     ];
     const sections = new Map();
@@ -152,15 +152,15 @@ window.PWA = (() => {
     sections.set('continue_watching', continueHTML);
     for (const rail of data.rails || []) {
       const key = rail.key || 'pwa_latest_movies';
-      if (!rail.items.length && key !== 'pwa_free_series') continue;
-      const wide = ['pwa_free_movies','pwa_free_series'].includes(key);
+      if (key === 'pwa_free_series' || !rail.items.length) continue;
+      const wide = key === 'pwa_free_movies';
       const heading = ({pwa_turkish_series: 'سریال‌های ترکیه‌ای', pwa_free_movies: 'بدون نیاز به اشتراک',
-        pwa_free_series: 'سریال‌های بدون نیاز به اشتراک', trending_movies: 'ترندترین‌ها'})[key] || rail.title;
+        trending_movies: 'ترندترین‌ها'})[key] || rail.title;
       const link = '#/browse/' + (key.includes('series') ? 'series' : 'movie');
       sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
         '"><div class="dm54-head"><h2>' + esc(heading) + '</h2><a href="' + link +
         '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
-        (rail.items.length ? rail.items.map(wide ? landscape : homePoster).join('') : '<p>فعلاً سریال رایگانی در دسترس نیست.</p>') + '</div></section>');
+        rail.items.map(wide ? landscape : homePoster).join('') + '</div></section>');
     }
     return hero(data.hero || []) + '<div class="dm-pwa-home-v54 dm-figma-home-v2">' +
       order.map(key => sections.get(key) || '').join('') +
@@ -305,9 +305,9 @@ window.PWA = (() => {
       '<footer class="reference-profile-footer"><img src="' + logo + '" alt="Diastomy"><p>برای مطلع شدن از آخرین اخبار و به‌روزرسانی‌ها،<br>دیاستومی را در شبکه‌های اجتماعی دنبال کنید.</p>' +
       PWA_SOURCE.accountSocial + '</footer></div></div>';
   }
-  function auth(title, body) {
+  function auth(title, body, back = '#/home') {
     return '<div id="dm-auth-reference"><div class="dm-auth-shell"><div class="dm-auth-logo"><img src="' + logo +
-      '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="#/home">' + PWA_SOURCE.authBack + '<span>Back</span></a><h1 dir="auto">' + esc(title) + '</h1>' + body +
+      '" alt="Diastomy"></div><div class="dm-auth-step"><div class="dm-auth-card"><a class="reference-auth-back" href="' + esc(back) + '">' + PWA_SOURCE.authBack + '<span>بازگشت</span></a><h1 dir="auto">' + esc(title) + '</h1>' + body +
       '</div></div></div></div>';
   }
   function searchDiscovery(catalog, recommendations) {
@@ -496,5 +496,5 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, savedCard:card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
+  return {card, homePoster, savedCard:card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
 })();
