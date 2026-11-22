@@ -13,7 +13,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     var isLoadingSecondaryTab: Bool { isSecondaryTab && waitingForTabRoute }
     private(set) var showsNativeTabBar = false
     private var resetOnAppearance = false
-    private var pendingSearchFocus = false
+    private var pendingSearchQuery: String?
 
     func resetTabOnAppearance() {
         resetOnAppearance = isViewLoaded
@@ -37,24 +37,25 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        focusSearchIfReady()
+        showPendingSearchResults()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        pendingSearchFocus = false
+        pendingSearchQuery = nil
     }
 
-    func requestSearchFocus() {
-        pendingSearchFocus = true
-        focusSearchIfReady()
+    func showSearchResults(for query: String) {
+        pendingSearchQuery = query
+        showPendingSearchResults()
     }
 
-    private func focusSearchIfReady() {
-        guard pendingSearchFocus, !waitingForTabRoute, viewIfLoaded?.window != nil,
+    private func showPendingSearchResults() {
+        guard let query = pendingSearchQuery, !waitingForTabRoute, viewIfLoaded?.window != nil,
               tabBarController?.selectedViewController === self, isLocal(webView.url) else { return }
-        pendingSearchFocus = false
-        webView.evaluateJavaScript("window.diastomyFocusSearch?.()")
+        pendingSearchQuery = nil
+        webView.callAsyncJavaScript("window.diastomyShowSearchResults?.(query)",
+                                    arguments: ["query": query], in: nil, in: .page, completionHandler: nil)
     }
 
     private var webView: WKWebView!
@@ -592,12 +593,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             waitingForTabRoute = data["starting"] as? Bool == true
             showsNativeTabBar = visible
             (tabBarController as? DiastomyTabController)?.updateTabBar()
-            if visible { focusSearchIfReady() }
+            if visible { showPendingSearchResults() }
             replyHandler(["ok": true], nil)
         } else if action == "nativeTitleButtons" {
             replyHandler(["ok": updateNativeTitleButtons(data)], nil)
-        } else if action == "openSearchTab" {
-            let opened = (tabBarController as? DiastomyTabController)?.openSearchTab(from: self) ?? false
+        } else if action == "openSearchTab", let query = data["query"] as? String, !query.isEmpty {
+            let opened = (tabBarController as? DiastomyTabController)?.openSearchTab(from: self, query: query) ?? false
             replyHandler(["ok": opened], nil)
         } else if action == "nativeTabSessionEnded" {
             (tabBarController as? DiastomyTabController)?.clearOtherTabs(except: self)
