@@ -77,10 +77,10 @@ with sync_playwright() as playwright:
     page.wait_for_selector('[data-play]')
     print('PASS: offline home and detail from retained public JSON')
     routes = {
-        'account': 'پروفایل کاربری', 'login': 'Sign in or register',
-        'otp': 'ورود با کد تأیید', 'forgot': 'بازیابی رمز عبور', 'settings': 'تنظیمات',
+        'account': 'پروفایل کاربری', 'login': 'ورود یا ثبت‌نام',
+        'otp': 'ورود با کد تأیید', 'forgot': 'فراموشی رمز عبور', 'settings': 'تنظیمات',
         'support': 'پشتیبانی', 'subscription': 'خرید یا تمدید اشتراک', 'library': 'لیست من',
-        'notifications': 'اعلان‌ها', 'rooms': 'به اتاق فیلم دیاستومی خوش آمدید!', 'about': 'دربارهٔ دیاستومی',
+        'notifications': 'اعلان‌ها', 'rooms': 'به اتاق فیلم دیاستومی خوش اومدی!', 'about': 'دربارهٔ دیاستومی',
     }
     for route, heading in routes.items():
         page.evaluate('(hash) => { location.hash = hash; }', '#/' + route)
