@@ -67,7 +67,8 @@
           const sequence = state.sequence;
           const refresh = api(path, { cache: true, networkOnly: true }).then(data => {
             if (state.sequence === sequence && location.hash === hash &&
-                opts.refreshRoute !== false && JSON.stringify(data) !== JSON.stringify(saved.data)) route();
+                opts.refreshRoute !== false && !document.activeElement?.closest('.home-search-form') &&
+                !document.querySelector('.home-search-form input')?.value && JSON.stringify(data) !== JSON.stringify(saved.data)) route();
           }).catch(() => {}).finally(() => publicRefresh.delete(path));
           publicRefresh.set(path, refresh);
         }
@@ -211,6 +212,24 @@
     container.querySelectorAll('[data-history-frame]').forEach(image => observer.observe(image));
   }
   async function home(seq) {
+    const search = PWA.searchInput('');
+    search.classList.add('home-search-form');
+    search.onsubmit = async event => {
+      event.preventDefault();
+      const query = search.elements.q.value.trim();
+      if (!query) {
+        search.elements.q.focus();
+        return;
+      }
+      search.elements.q.blur();
+      if (root.classList.contains('diastomy-native-tabs')) {
+        try {
+          const result = await native({action:'openSearchTab',query});
+          if (result.ok) return;
+        } catch (_) {}
+      }
+      if (seq === state.sequence) showSearchResults(query);
+    };
     mount('<div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
     try {
       const data = await api('/api/app/v1/home/', { cache: true });
@@ -778,7 +797,12 @@
   }
   function library(seq, params) {
     const tabs = [['history','ادامه تماشا'], ['saved','فیلم و سریال من'], ['downloads','دانلودها']];
-    mount(PWA_SOURCE.libraryHeader + '<dialog id="history-menu"><form method="dialog"><button aria-label="بستن">×</button></form><a>مشاهده جزئیات</a><button type="button" data-remove-history>حذف از ادامه تماشا</button></dialog><dialog id="delete-download-dialog"><p>فایل دانلودشده حذف شود؟</p><button type="button" data-cancel-delete>انصراف</button><button type="button" data-confirm-delete>حذف فایل</button></dialog><section class="library-shell" aria-label="لیست من"><div class="library-tabs" role="tablist">' +
+    mount(PWA_SOURCE.libraryHeader + '<dialog id="history-menu" aria-labelledby="history-menu-title">' +
+      '<form method="dialog"><h2 id="history-menu-title" tabindex="-1" autofocus>گزینه‌های ادامه تماشا</h2>' +
+      '<button class="history-menu-close" aria-label="بستن"><span aria-hidden="true">×</span></button></form>' +
+      '<a class="history-menu-action">مشاهده جزئیات</a><button class="history-menu-action" type="button" data-remove-history>حذف از ادامه تماشا</button></dialog>' +
+      '<dialog id="delete-download-dialog"><p>فایل دانلودشده حذف شود؟</p><button type="button" data-cancel-delete>انصراف</button>' +
+      '<button type="button" data-confirm-delete>حذف فایل</button></dialog><section class="library-shell" aria-label="لیست من"><div class="library-tabs" role="tablist">' +
       tabs.map(([id,label]) => '<button type="button" role="tab" id="library-tab-' + id + '" aria-controls="library-' + id +
         '" data-library-tab="' + id + '">' + label + '</button>').join('') + '</div>' +
       tabs.map(([id]) => '<section class="library-panel" id="library-' + id + '" aria-labelledby="library-tab-' + id + '" role="tabpanel" hidden></section>').join('') + '</section>');
@@ -793,7 +817,7 @@
     }
     function renderCollection(data) {
       const cards = data.saved.map((item,index) =>
-          '<article class="local-library-saved">' + PWA.savedCard(item) + '<button type="button" class="library-heart" data-remove-saved="' + index +
+          '<article class="local-library-saved">' + PWA.homePoster(item) + '<button type="button" class="library-heart" data-remove-saved="' + index +
           '" aria-label="حذف از لیست من">' + PWA_SOURCE.libraryHeart + '</button></article>').join('');
       panel('saved').innerHTML = cards ? '<div class="library-grid">' + cards + '</div>' : '<p class="library-empty">هنوز عنوانی ذخیره نکرده‌ای.</p>';
       panel('history').innerHTML = data.history.length ? '<div class="library-history-grid">' + data.history.map(PWA.historyCard).join('') +
@@ -1601,8 +1625,8 @@
     mount(PWA_SOURCE.libraryHeader + '<section class="mr-wrap local-room-landing"><h1 class="local-room-welcome">به اتاق فیلم دیاستومی خوش اومدی!</h1>' +
       '<section class="mr-exact-slider" aria-label="معرفی اتاق فیلم"><div class="mr-exact-viewport">' + slides.map(([label,file]) =>
         '<button type="button" class="mr-exact-slide" data-room-slide aria-label="' + label +
-        '"><img draggable="false" alt="" src="/static/public/assets/img/' + file +
-        '"><span class="room-slide-cta" aria-hidden="true">' + label + '</span></button>').join('') +
+        '"><span class="room-slide-art"><img draggable="false" alt="" src="/static/public/assets/img/' + file +
+        '"><span class="room-slide-cta" aria-hidden="true">' + label + '</span></span></button>').join('') +
       '</div><div class="mr-exact-dots" dir="rtl">' + slides.map((_,index) => '<button type="button" data-room-dot="' + index +
         '" aria-label="اسلاید ' + (index + 1) + '" aria-pressed="' + (index === 0) + '"></button>').join('') +
       '</div></section><section class="mr-section"><h2>اتاق‌های من</h2><div id="my-rooms" role="status">در حال دریافت اتاق‌ها…</div></section>' +
@@ -2164,26 +2188,16 @@
     if (state.user && (!location.hash || location.hash === '#/login')) history.replaceState(null, '', '#/home');
     route();
   }
-  function focusSearch() {
+  function showSearchResults(query) {
     if (!state.user || state.checkingSession) return;
-    if (document.body.dataset.page !== 'search') {
-      history.pushState(null, '', '#/search');
-      route();
-    }
-    window.scrollTo(0,0);
-    document.querySelector('.reference-search-form input')?.focus({preventScroll:true});
+    const target = '#/search?q=' + enc(query);
+    if (location.hash === target) return;
+    history.pushState(null, '', target);
+    route();
   }
-  window.diastomyFocusSearch = focusSearch;
+  window.diastomyShowSearchResults = showSearchResults;
   document.addEventListener('click', event => {
-    if (event.target.closest('.dmf3-filter')) { openFilters(); return; }
-    if (!event.target.closest('[data-local-search]') || !state.user) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (document.documentElement.classList.contains('diastomy-native-tabs')) {
-      native({action:'openSearchTab'}).catch(error => toast(error));
-      return;
-    }
-    focusSearch();
+    if (event.target.closest('.dmf3-filter')) openFilters();
   });
   function signalNativeTabSessionEnded() {
     if (document.documentElement.classList.contains('diastomy-native-tabs')) {
