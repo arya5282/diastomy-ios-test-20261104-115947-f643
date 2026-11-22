@@ -214,23 +214,9 @@
   async function home(seq) {
     const search = PWA.searchInput('');
     search.classList.add('home-search-form');
-    search.onsubmit = async event => {
-      event.preventDefault();
-      const query = search.elements.q.value.trim();
-      if (!query) {
-        search.elements.q.focus();
-        return;
-      }
-      search.elements.q.blur();
-      if (root.classList.contains('diastomy-native-tabs')) {
-        try {
-          const result = await native({action:'openSearchTab',query});
-          if (result.ok) return;
-        } catch (_) {}
-      }
-      if (seq === state.sequence) showSearchResults(query);
-    };
-    mount('<div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
+    mount('<section class="dmf3-search-discovery home-live-search" aria-label="جست‌وجو" hidden><div id="catalogue"></div></section>' +
+      '<div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
+    bindLiveSearch(seq, search, $('#catalogue'), $('#home-data'));
     try {
       const data = await api('/api/app/v1/home/', { cache: true });
       whenCurrent(seq, () => {
@@ -434,16 +420,19 @@
       form.refreshChoices();
     }).catch(() => {});
   }
-  async function searchPage(seq, initialQuery) {
+  function searchPage(seq, initialQuery) {
     const search = PWA.searchInput(initialQuery);
-    const input = search.elements.q;
     mount('<section class="dmf3-search-discovery" aria-label="جست‌وجو"><div id="catalogue"></div></section>');
-    const catalogue = $('#catalogue');
+    return bindLiveSearch(seq, search, $('#catalogue'));
+  }
+  function bindLiveSearch(seq, search, catalogue, homeContent) {
+    const input = search.elements.q;
     let timer;
     let searchRequest = 0;
     async function render(term, request) {
       if (seq !== state.sequence || request !== searchRequest) return;
       if (!term) {
+      if (homeContent) return;
       try {
         const data = await api('/api/app/v1/home/', {cache:true, refreshRoute:false});
         if (request !== searchRequest) return;
@@ -467,7 +456,7 @@
       }
       try {
         const query = new URLSearchParams({q:term, type:'all', sort:'relevance'});
-        const data = await api('/movie/api/filter/?' + query, {cache:true});
+        const data = await api('/movie/api/filter/?' + query, {cache:true, refreshRoute:false});
         if (request !== searchRequest || seq !== state.sequence) return;
         catalogue.innerHTML = data.results.length ?
           '<h2>نتایج جستجو</h2><div class="dm-search-live-results">' + data.results.map(PWA.savedCard).join('') + '</div>' :
@@ -491,7 +480,13 @@
       clearTimeout(timer);
       const term = input.value.trim();
       const request = ++searchRequest;
-      history.replaceState(null, '', term ? '#/search?q=' + enc(term) : '#/search');
+      if (homeContent) {
+        homeContent.hidden = Boolean(term);
+        catalogue.parentElement.hidden = !term;
+        if (!term) catalogue.replaceChildren();
+      } else {
+        history.replaceState(null, '', term ? '#/search?q=' + enc(term) : '#/search');
+      }
       if (term) catalogue.innerHTML = '<div class="live-search-loading" role="status">' +
         '<span class="startup-spinner" aria-hidden="true"></span><strong>در حال جستجو...</strong>' +
         '<small>لطفاً کمی صبر کنید</small></div>';
@@ -504,7 +499,7 @@
       input.blur();
       queue(true);
     };
-    await queue(true);
+    if (!homeContent) return queue(true);
   }
   async function browse(seq, kind, params) {
     const route = '#/browse/' + enc(kind);
@@ -1671,16 +1666,20 @@
     renderDate();
     const jump = () => $('#local-room-create').scrollIntoView({behavior:'smooth'});
     function openRoom(code) { location.hash = '#/room/' + enc(code); }
-    document.querySelectorAll('[data-room-slide]').forEach(button => button.onclick = jump);
     const viewport = $('.mr-exact-viewport');
+    const posters = [...viewport.querySelectorAll('[data-room-slide]')];
     const dots = [...document.querySelectorAll('[data-room-dot]')];
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-    dots.forEach((dot, index) => dot.onclick = () => {
-      viewport.scrollTo({left: viewport.children[index].offsetLeft, behavior: reduceMotion.matches ? 'auto' : 'smooth'});
+    posters.forEach(poster => { poster.onclick = jump; });
+    dots.forEach((dot, index) => {
+      dot.onclick = () => viewport.scrollTo({
+        left:posters[index].offsetLeft, behavior:reduceMotion.matches ? 'instant' : 'smooth'
+      });
     });
     viewport.addEventListener('scroll', () => {
-      const index = Math.round(viewport.scrollLeft / viewport.clientWidth);
-      dots.forEach((dot, i) => dot.setAttribute('aria-pressed', String(i === index)));
+      const stride = posters[1].offsetLeft - posters[0].offsetLeft;
+      const active = stride ? Math.round(viewport.scrollLeft / stride) : 0;
+      dots.forEach((dot, index) => dot.setAttribute('aria-pressed', String(index === active)));
     }, {passive:true});
     $('#join-room').onsubmit = event => { event.preventDefault(); const code = new FormData(event.target).get('code').trim(); if (code) openRoom(code); };
     function roomCards(items, owned) {
@@ -2188,14 +2187,6 @@
     if (state.user && (!location.hash || location.hash === '#/login')) history.replaceState(null, '', '#/home');
     route();
   }
-  function showSearchResults(query) {
-    if (!state.user || state.checkingSession) return;
-    const target = '#/search?q=' + enc(query);
-    if (location.hash === target) return;
-    history.pushState(null, '', target);
-    route();
-  }
-  window.diastomyShowSearchResults = showSearchResults;
   document.addEventListener('click', event => {
     if (event.target.closest('.dmf3-filter')) openFilters();
   });
