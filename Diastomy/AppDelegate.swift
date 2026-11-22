@@ -47,7 +47,7 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
     private var didPreloadTabs = false
     private var swipeOrigin: Int?
     private var swipeTabWidth: CGFloat = 1
-    private let compactTabBarScale: CGFloat = 0.77
+    private let compactTabBarScale: CGFloat = 0.95
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -161,11 +161,12 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
 
     func openSearchTab(from source: BrowserViewController) -> Bool {
         guard selectedViewController === source,
-              let search = viewControllers?.first(where: {
-                  ($0 as? BrowserViewController)?.initialTabRoute == "search"
+              let search = viewControllers?.compactMap({ $0 as? BrowserViewController }).first(where: {
+                  $0.initialTabRoute == "search"
               }) else { return false }
         selectedViewController = search
         updateTabBar()
+        search.requestSearchFocus()
         return true
     }
 
