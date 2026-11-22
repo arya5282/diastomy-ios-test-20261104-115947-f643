@@ -17,14 +17,38 @@
     const url = imageURL(path);
     return url ? '<img src="' + esc(url) + '" class="' + esc(cls || '') + '" alt="' + esc(alt || '') + '" loading="lazy">' : '';
   }
+  function noticeContent(message) {
+    return '<span class="app-notice-message">' + esc(message) +
+      '</span><button type="button" class="app-notice-close" data-dismiss-notice aria-label="بستن"><span aria-hidden="true">×</span></button>';
+  }
+  function noticeMarkup(message, tone = 'error') {
+    return '<div class="app-notice" data-tone="' + tone + '" dir="rtl" role="status">' + noticeContent(message) + '</div>';
+  }
+  function errorNotice(error) {
+    if (error.status === 0 || error.message === 'اتصال به سرور برقرار نشد.') return 'مشکل در اتصال اینترنت';
+    if (error.status >= 500) return 'خطای سرور';
+    return error.message || 'خطایی رخ داد.';
+  }
   function connection(online) {
+    if (state.online === online) return;
     state.online = online;
-    $('#connection').hidden = online;
+    const notice = $('#connection');
+    if (!online) notice.innerHTML = noticeContent('مشکل در اتصال اینترنت');
+    notice.hidden = online;
   }
-  function toast(message) {
-    const el = $('#toast'); el.textContent = message; el.hidden = false;
-    clearTimeout(toast.timer); toast.timer = setTimeout(() => { el.hidden = true; }, 5000);
+  function toast(value, tone = 'info') {
+    const isError = value instanceof Error;
+    const el = $('#toast');
+    el.dataset.tone = isError ? 'error' : tone;
+    el.innerHTML = noticeContent(isError ? errorNotice(value) : value);
+    el.hidden = false;
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => { el.hidden = true; }, 5000);
   }
+  document.addEventListener('click', event => {
+    const target = event.target.closest('[data-dismiss-notice]');
+    if (target) target.closest('.app-notice').hidden = true;
+  });
   async function native(body) {
     if (!window.webkit || !window.webkit.messageHandlers.native) throw new Error('این صفحه باید داخل اپ iOS اجرا شود.');
     return window.webkit.messageHandlers.native.postMessage(body);
@@ -70,7 +94,7 @@
       return response.data;
     }
     if (response.status === 0 || response.status >= 500) {
-      connection(false);
+      if (response.status === 0) connection(false);
       if (opts.cache) {
         try { const saved = JSON.parse(localStorage.getItem(key)); if (saved) return saved.data; } catch (_) {}
       }
@@ -119,7 +143,10 @@
       (body || '') + '</section>';
   }
   function status(id) { return '<div class="status" id="' + id + '" role="status"></div>'; }
-  function fail(el, error) { el.innerHTML = empty(error.message); }
+  function fail(el, error) {
+    if (error.status === 0) $('#connection').hidden = true;
+    el.innerHTML = noticeMarkup(errorNotice(error));
+  }
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   function closeWithMotion(dialog) {
     if (!dialog.open || dialog.hasAttribute('data-closing')) return;
@@ -162,7 +189,10 @@
       const output = document.getElementById(id + '-status');
       button.disabled = true; if (output) output.textContent = 'در حال ارسال…';
       try { await handler(Object.fromEntries(new FormData(element)), output); }
-      catch (error) { if (output) output.textContent = error.message; else toast(error.message); }
+      catch (error) {
+        if (output && error.status !== 0 && !(error.status >= 500)) output.textContent = error.message;
+        else toast(error);
+      }
       finally { button.disabled = false; }
     });
   }
@@ -396,7 +426,7 @@
       if (seq !== state.sequence || request !== searchRequest) return;
       if (!term) {
       try {
-        const data = await api('/api/app/v1/home/', {cache:true});
+        const data = await api('/api/app/v1/home/', {cache:true, refreshRoute:false});
         if (request !== searchRequest) return;
         whenCurrent(seq, () => {
           const rails = data.rails || [];
@@ -420,11 +450,12 @@
         const query = new URLSearchParams({q:term, type:'all', sort:'relevance'});
         const data = await api('/movie/api/filter/?' + query, {cache:true});
         if (request !== searchRequest || seq !== state.sequence) return;
-        catalogue.innerHTML = '<h2>نتایج جستجو</h2>' + (data.results.length ?
-          '<div class="dm-search-live-results">' + data.results.map(PWA.savedCard).join('') + '</div>' :
-          '<form id="search-suggestion"><p>متأسفانه جستجوی شما نتیجه‌ای نداشت. می‌توانید عنوان موردنظر را پیشنهاد بدهید تا به مجموعه اضافه کنیم.</p>' +
-          '<label>نام فیلم یا سریال<input name="title" maxlength="255" required></label>' +
-          '<button type="submit">ثبت پیشنهاد</button><small id="search-suggestion-status" role="status"></small></form>');
+        catalogue.innerHTML = data.results.length ?
+          '<h2>نتایج جستجو</h2><div class="dm-search-live-results">' + data.results.map(PWA.savedCard).join('') + '</div>' :
+          '<form id="search-suggestion" aria-label="پیشنهاد عنوان"><span class="search-suggestion-icon" aria-hidden="true"><span>×</span></span>' +
+          '<p>جست‌وجوی شما نتیجه‌ای نداشت. عنوان موردنظر رو پیشنهاد بدید تا به مجموعه اضافه کنیم.</p>' +
+          '<label><span>نام فیلم یا سریال</span><input name="title" maxlength="255" dir="auto" required></label>' +
+          '<button type="submit">ثبت پیشنهاد</button><small id="search-suggestion-status" role="status"></small></form>';
         const suggestion = $('#search-suggestion');
         if (suggestion) {
           suggestion.elements.title.value = term;
@@ -507,7 +538,7 @@
             const enabled = button.getAttribute('aria-pressed') !== 'true';
             const result = await api(endpoint, {body:{...payload,[key]:enabled}});
             whenCurrent(sequence, () => update(Boolean(result[key])));
-          } catch (error) { toast(error.message); }
+          } catch (error) { toast(error); }
           finally { button.disabled = false; }
         };
       } catch (_) {}
@@ -644,7 +675,7 @@
             try {
               const result = await native({action:'openSocial',site:button.dataset.social});
               if (!result.ok) throw Error(result.error);
-            } catch (error) { toast(error.message); }
+            } catch (error) { toast(error); }
           });
           downloadOptions.addEventListener('click', event => {
             if (event.target === downloadOptions) {
@@ -662,13 +693,13 @@
             const action = kind === 'series' ? 'downloadSeries' : 'downloadMovie';
             const result = await native({action, slug, id:Number(button.dataset.download), dubbed:button.dataset.variant === "dubbed"});
             toast(result.ok ? 'فایل در برنامه Files ذخیره شد.' : result.error);
-          } catch (error) { toast(error.message); }
+          } catch (error) { toast(error); }
           finally { button.disabled = false; }
         });
         if (kind === 'movie') {
           const create = document.createElement('button'); create.textContent = 'ساخت اتاق فیلم';
           document.querySelector('.actions').appendChild(create);
-          create.onclick = async () => { try { const result = await api('/api/app/v1/rooms/', { body: { movie_id: data.id, title: data.title } }); location.hash = '#/room/' + enc(result.code); } catch (error) { toast(error.message); } };
+          create.onclick = async () => { try { const result = await api('/api/app/v1/rooms/', { body: { movie_id: data.id, title: data.title } }); location.hash = '#/room/' + enc(result.code); } catch (error) { toast(error); } };
         }
         const bookmark = $('#bookmark');
         let bookmarkTouched = false;
@@ -686,7 +717,7 @@
               bookmark.setAttribute('aria-pressed', String(result.is_bookmarked === true));
               toast(result.message || 'لیست به‌روز شد.');
             });
-          } catch (error) { whenCurrent(seq, () => toast(error.message)); }
+          } catch (error) { whenCurrent(seq, () => toast(error)); }
           finally { bookmark.disabled = false; }
         };
       });
@@ -783,7 +814,7 @@
               if (seq !== state.sequence) return;
               menu.close();
               await loadCollection();
-            } catch (error) { toast(error.message); }
+            } catch (error) { toast(error); }
             finally { remove.disabled = false; }
           };
           menu.showModal();
@@ -798,7 +829,7 @@
             if (result.success === false) throw Error(result.message || 'حذف ممکن نشد.');
             if (seq !== state.sequence) return;
             await loadCollection();
-          } catch (error) { toast(error.message); }
+          } catch (error) { toast(error); }
           finally { button.disabled = false; }
         };
       });
@@ -838,7 +869,7 @@
             try {
               const outcome = await native({action:'playDownload', name:resultFiles[Number(button.dataset.localPlay)].name});
               if (!outcome.ok) toast(outcome.error);
-            } catch (error) { toast(error.message); }
+            } catch (error) { toast(error); }
           };
         });
         target.querySelectorAll('[data-local-delete]').forEach(button => {
@@ -849,7 +880,7 @@
               const outcome = await native({action:'deleteDownload', name:resultFiles[Number(button.dataset.localDelete)].name});
               if (!outcome.ok) throw Error(outcome.error);
               if (seq === state.sequence) await loadDownloads();
-            } catch (error) { toast(error.message); }
+            } catch (error) { toast(error); }
             finally { button.disabled = false; }
           };
         });
@@ -914,7 +945,7 @@
       try {
         const result = await native({action:'browserSignIn'});
         if (!result.ok) throw Error('باز کردن ورود با گوگل ممکن نشد.');
-      } catch (error) { toast(error.message); }
+      } catch (error) { toast(error); }
       finally { google.disabled = false; }
     };
     $('#identify [name=identifier]').value = previousIdentifier;
@@ -1036,13 +1067,13 @@
         state.sessionKnown = true;
         state.nextAfterLogin = '#/home';
         location.hash = '#/login';
-      } catch (error) { dialog.close(); toast(error.message); }
+      } catch (error) { dialog.close(); toast(error); }
       finally { event.target.disabled = false; }
     };
     document.querySelectorAll('[data-social]').forEach(link => link.onclick = async event => {
       event.preventDefault();
       try { const result = await native({action:'openSocial', site:link.dataset.social}); if (!result.ok) throw Error(result.error); }
-      catch (error) { toast(error.message); }
+      catch (error) { toast(error); }
     });
     loadAccountWatchTime(user, sequence);
   }
@@ -1162,7 +1193,9 @@
           '<details class="ar-payment"><summary><span>' + esc(payment.plan_name === '-' ? '' : payment.plan_name) + '</span>' +
           '<time dir="ltr">' + esc(paymentDate(payment.created_at)) + '</time><span dir="ltr">' + esc(payment.amount) + '</span>' +
           '<span aria-label="جزئیات پرداخت">•••</span></summary><div class="ar-payment-detail">' +
-          detailLine('وضعیت:',payment.status_display) + detailLine('مبلغ:',payment.amount + ' تومان') +
+          (payment.status === 'SUCCESS' ? noticeMarkup('خرید موفق', 'success') :
+            payment.status === 'FAILED' ? noticeMarkup('خرید ناموفق') : detailLine('وضعیت:',payment.status_display)) +
+          detailLine('مبلغ:',payment.amount + ' تومان') +
           detailLine('کد تخفیف:',payment.discount_code) +
           detailLine('شروع:',payment.start_date && paymentDate(payment.start_date)) +
           detailLine('پایان:',payment.end_date && paymentDate(payment.end_date)) + '</div></details>').join('');
@@ -1231,7 +1264,7 @@
             await api('/accounts/notifications/' + enc(id) + '/dismiss/', {body:{}});
             items = items.filter(n => String(n.id) !== id);
             whenCurrent(seq, render);
-          } catch (error) { toast(error.message); }
+          } catch (error) { toast(error); }
           finally { button.disabled = false; }
         };
         render();
@@ -1417,8 +1450,11 @@
           pay.disabled = true;
           try {
             const result = await native({action:'checkout',plan:Number(selected.id),discount:applied});
-            if (!result.data?.opened) throw Error(result.data?.message || 'درگاه پرداخت باز نشد.');
-          } catch (error) { toast(error.message); }
+            if (!result.data?.opened) {
+              if (result.status === 0) toast('مشکل در اتصال اینترنت', 'error');
+              else toast('خرید ناموفق', 'error');
+            }
+          } catch (_) { toast('خرید ناموفق', 'error'); }
           finally { pay.disabled = false; }
         };
         render();
@@ -1489,7 +1525,7 @@
               const result = await api('/api/content-preferences/', {body:{kind:button.dataset.kind,id:Number(button.dataset.follow),following}});
               button.setAttribute('aria-pressed',String(result.following));
               button.querySelector('span').hidden = !result.following;
-            } catch (error) { toast(error.message); }
+            } catch (error) { toast(error); }
             finally { button.disabled = false; }
           };
         });
@@ -1533,7 +1569,7 @@
       try {
         const data = await api('/api/content-preferences/', {body:{spoiler_mode:spoiler.getAttribute('aria-pressed') !== 'true'}});
         spoiler.setAttribute('aria-pressed',String(Boolean(data.spoiler_mode)));
-      } catch (error) { toast(error.message); }
+      } catch (error) { toast(error); }
       finally { spoiler.disabled = false; }
     };
     try {
@@ -1550,7 +1586,7 @@
             await api('/accounts/api/devices/' + Number(button.dataset.device) + '/terminate/', {body:{}});
             button.closest('article').remove();
             if (!$('#devices').children.length) $('#devices').textContent = 'دستگاه متصلی ثبت نشده است.';
-          } catch (error) { toast(error.message); button.disabled = false; }
+          } catch (error) { toast(error); button.disabled = false; }
         };
       });
     } catch (error) { whenCurrent(seq, () => fail($('#devices'),error)); }
@@ -1657,7 +1693,7 @@
       const share = event.target.closest('[data-room-share]');
       if (share) {
         try { const result = await native({action:'shareRoom',code:share.dataset.roomShare}); if (!result.ok) throw Error(result.error); }
-        catch (error) { toast(error.message); }
+        catch (error) { toast(error); }
         return;
       }
       const button = event.target.closest('[data-room-delete]');
@@ -1669,7 +1705,7 @@
         dialog.close();
         button.disabled = true;
         try { await api('/movie-room/r/' + enc(item.code) + '/delete/', {body:{}}); await refreshRooms(); }
-        catch (error) { toast(error.message); }
+        catch (error) { toast(error); }
         finally { button.disabled = false; }
       };
       dialog.showModal();
@@ -1731,9 +1767,10 @@
         if (!isCurrent()) return;
         const movies = $('#room-movies');
         $('#room-movie-heading').textContent = query ? 'نتایج جستجو' : 'پیشنهادی';
-        movies.innerHTML = '<div class="room-movie-message"><p role="status">' + esc(error.message) +
-          '</p><button type="button">تلاش دوباره</button></div>';
-        movies.querySelector('button').onclick = () => searchMovies(query);
+        movies.innerHTML = '<div class="room-movie-message">' + noticeMarkup(errorNotice(error)) +
+          '<button type="button" data-retry-room-movies>تلاش دوباره</button></div>';
+        if (error.status === 0) $('#connection').hidden = true;
+        movies.querySelector('[data-retry-room-movies]').onclick = () => searchMovies(query);
       }
     }
     form.elements.movie.oninput = () => {
@@ -1940,7 +1977,7 @@
         if (!player.hidden && player.webkitEnterFullscreen) player.webkitEnterFullscreen();
         else if (!player.hidden && player.requestFullscreen) player.requestFullscreen().catch(() => {});
       };
-      $('#share-inside-room').onclick = () => native({action:'shareRoom',code}).catch(error => toast(error.message));
+      $('#share-inside-room').onclick = () => native({action:'shareRoom',code}).catch(error => toast(error));
       document.querySelectorAll('.local-room-reactions button').forEach(button => {
         button.onclick = () => { $('#room-chat-form input').value += button.textContent; $('#room-chat-form input').focus(); };
       });
@@ -1959,7 +1996,7 @@
           message.position = Math.max(0, Math.min(roomState?.duration || Infinity, position() + (control === 'forward' ? 10 : -10)));
         }
         try { const response = await native({action:'roomSend',message}); if (!response.ok) throw Error('فرمان اتاق ارسال نشد.'); }
-        catch (error) { toast(error.message); }
+        catch (error) { toast(error); }
       });
       state.handleRoomState = event => {
         if (event.type === 'state') {
@@ -1988,7 +2025,7 @@
     if (data.type === 'history') $('#room-chat').innerHTML = data.messages.map(message).join('');
     if (data.type === 'chat') $('#room-chat').insertAdjacentHTML('beforeend', message(data.message));
     if (data.type === 'presence') $('#room-status').textContent = data.users.length + ' کاربر آنلاین';
-    if (data.type === 'error') { $('#room-status').textContent = 'اتصال قطع شد'; toast(data.message); }
+    if (data.type === 'error') { $('#room-status').textContent = 'اتصال قطع شد'; toast(data.message, 'error'); }
     if (state.handleRoomState) state.handleRoomState(data);
   });
   let previousRoute;
@@ -2019,7 +2056,7 @@
         return;
       }
       const content = state.checkingSession
-        ? '<div class="startup-progress" role="status"><span>loading...</span><i aria-hidden="true"></i></div>'
+        ? '<div class="startup-progress" role="status" lang="en" dir="ltr"><span>loading...</span><i aria-hidden="true"></i></div>'
         : '<p role="status">وضعیت ورود بررسی نشد. اتصال اینترنت را بررسی کنید.</p><button id="retry-session" type="button">تلاش دوباره</button>';
       mount('<section class="local-startup' + (state.checkingSession ? ' local-startup-active' : '') + '"><img src="assets/logo.svg" alt="دیاستومی">' + content + '</section>');
       const retry = $('#retry-session');
@@ -2069,7 +2106,7 @@
       else if (name === 'settings') await settings(seq, params);
       else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۷۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
-    } catch (error) { whenCurrent(seq, () => mount(shell('خطا', empty(error.message)))); }
+    } catch (error) { whenCurrent(seq, () => mount(shell('خطا', noticeMarkup(errorNotice(error))))); }
     finally {
       clearTimeout(loadingTimer);
       whenCurrent(seq, () => {
@@ -2109,12 +2146,12 @@
           save:body => api('/api/watch-progress/', {body}).catch(() => {})
         });
       }
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error); }
     finally { button.disabled = false; }
   });
   window.addEventListener('diastomy-browser-sign-in', async event => {
     if (!event.detail) { toast('ورود کامل نشد. دوباره تلاش کنید.'); return; }
-    try { await finishLogin(state.sequence); } catch (error) { toast(error.message); }
+    try { await finishLogin(state.sequence); } catch (error) { toast(error); }
   });
   window.addEventListener('hashchange', route);
   window.addEventListener('online', () => { connection(true); if (!document.body.classList.contains('local-player-open')) route(); });
@@ -2127,18 +2164,26 @@
     if (state.user && (!location.hash || location.hash === '#/login')) history.replaceState(null, '', '#/home');
     route();
   }
+  function focusSearch() {
+    if (!state.user || state.checkingSession) return;
+    if (document.body.dataset.page !== 'search') {
+      history.pushState(null, '', '#/search');
+      route();
+    }
+    window.scrollTo(0,0);
+    document.querySelector('.reference-search-form input')?.focus({preventScroll:true});
+  }
+  window.diastomyFocusSearch = focusSearch;
   document.addEventListener('click', event => {
     if (event.target.closest('.dmf3-filter')) { openFilters(); return; }
     if (!event.target.closest('[data-local-search]') || !state.user) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     if (document.documentElement.classList.contains('diastomy-native-tabs')) {
-      native({action:'openSearchTab'}).catch(error => toast(error.message));
+      native({action:'openSearchTab'}).catch(error => toast(error));
       return;
     }
-    history.pushState(null, '', '#/search');
-    route();
-    document.querySelector('.reference-search-form input')?.focus();
+    focusSearch();
   });
   function signalNativeTabSessionEnded() {
     if (document.documentElement.classList.contains('diastomy-native-tabs')) {
