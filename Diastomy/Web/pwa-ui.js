@@ -327,7 +327,7 @@ window.PWA = (() => {
       '</div><div id="search-genres-extra" aria-hidden="true" inert><div class="search-extra-clip"><div class="dm-search-genres" dir="ltr">' +
       tiles.slice(12).join('') + '</div></div></div><button id="search-genres-toggle" type="button" aria-controls="search-genres-extra" aria-expanded="false">' +
       '── دیدن ژانرهای بیشتر ──</button><h2>پیشنهادی</h2><div class="dm-search-recommendations">' +
-      recommendations.map(card).join('') + '</div>';
+      recommendations.map(homePoster).join('') + '</div>';
   }
   function searchInput(query) {
     const header = document.getElementById('pwa-header');
