@@ -1103,17 +1103,17 @@ body:is([data-page=local-rooms],[data-page=local-room]) #app>.library-header{
   box-sizing:border-box;height:28px;margin:0 0 24px;padding:0;max-width:620px;margin-inline:auto;
 }
 body #app .local-room-landing .mr-exact-viewport{
-  position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:100%;direction:ltr;
-  overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;
-  gap:0;border-radius:24px;background:transparent;overscroll-behavior-x:contain;touch-action:auto;
+  position:relative;display:flex;direction:ltr;aspect-ratio:881/311;gap:10px;
+  overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;
+  scrollbar-width:none;background:transparent;
+}
+body #app .local-room-landing .mr-exact-slide{
+  position:relative;display:block;flex:0 0 100%;min-width:0;opacity:1;visibility:visible;pointer-events:auto;
+  box-sizing:border-box;width:100%;height:100%;padding:0;border:0;border-radius:24px;
+  scroll-snap-align:start;scroll-snap-stop:always;
+  overflow:hidden;background:transparent;-webkit-tap-highlight-color:transparent;
 }
 body #app .local-room-landing .mr-exact-viewport::-webkit-scrollbar{display:none}
-body #app .local-room-landing .mr-exact-slide{
-  position:relative;display:block;opacity:1;visibility:visible;pointer-events:auto;
-  box-sizing:border-box;min-width:0;width:100%;height:auto;aspect-ratio:540/190;
-  padding:0;border:0;border-radius:0;overflow:hidden;background:transparent;scroll-snap-align:start;scroll-snap-stop:always;
-  -webkit-tap-highlight-color:transparent;
-}
 /* Trim the rounded black pixels baked into each 881×311 source. */
 #app .local-room-landing .room-slide-art{
   position:absolute;inset:0;display:block;transform:scale(1.055,1.10);
@@ -1498,3 +1498,6 @@ body #toast.app-notice{
 .app-notice-close:focus-visible{outline:1px solid currentColor;outline-offset:-3px;border-radius:50%}
 body #connection.app-notice{position:relative;top:auto}
 body #toast.app-notice{left:50%;right:auto;transform:translateX(-50%);margin:0;z-index:1200}
+
+body[data-page=home] #app .home-live-search{background:transparent}
+body[data-page=home] #app :is(.home-live-search,#home-data)[hidden]{display:none!important}
