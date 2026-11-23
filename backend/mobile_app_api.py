@@ -66,6 +66,7 @@ def session(request):
             'phone': str(getattr(user, 'phone', '') or ''),
             'subscribed': user.has_active_subscription or user.is_staff,
             'language': user.preferred_language,
+            'language_selection_completed': user.language_selection_completed,
             'quality': user.preferred_quality,
         }
     from django.conf import settings
@@ -223,13 +224,29 @@ def detail(request, kind, slug):
     data['hero_cover'] = file_url(getattr(item, 'trailer_cover', None)) or data['banner']
     data['actors'] = [{'slug': a.slug, 'name': a.name, 'photo': file_url(a.photo)}
                       for a in item.actors.all()]
-    from django.db.models import Count
-    comments = item.comments.filter(is_approved=True, parent__isnull=True)
+    from django.db.models import Count, Prefetch
+    public_comments = item.comments.filter(is_approved=True)
+    reactions = {'likes_count': Count('likes', distinct=True), 'dislikes_count': Count('dislikes', distinct=True)}
+    replies = item.comments.model.objects.filter(
+        is_approved=True
+    ).select_related('user').annotate(**reactions).order_by('pk')
+    comments = public_comments.filter(parent__isnull=True)
     data['comment_count'] = comments.count()
+
+    def comment_data(comment):
+        return {
+            'id': comment.pk, 'text': comment.text, 'spoiler': comment.is_spoiler,
+            'author': comment.user.full_name or comment.user.username, 'avatar': comment.user.avatar_src,
+            'created_at': comment.created_at.isoformat(),
+            'likes': comment.likes_count, 'dislikes': comment.dislikes_count,
+        }
+
+    roots = comments.select_related('user').annotate(**reactions).prefetch_related(
+        Prefetch('replies', queryset=replies, to_attr='approved_replies')
+    ).order_by('-pk')[:30]
     data['comments'] = [
-        {'text': comment.text, 'spoiler': comment.is_spoiler,
-         'author': comment.user.username, 'created_at': comment.created_at.isoformat()}
-        for comment in comments.select_related('user').order_by('-pk')[:30]
+        {**comment_data(comment), 'replies': [comment_data(reply) for reply in comment.approved_replies]}
+        for comment in roots
     ]
     data['similar'] = []
     for model in (type(item), Series if kind == 'movie' else Movie):
@@ -294,12 +311,19 @@ def add_title_comment(request, kind, slug):
         body = json.loads(request.body)
         text = body['text'].strip()
         spoiler = body.get('is_spoiler', False)
+        parent_id = body.get('parent_id')
         if not 1 <= len(text) <= 2000 or type(spoiler) is not bool:
             raise ValueError
     except (AttributeError, KeyError, TypeError, ValueError):
         return JsonResponse({'error': 'متن دیدگاه باید بین ۱ تا ۲۰۰۰ نویسه باشد.'}, status=400)
     item = title_object(kind, slug)
-    item.comments.create(user=request.user, text=text, is_spoiler=spoiler)
+    parent = None
+    if parent_id is not None:
+        if type(parent_id) is not int or parent_id < 1:
+            return JsonResponse({'error': 'دیدگاه معتبر نیست.'}, status=400)
+        parent = get_object_or_404(item.comments, pk=parent_id, is_approved=True)
+        parent = parent.parent or parent
+    item.comments.create(user=request.user, text=text, is_spoiler=spoiler, parent=parent)
     return JsonResponse({'message': 'دیدگاه ثبت شد و پس از تأیید نمایش داده می‌شود.'}, status=201)
 
 
@@ -379,11 +403,19 @@ def library(request):
 @private
 @require_GET
 def settings(request):
+    from django.contrib.sessions.models import Session
+    from django.db.models import OuterRef, Subquery
+    from django.utils.timezone import localtime, now
     from accounts.models import UserDevice
     from interactions.models import ContentFollow
-    from django.utils.timezone import localtime
 
-    devices = UserDevice.objects.filter(user=request.user).order_by('-last_activity')[:50]
+    registered = UserDevice.objects.filter(user=request.user)
+    live_sessions = Session.objects.filter(expire_date__gt=now()).values('session_key')
+    latest_for_session = registered.filter(session_key=OuterRef('session_key')).order_by('-last_activity', '-pk')
+    devices = registered.filter(
+        session_key__in=live_sessions,
+        pk=Subquery(latest_for_session.values('pk')[:1]),
+    ).order_by('-last_activity', '-pk')[:50]
     follows = ContentFollow.objects.filter(user=request.user).select_related('series', 'person').order_by('-created_at')
     return JsonResponse({
         'devices': [

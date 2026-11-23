@@ -25,7 +25,7 @@
     return '<div class="app-notice" data-tone="' + tone + '" dir="rtl" role="status">' + noticeContent(message) + '</div>';
   }
   function errorNotice(error) {
-    if (error.status === 0 || error.message === 'اتصال به سرور برقرار نشد.') return 'مشکل در اتصال اینترنت';
+    if (error.status === 0) return 'مشکل در اتصال اینترنت';
     if (error.status >= 500) return 'خطای سرور';
     return error.message || 'خطایی رخ داد.';
   }
@@ -54,10 +54,11 @@
     return window.webkit.messageHandlers.native.postMessage(body);
   }
   const publicRefresh = new Map();
+  let pullRefreshSequence;
   async function api(path, options) {
     const opts = options || {};
     const key = 'dm-public-v2:' + path;
-    if (opts.cache && !opts.networkOnly) {
+    if (opts.cache && !opts.networkOnly && pullRefreshSequence !== state.sequence) {
       let saved;
       try { saved = JSON.parse(localStorage.getItem(key)); } catch (_) {}
       if (saved && saved.data) {
@@ -68,6 +69,7 @@
           const refresh = api(path, { cache: true, networkOnly: true }).then(data => {
             if (state.sequence === sequence && location.hash === hash &&
                 opts.refreshRoute !== false && !document.activeElement?.closest('.home-search-form') &&
+                !document.querySelector('#dm-playback-choice, .local-pwa-player, [data-opening-playback]') &&
                 !document.querySelector('.home-search-form input')?.value && JSON.stringify(data) !== JSON.stringify(saved.data)) route();
           }).catch(() => {}).finally(() => publicRefresh.delete(path));
           publicRefresh.set(path, refresh);
@@ -110,17 +112,46 @@
     }
     throw Object.assign(new Error(response.data.error || response.data.message || 'دریافت اطلاعات ممکن نشد.'), {status:response.status});
   }
-  async function refreshSession() {
-    try { const data = await api('/api/app/v1/session/'); state.user = data.user; state.browserSignIn = data.browser_sign_in === true; state.sessionKnown = true; }
-    catch (_) { state.sessionKnown = false; }
+  async function refreshSession({showError = false} = {}) {
+    try { const data = await api('/api/app/v1/session/'); state.user = data.user; state.browserSignIn = data.browser_sign_in === true; state.sessionKnown = true; applyLanguage(); }
+    catch (error) { state.sessionKnown = false; if (showError && error.status !== 0) toast(error); }
   }
-  async function finishLogin(sequence) {
-    await refreshSession();
-    if (!state.user) throw new Error('ورود تأیید نشد. اتصال اینترنت را بررسی کنید.');
-    if (sequence !== state.sequence) return;
+  function applyLanguage() {
+    document.documentElement.lang = state.user?.language || 'fa';
+  }
+  const languageKey = user => 'diastomy-language-picked:' + (user.id || user.username || user.name);
+  function languagePending() {
+    return state.user && (state.user.language_selection_completed === false ||
+      (state.user.language_selection_completed == null && !localStorage.getItem(languageKey(state.user))));
+  }
+  function finishLanguage() {
     history.replaceState(null, '', state.nextAfterLogin);
     state.nextAfterLogin = '#/home';
     route();
+  }
+  function chooseAppLanguage() {
+    mount('<section class="first-language" dir="rtl"><img src="assets/logo.svg" alt="دیاستومی">' +
+      form('first-language-form', '<h1>زبان برنامه رو انتخاب کن</h1><fieldset>' +
+        languageChoices.map(([value,,label]) => '<label><input type="radio" name="language" value="' + value + '"' +
+          (value === (state.user.language || 'fa') ? ' checked' : '') + ' required><span lang="' + value + '">' + label + '</span></label>').join('') +
+        '</fieldset>', 'ادامه') + '</section>');
+    submit('first-language-form', async ({language}) => {
+      const account = state.user;
+      const result = await api('/accounts/api/set-language/', {body:{language}});
+      if (state.user !== account) return;
+      account.language = result.language || language;
+      account.language_selection_completed = true;
+      localStorage.setItem(languageKey(account), account.language);
+      applyLanguage();
+      finishLanguage();
+    });
+  }
+  async function finishLogin(sequence) {
+    await refreshSession();
+    if (!state.user) throw new Error('ورود تأیید نشد. دوباره تلاش کنید.');
+    if (sequence !== state.sequence) return;
+    if (languagePending()) { location.hash = '#/language'; return; }
+    finishLanguage();
   }
   function card(x) { return PWA.card(x); }
   function empty(text) { return '<div class="empty"><p>' + esc(text) + '</p></div>'; }
@@ -154,7 +185,7 @@
     if (reduceMotion.matches || !dialog.animate) { dialog.close(); return; }
     const {opacity, transform} = getComputedStyle(dialog);
     dialog.setAttribute('data-closing','');
-    const sheet = dialog.matches('#home-history-menu,#local-filters,#settings-choice');
+    const sheet = dialog.matches('#local-filters,#settings-choice');
     const motion = dialog.animate([
       {opacity, transform},
       {opacity:0, transform:sheet ? 'translateY(18px)' : 'translateY(6px) scale(.985)'}
@@ -226,8 +257,10 @@
             const container = $('#home-data');
             const entries = library.history || [];
             container.innerHTML = PWA.home(data, entries) +
-              '<dialog id="home-history-menu" aria-label="گزینه‌های ادامه تماشا"><form method="dialog"><button aria-label="بستن">×</button></form>' +
-              '<button type="button" id="home-history-resume" data-play="" data-resume>ادامه تماشا</button><a>اطلاعات فیلم</a></dialog>';
+              '<dialog id="home-history-menu" aria-labelledby="home-history-title" dir="rtl"><div class="home-history-heading">' +
+              '<h2 id="home-history-title">ادامه تماشا</h2><form method="dialog"><button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></div>' +
+              '<p class="home-history-title" dir="auto"></p><div class="home-history-actions">' +
+              '<button type="button" id="home-history-resume" data-play="" data-resume>ادامه تماشا</button><a>اطلاعات فیلم</a></div></dialog>';
             loadHistoryFrames(container);
             const menu = $('#home-history-menu');
             container.onclick = event => {
@@ -237,9 +270,12 @@
               const resume = $('#home-history-resume');
               const details = menu.querySelector('a');
               details.href = trigger.closest('article').querySelector('a').href;
+              details.textContent = item.type === 'series' ? 'اطلاعات سریال' : 'اطلاعات فیلم';
+              menu.querySelector('.home-history-title').textContent = item.title || '';
               details.onclick = () => menu.close();
               resume.dataset.play = item.video_id || '';
               resume.dataset.kind = item.type;
+              resume.dataset.savedPosition = item.position || 0;
               resume.onclick = event => {
                 menu.close();
                 if (!item.video_id) {
@@ -522,7 +558,7 @@
         whenCurrent(seq, () => {
           const items = (source.similar || []).filter(item => (item.type || sourceKind) === kind);
           $('#catalogue').innerHTML = items.length ? '<div class="archive-reference-grid">' +
-            items.map(item => '<article class="archive-reference-card">' + PWA.savedCard(item) + '</article>').join('') +
+            items.map(item => '<article class="archive-reference-card">' + PWA.homePoster(item) + '</article>').join('') +
             '</div>' : empty('عنوانی پیدا نشد.');
         });
       } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
@@ -540,7 +576,7 @@
       const data = await api('/movie/api/filter/?' + query, { cache: true });
       whenCurrent(seq, () => {
         $('#catalogue').innerHTML = '<div class="archive-reference-grid">' + data.results.map(item =>
-          '<article class="archive-reference-card">' + PWA.savedCard(item) + '</article>').join('') + '</div>' +
+          '<article class="archive-reference-card">' + PWA.homePoster(item) + '</article>').join('') + '</div>' +
           (!data.results.length ? empty('عنوانی پیدا نشد.') : '') +
           (data.has_next ? '<div class="archive-reference-pagination"><button id="more">بعدی</button></div>' : '');
         if ($('#more')) $('#more').onclick = () => {
@@ -633,12 +669,64 @@
             input.focus();
           };
         }
+        let replyTo;
+        const commentReply = $('#title-comment-reply');
+        $('[data-detail-panel="comments"]').addEventListener('click', async event => {
+          const reply = event.target.closest('[data-comment-reply]');
+          if (reply) {
+            const card = reply.closest('[data-comment-id]');
+            replyTo = Number(card.dataset.commentId);
+            commentReply.hidden = false;
+            commentReply.textContent = 'پاسخ به ' + card.querySelector('strong').textContent;
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.textContent = 'انصراف';
+            cancel.onclick = () => { replyTo = undefined; commentReply.hidden = true; };
+            commentReply.append(' ', cancel);
+            $('#title-comment textarea').focus();
+          }
+          const vote = event.target.closest('[data-comment-vote]');
+          if (!vote || vote.disabled) return;
+          const card = vote.closest('[data-comment-id]');
+          const buttons = [...vote.parentElement.querySelectorAll('button')];
+          buttons.forEach(button => { button.disabled = true; });
+          try {
+            const endpoint = kind === 'movie' ? 'movie-comment' : 'comment';
+            const result = await api('/movie/' + endpoint + '/' + Number(card.dataset.commentId) + '/' + vote.dataset.commentVote + '/', {body:{}});
+            if (result.status !== 'success') throw Error('ثبت واکنش ممکن نشد.');
+            buttons.forEach(button => {
+              const like = button.dataset.commentVote === 'like';
+              button.querySelector('span').textContent = like ? result.likes : result.dislikes;
+              button.setAttribute('aria-pressed', String(button === vote && (like ? result.liked : result.disliked)));
+            });
+          } catch (error) { toast(error); }
+          finally { buttons.forEach(button => { button.disabled = false; }); }
+        });
         submit('title-comment', async (values, output) => {
           const result = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/comments/', {
-            body:{text:values.text.trim(),is_spoiler:values.spoiler === 'on'}
+            body:{text:values.text.trim(),is_spoiler:values.spoiler === 'on',parent_id:replyTo}
           });
           output.textContent = result.message;
-          whenCurrent(seq, () => $('#title-comment').reset());
+          whenCurrent(seq, () => {
+            $('#title-comment').reset();
+            replyTo = undefined;
+            commentReply.hidden = true;
+          });
+        });
+        const report = $('#title-report-dialog');
+        $('#title-report-open').onclick = () => report.showModal();
+        submit('title-report-form', async (values, output) => {
+          const reasons = new FormData($('#title-report-form')).getAll('reason').filter(reason => PWA.reportReasons.includes(reason));
+          if (!reasons.length) throw Error('حداقل یک مورد رو انتخاب کن.');
+          const link = '/movie/' + kind + '/' + enc(slug) + '/';
+          const content = ['گزارش مشکل — ' + data.title, link, reasons.join('، '), values.description.trim()].filter(Boolean).join('\n');
+          await api('/accounts/support/api/send/', {body:{content}});
+          whenCurrent(seq, () => {
+            $('#title-report-form').reset();
+            output.textContent = '';
+            report.close();
+            toast('گزارش برای پشتیبانی ارسال شد.', 'success');
+          });
         });
         const season = $('#series-season');
         if (season) {
@@ -686,14 +774,6 @@
             whenCurrent(seq, () => { watchState = result.items || {}; renderEpisodes(); });
           }).catch(() => {});
         }
-        const castToggle = $('[data-cast-more]');
-        if (castToggle) castToggle.onclick = () => {
-          const expanded = castToggle.getAttribute('aria-expanded') !== 'true';
-          castToggle.setAttribute('aria-expanded', String(expanded));
-          castToggle.textContent = expanded ? 'کمتر' : 'بیشتر';
-          document.querySelectorAll('[data-extra-cast]').forEach(actor => { actor.hidden = !expanded; });
-          $('.reference-cast').classList.toggle('expanded', expanded);
-        };
         const trailers = (data.trailers || []).filter(trailer => imageURL(trailer.url));
         document.querySelectorAll('[data-trailer-index]').forEach(button => {
           const trailer = trailers[Number(button.dataset.trailerIndex)];
@@ -870,18 +950,28 @@
     const link = event.target.closest('a[href^="#/actor/"]');
     if (link && !location.hash.startsWith('#/actor/')) state.actorBack = location.hash;
   });
-  async function actors(seq, slug, page) {
-    mount(slug ? PWA.actorPage() : shell('بازیگران', '<div id="actors-data"><div class="loading"></div></div>'));
+  async function actors(seq, slug, page, params) {
+    const castSource = !slug && params.get('cast')?.match(/^(movie|series)\/([^/]+)$/);
+    mount(PWA.actorPage());
+    if (!slug && !castSource) $('.dm-actor-back').href = '#/home';
     const query = '?page=' + (Number(page) || 1);
+    const cache = {cache:true};
     try {
-      const cache = {cache:true};
-      const data = slug ? await api('/api/app/v1/actor/' + enc(slug) + '/' + query, cache)
-        .catch(() => api('/movie/api/actor/' + enc(slug) + '/' + query, cache)) :
-        await api('/movie/api/actors/', cache);
+      let data;
+      if (castSource) {
+        const [, kind, titleSlug] = castSource;
+        $('.dm-actor-back').href = '#/title/' + kind + '/' + enc(titleSlug);
+        data = await api('/api/app/v1/title/' + kind + '/' + enc(titleSlug) + '/', cache);
+      } else if (slug) {
+        data = await api('/api/app/v1/actor/' + enc(slug) + '/' + query, cache)
+          .catch(() => api('/movie/api/actor/' + enc(slug) + '/' + query, cache));
+      } else {
+        data = await api('/movie/api/actors/', cache);
+      }
       whenCurrent(seq, () => {
         $('#actors-data').innerHTML = slug ? PWA.actorProfile(data, slug) :
-          '<div class="grid">' + data.actors.map(a => '<a class="person" href="#/actor/' + enc(a.slug) + '">' +
-          image(a.photo, '', a.name) + '<p>' + esc(a.name) + '</p></a>').join('') + '</div>';
+          '<div class="actor-archive-grid">' + (data.actors || []).map(a => '<a class="person" href="#/actor/' + enc(a.slug) + '">' +
+          image(a.photo, '', '') + '<p dir="auto">' + esc(a.name) + '</p></a>').join('') + '</div>';
         if (!slug) return;
         const back = $('.dm-actor-back');
         back.onclick = event => {
@@ -1242,21 +1332,22 @@
     const profileField = (name, label, value, attributes) =>
       '<label><span>' + label + '</span><input name="' + name + '" value="' + esc(value) + '" ' + attributes + '></label>';
     mount('<section class="profile-editor"><header><h1>پروفایل کاربری</h1><a href="#/account" aria-label="بازگشت">' +
-      PWA_SOURCE.actorBack + '</a></header>' + PWA.watchTimeCard() +
+      PWA_SOURCE.actorBack + '</a></header>' +
       '<div class="profile-editor-avatar"><button type="button" id="profile-avatar-edit" aria-label="تغییر آواتار">' +
       '<img id="profile-avatar-current" src="' + esc(avatar) + '" alt="آواتار"><span aria-hidden="true">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m4 16-1 5 5-1L21 7l-4-4L4 16Zm11-11 4 4M4 16l4 4"/></svg></span></button>' +
-      '<span class="reference-subscription-badge">' + (user.subscribed ? 'اشتراک فعال' : 'اشتراک غیرفعال') + '</span></div>' +
+      '<span class="reference-subscription-badge">' + (user.subscribed ? PWA_SOURCE.heroPremium + 'اشتراک فعال' : 'اشتراک غیرفعال') + '</span>' +
+      (user.subscribed && user.subscription_days != null ? '<small class="profile-subscription-days">' + esc(user.subscription_days) + ' روز باقی مانده</small>' : '') + '</div>' +
       form('edit-profile', profileField('first','نام',first,'autocomplete="given-name"') +
         profileField('last','نام خانوادگی',last.join(' '),'autocomplete="family-name"') +
         profileField('username','نام کاربری',user.username || '','dir="ltr" autocomplete="username" required') +
         profileField('email','ایمیل',user.email || '','dir="ltr" type="email" autocomplete="email" readonly') +
         profileField('phone','شماره تماس',user.phone || '','dir="ltr" type="tel" autocomplete="tel" readonly'), 'ذخیره اطلاعات') +
-      '<dialog id="profile-avatar-dialog" aria-labelledby="profile-avatar-title"><form method="dialog"><button aria-label="بستن">×</button></form>' +
-      '<h2 id="profile-avatar-title">تغییر آواتار</h2><div class="profile-avatar-presets">' + presets +
-      '</div><label>بارگذاری تصویر<input id="profile-avatar-file" type="file" accept="image/*"></label>' +
-      '<p id="profile-avatar-status" role="status"></p></dialog></section>');
-    loadAccountWatchTime(user, sequence);
+      '<dialog id="profile-avatar-dialog" aria-labelledby="profile-avatar-title"><header><h2 id="profile-avatar-title">انتخاب آواتار</h2>' +
+      '<form method="dialog"><button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></header>' +
+      '<div class="profile-avatar-presets">' + presets + '</div>' +
+      '<label class="profile-avatar-upload">بارگذاری تصویر شخصی<input id="profile-avatar-file" type="file" accept="image/*"></label>' +
+      '<p id="profile-avatar-status" role="status"></p><button id="profile-avatar-save" type="button" disabled>انتخاب آواتار</button></dialog></section>');
     submit('edit-profile', async (values, output) => {
       const full_name = [values.first.trim(), values.last.trim()].filter(Boolean).join(' ');
       const result = await api('/accounts/api/update-profile/', {body:{full_name,username:values.username}});
@@ -1266,11 +1357,23 @@
     const dialog = $('#profile-avatar-dialog');
     const picker = $('#profile-avatar-file');
     const presetButtons = [...dialog.querySelectorAll('[data-preset-avatar]')];
-    $('#profile-avatar-edit').onclick = () => dialog.showModal();
+    const choose = $('#profile-avatar-save');
+    let pickedAvatar;
+    function select(button) {
+      pickedAvatar = button;
+      presetButtons.forEach(preset => preset.setAttribute('aria-pressed', String(preset === button)));
+      choose.disabled = !button;
+    }
+    $('#profile-avatar-edit').onclick = () => {
+      const current = $('#profile-avatar-current').src;
+      select(presetButtons.find(button => button.querySelector('img').src === current));
+      dialog.showModal();
+    };
     async function saveAvatar(payload) {
       const output = dialog.querySelector('#profile-avatar-status');
       if (picker.disabled) return;
       picker.disabled = true;
+      choose.disabled = true;
       presetButtons.forEach(button => { button.disabled = true; });
       output.textContent = 'در حال ذخیره…';
       try {
@@ -1284,12 +1387,14 @@
       } catch (error) { output.textContent = error.message; }
       finally {
         picker.disabled = false;
+        choose.disabled = !pickedAvatar;
         picker.value = '';
         presetButtons.forEach(button => { button.disabled = false; });
       }
     }
-    presetButtons.forEach(button => button.onclick = () => saveAvatar(() =>
-      ({action:'selectDefaultAvatar', index:Number(button.dataset.presetAvatar)})));
+    presetButtons.forEach(button => button.onclick = () => select(button));
+    choose.onclick = () => saveAvatar(() =>
+      ({action:'selectDefaultAvatar', index:Number(pickedAvatar.dataset.presetAvatar)}));
     picker.onchange = async () => {
       const file = picker.files[0];
       if (!file) return;
@@ -1328,7 +1433,7 @@
       whenCurrent(seq, () => {
         const detailLine = (label,value) => value ? '<p>' + label + ' <bdi>' + esc(value) + '</bdi></p>' : '';
         const rows = (data.payments || []).map(payment =>
-          '<details class="ar-payment"><summary><span>' + esc(payment.plan_name === '-' ? '' : payment.plan_name) + '</span>' +
+          '<details class="ar-payment"><summary><span>' + esc(payment.plan_name && payment.plan_name !== '-' ? payment.plan_name : '—') + '</span>' +
           '<time dir="ltr">' + esc(paymentDate(payment.created_at)) + '</time><span dir="ltr">' + esc(payment.amount) + '</span>' +
           '<span aria-label="جزئیات پرداخت">•••</span></summary><div class="ar-payment-detail">' +
           (payment.status === 'SUCCESS' ? noticeMarkup('خرید موفق', 'success') :
@@ -1342,6 +1447,20 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#payment-history'), error)); }
   }
+  const noticeIcon = path => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
+  const noticeIcons = {
+    all:noticeIcon('<path d="M5 10a7 7 0 1 1 14 0c0 3 2 4 2 6 0 1-3 2-9 2s-9-1-9-2c0-2 2-3 2-6m4 10a3 3 0 0 0 6 0"/>'),
+    media:noticeIcon('<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M3 9h18M9 3v6m6-6v6m-5 3 5 3-5 3z"/>'),
+    room:noticeIcon('<circle cx="9" cy="7" r="3"/><path d="M2 19a7 7 0 0 1 14 0c0 2-14 2-14 0zM17 4a3 3 0 0 1 0 6m1 3a5 5 0 0 1 4 5c0 1-1 2-3 2"/>'),
+    news:noticeIcon('<path d="m12 2 9 5v10l-9 5-9-5V7zM12 7v5m0 4h.01"/>'),
+    account:noticeIcon('<circle cx="12" cy="7" r="4"/><path d="M5 19a7 7 0 0 1 14 0c0 3-14 3-14 0z"/>')
+  };
+  function noticeMediaRoute(link) {
+    const target = typeof link === 'string' && link.match(/^\/movie\/(movie|series)\/([^/?#]+)\/?(?:[?#].*)?$/);
+    if (!target) return '';
+    try { return '#/title/' + target[1] + '/' + enc(decodeURIComponent(target[2])); }
+    catch (_) { return ''; }
+  }
   const noticeCategories = {media:'فیلم و سریال',room:'اتاق فیلم',news:'اخبار و اطلاعیه‌ها',account:'حساب و سیستم'};
   function noticeCategory(title) {
     if (/اتاق|میزبان|دعوت/.test(title)) return 'room';
@@ -1352,7 +1471,7 @@
     const requested = params.get('category');
     const category = Object.hasOwn(noticeCategories,requested) ? requested : '';
     const label = category === 'media' ? 'اعلان‌های فیلم و سریال' : noticeCategories[category] || 'اعلان‌ها';
-    mount(shell('اعلان‌ها', '<div class="account-notice-row account-notice-pref"><strong>' + label +
+    mount(shell('اعلان‌ها', '<div class="account-notice-row account-notice-pref"><strong>' + noticeIcons.all + label +
       '</strong><button type="button" role="switch" aria-label="فعال بودن ' + label +
       '" aria-checked="true"></button></div><div id="notifications"><p role="status">در حال دریافت…</p></div>'));
     if (category) $('.pwa-internal-head a').href = '#/notifications';
@@ -1366,8 +1485,8 @@
     };
     if (!category) {
       $('#notifications').innerHTML = Object.entries(noticeCategories).map(([key,label]) =>
-        '<a class="account-notice-row" href="#/notifications?category=' + key + '"><span>' + label +
-        '</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></svg></a>').join('');
+        '<a class="account-notice-row" href="#/notifications?category=' + key + '"><span class="notice-category-label">' + noticeIcons[key] + label +
+        '</span>' + settingsArrow + '</a>').join('');
     }
     try {
       const data = await api('/accounts/api/notifications/');
@@ -1379,7 +1498,7 @@
               const dot = document.createElement('i');
               dot.className = 'account-notice-unread';
               dot.setAttribute('aria-label','خوانده‌نشده');
-              $('#notifications a[href="#/notifications?category=' + key + '"] span').append(dot);
+              $('#notifications a[href="#/notifications?category=' + key + '"] .notice-category-label').prepend(dot);
             }
           }
           return;
@@ -1387,11 +1506,13 @@
         let items = notices.filter(n => noticeCategory(n.title) === category);
         const list = $('#notifications');
         function render() {
-          list.innerHTML = items.map(n =>
-            '<article class="account-notice-row account-notice-item"><button type="button" data-dismiss-notice="' + esc(n.id) +
-            '" aria-label="حذف اعلان">×</button><h2>' + esc(n.title) + '</h2><p>' + esc(n.message) +
-            '</p><small>' + esc(n.created_at) + '</small></article>').join('') ||
-            '<p class="account-reference-empty">اعلانی در این بخش ندارید.</p>';
+          list.innerHTML = items.map(n => {
+            const target = category === 'media' && noticeMediaRoute(n.link);
+            return '<article class="account-notice-row account-notice-item"><div class="notice-item-copy"><h2>' + esc(n.title) +
+              '</h2><p>' + esc(n.message) + '</p></div><div class="notice-item-actions"><small>' + esc(n.created_at) + '</small>' +
+              (target ? '<a href="' + esc(target) + '">تماشای فیلم</a>' : '') + '</div>' +
+              '<button type="button" data-dismiss-notice="' + esc(n.id) + '" aria-label="حذف اعلان">×</button></article>';
+          }).join('') || '<p class="account-reference-empty">اعلانی در این بخش ندارید.</p>';
         }
         list.onclick = async event => {
           const button = event.target.closest('[data-dismiss-notice]');
@@ -1417,7 +1538,9 @@
     const clip = icon('<path d="M8 9v9a4 4 0 0 0 8 0V6a3 3 0 0 0-6 0v11a1 1 0 0 0 2 0V8"/>');
     const smile = icon('<circle cx="12" cy="12" r="10"/><path d="M8 14a4 4 0 0 0 8 0M9 9h.1M15 9h.1"/>');
     const missing = icon('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m5 17 5-5 3 3 2-2 4 4"/><path stroke="#ed1423" d="M2 3l20 18"/>');
-    mount(shell('پشتیبانی', '<section class="local-support-chat"><div class="local-support-chat-head"><h2>پشتیبانی</h2><span>پاسخ‌گویی آنلاین</span></div>' +
+    mount(shell('پشتیبانی آنلاین', '<section class="local-support-chat"><div class="local-support-chat-head"><h2>' +
+      icon('<path d="M4 13v-2a8 8 0 0 1 16 0v5a4 4 0 0 1-4 4h-3M4 12H3v5h3v-5Zm16 0h1v5h-3v-5Z"/>') +
+      'پشتیبانی</h2><span>پاسخ‌گویی آنلاین</span></div>' +
       '<div id="messages" role="log" aria-label="گفتگوی پشتیبانی"><p>در حال دریافت پیام‌ها…</p></div>' +
       '<form id="support"><div class="local-support-quick">' + quickReplies.map(text => '<button type="button">' + text + '</button>').join('') + '</div>' +
       '<div class="local-support-emojis" hidden>' + ['😊','🙏','👍','❤️','😕'].map(text => '<button type="button">' + text + '</button>').join('') + '</div>' +
@@ -1465,7 +1588,8 @@
           const read = m.is_read === true || m.is_read === 1 || Boolean(m.read_at);
           return date + '<article class="local-support-message ' + (mine(m) ? 'mine' : 'operator') + '">' +
             (m.content ? '<p class="local-support-bubble" dir="auto">' + esc(m.content) + '</p>' : '') + attachment +
-            '<small dir="ltr">' + esc(m.created_at) + (mine(m) ? (read ? ' <span role="img" aria-label="خوانده‌شده">✓✓</span>' : ' <span role="img" aria-label="ارسال‌شده">✓</span>') : '') +
+            '<small dir="ltr">' + esc(m.created_at) + (mine(m) ? ' <span class="support-delivery" role="img" aria-label="' + (read ? 'خوانده‌شده' : 'ارسال‌شده') + '">' +
+              icon(read ? '<path d="m2 12 4 4L17 5m-6 10 2 2L24 6"/>' : '<path d="m4 12 5 5L21 5"/>') + '</span>' : '') +
             '</small></article>';
         }).join('') || '<p class="local-support-empty">پیام خود را برای پشتیبانی بفرستید.</p>';
         if (follow) scrollLatest();
@@ -1639,6 +1763,11 @@
           const result = await api(endpoint, {body:{[key]:value}});
           if (result.success === false) throw Error(result.error || 'ذخیره نشد.');
           state.user[key] = result[key] || value;
+          if (key === 'language') {
+            state.user.language_selection_completed = true;
+            localStorage.setItem(languageKey(state.user), state.user.language);
+            applyLanguage();
+          }
           renderTrigger();
           dialog.close();
         } catch (error) { dialog.querySelector('.settings-choice-error').textContent = error.message; }
@@ -1673,11 +1802,35 @@
     const section = params.get('section');
     if (section === 'following') { location.replace('#/followed-actors'); return; }
     if (section === 'password') {
-      mount(shell('تغییر رمز عبور', form('password', field('old_password','رمز فعلی','password','autocomplete="current-password"') +
-        field('new_password','رمز جدید','password','autocomplete="new-password" minlength="8"') +
-        field('confirm_password','تکرار رمز جدید','password','autocomplete="new-password" minlength="8"'),'تغییر رمز')));
+      const passwordField = (name, label, placeholder, autocomplete) =>
+        '<label class="settings-password-field"><span>' + label + '</span><div>' +
+        '<input type="password" name="' + name + '" placeholder="' + placeholder + '" autocomplete="' +
+        autocomplete + '"' + (autocomplete === 'new-password' ? ' minlength="8"' : '') + ' required>' +
+        '<button type="button" aria-label="نمایش ' + label + '" aria-pressed="false">' + PWA_SOURCE.passwordHidden + '</button></div></label>';
+      mount(shell('تنظیمات', '<h2 class="settings-password-title">تغییر رمز عبور</h2>' +
+        form('password', passwordField('old_password','رمز عبور قبلی','رمز عبور قبلی را وارد کنید.','current-password') +
+          passwordField('new_password','رمز عبور جدید','رمز عبور جدید را وارد کنید.','new-password') +
+          passwordField('confirm_password','تکرار رمز عبور جدید','رمز عبور جدید را دوباره وارد کنید.','new-password'),
+          'تغییر رمز عبور')));
       $('.pwa-internal-head a').href = '#/settings';
-      submit('password', async (data, output) => { await api('/accounts/api/change-password/', {body:data}); $('#password').reset(); output.textContent = 'رمز تغییر کرد.'; });
+      document.querySelectorAll('.settings-password-field button').forEach(button => {
+        button.onclick = () => {
+          const input = button.previousElementSibling;
+          const visible = input.type === 'password';
+          input.type = visible ? 'text' : 'password';
+          button.setAttribute('aria-pressed', String(visible));
+          button.innerHTML = visible ? PWA_SOURCE.passwordVisible : PWA_SOURCE.passwordHidden;
+        };
+      });
+      submit('password', async (data, output) => {
+        await api('/accounts/api/change-password/', {body:data});
+        whenCurrent(seq, () => {
+          const passwordForm = $('#password');
+          passwordForm.reset();
+          passwordForm.querySelectorAll('[aria-pressed=true]').forEach(button => button.click());
+          output.textContent = 'رمز تغییر کرد.';
+        });
+      });
       return;
     }
     mount(shell('تنظیمات',
@@ -1714,8 +1867,8 @@
       const data = await api('/api/app/v1/settings/');
       whenCurrent(seq, () => {
         $('#devices').innerHTML = (data.devices || []).map(device =>
-          '<article class="account-notice-row settings-device"><strong>' + esc(device.name) + '</strong>' +
-          (device.last_activity ? '<time dir="ltr">' + esc(paymentDate(device.last_activity)) + ' ، ' + esc(device.last_activity.slice(11,19)) + '</time>' : '') +
+          '<article class="account-notice-row settings-device"><div class="settings-device-info"><strong dir="auto">' + esc(device.name) + '</strong>' +
+          (device.last_activity ? '<time dir="ltr">' + esc(paymentDate(device.last_activity)) + ' · ' + esc(device.last_activity.slice(11,19)) + '</time>' : '') + '</div>' +
           (device.current ? '<small>دستگاه فعلی</small>' : '<button type="button" data-device="' + esc(device.id) + '">خروج دستگاه</button>') + '</article>').join('') ||
           '<p class="account-reference-empty">دستگاه متصلی ثبت نشده است.</p>';
         for (const button of document.querySelectorAll('[data-device]')) button.onclick = async () => {
@@ -1963,7 +2116,9 @@
   async function room(seq, code) {
     const created = newlyCreatedRoom?.code === code ? newlyCreatedRoom : null;
     newlyCreatedRoom = null;
-    mount('<div class="local-room-header">' + PWA_SOURCE.header + '</div><section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1></div>' +
+    mount('<div class="local-room-header"><header class="dmf3-header" dir="ltr" aria-label="هدر دیاستومی">' +
+      '<a href="#/home" aria-label="دیاستومی"><img src="/static/pwa/generated/25cc514e5be789c9db17.svg" alt="" width="106" height="18"></a>' +
+      '<button type="button" class="dmf3-menu" data-local-menu aria-label="منو">' + PWA_SOURCE.actorMenu + '</button></header></div><section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1></div>' +
       '<div id="room-data"><p role="status">اطلاعات اتاق از سرور دریافت می‌شود…</p></div></section>');
     try {
       const data = created || await api('/api/app/v1/rooms/' + enc(code) + '/');
@@ -2186,7 +2341,7 @@
     if (state.handleRoomState) state.handleRoomState(data);
   });
   let previousRoute;
-  async function route() {
+  async function route({pullRefresh = false} = {}) {
     const loader = $('#route-loading');
     loader.hidden = true;
     app.classList.remove('route-enter');
@@ -2199,6 +2354,7 @@
     state.handleRoomState = null;
     state.playGroups = [];
     const seq = ++state.sequence;
+    if (pullRefresh) pullRefreshSequence = seq;
     if (state.roomCode) { state.roomCode = null; native({ action: 'roomClose' }).catch(() => {}); }
     const hash = (location.hash.slice(1) || '/home');
     const split = hash.indexOf('?');
@@ -2239,12 +2395,19 @@
       else if (name === 'browse') await browse(seq, parts[1] || 'all', params);
       else if (name === 'search') await searchPage(seq, params.get('q') || '');
       else if (name === 'title') await detail(seq, parts[1], parts[2]);
-      else if (name === 'actors' || name === 'actor') await actors(seq, parts[1], parts[2]);
+      else if (name === 'actors' || name === 'actor') await actors(seq, parts[1], parts[2], params);
       else if (name === 'library') await library(seq, params);
       else if (name === 'login') login();
       else if (name === 'otp') otp(params);
       else if (name === 'forgot') forgot(params);
-      else if (name === 'account') account();
+      else if (name === 'language') { if (languagePending()) chooseAppLanguage(); else finishLanguage(); }
+      else if (name === 'account') {
+        if (pullRefresh) await refreshSession();
+        if (state.sequence === seq) {
+          if (state.user) account();
+          else return route();
+        }
+      }
       else if (name === 'followed-actors') await followedActors(seq);
       else if (name === 'profile') {
         profile();
@@ -2265,6 +2428,7 @@
       else mount(shell('صفحه پیدا نشد', empty('از منوی برنامه صفحهٔ مورد نظر را انتخاب کنید.')));
     } catch (error) { whenCurrent(seq, () => mount(shell('خطا', noticeMarkup(errorNotice(error))))); }
     finally {
+      if (pullRefreshSequence === seq) pullRefreshSequence = undefined;
       clearTimeout(loadingTimer);
       whenCurrent(seq, () => {
         loader.hidden = true;
@@ -2272,30 +2436,110 @@
       });
     }
   }
+  function installPullRefresh() {
+    const indicator = document.createElement('div');
+    indicator.className = 'pull-refresh';
+    indicator.dir = 'rtl';
+    indicator.hidden = true;
+    indicator.innerHTML = '<span class="startup-spinner" aria-hidden="true"></span><span role="status"></span>';
+    document.body.append(indicator);
+    const label = indicator.querySelector('[role=status]');
+    const threshold = 72;
+    let touch, running = false;
+    const atTop = () => window.scrollY <= 1;
+    const blocked = () => document.body.classList.contains('local-player-open') ||
+      document.querySelector('dialog[open], #dm-playback-choice, .dm-inline-trailer');
+    const show = (phase, message) => {
+      indicator.hidden = false;
+      indicator.dataset.phase = phase;
+      if (label.textContent !== message) label.textContent = message;
+    };
+    function cancel() {
+      touch = undefined;
+      if (!running) indicator.hidden = true;
+    }
+    document.addEventListener('touchstart', event => {
+      if (event.touches.length !== 1 || running || !atTop() || blocked() ||
+          event.target.closest('input,textarea,select,button,[contenteditable],video')) { cancel(); return; }
+      for (let node = event.target; node instanceof HTMLElement && node !== document.body; node = node.parentElement) {
+        if (node.scrollTop > 1 && /^(auto|scroll)$/.test(getComputedStyle(node).overflowY)) return;
+      }
+      const {identifier, clientX, clientY} = event.touches[0];
+      touch = {identifier, x:clientX, y:clientY, distance:0};
+    }, {passive:true});
+    document.addEventListener('touchmove', event => {
+      if (!touch) return;
+      if (event.touches.length !== 1 || blocked() || !atTop()) { cancel(); return; }
+      const {identifier, clientX, clientY} = event.touches[0];
+      const deltaX = clientX - touch.x, deltaY = clientY - touch.y;
+      if (identifier !== touch.identifier || deltaY < -6 || Math.abs(deltaX) > Math.max(12, deltaY)) {
+        cancel();
+        return;
+      }
+      if (deltaY < 8 && !touch.distance) return;
+      if (event.cancelable) event.preventDefault();
+      touch.distance = Math.max(0, deltaY);
+      indicator.style.setProperty('--pull-offset', Math.min(20, touch.distance / 5) + 'px');
+      const armed = touch.distance >= threshold;
+      show(armed ? 'armed' : 'pulling', armed ? 'برای تازه‌سازی رها کن' : 'برای تازه‌سازی بکش');
+    }, {passive:false});
+    document.addEventListener('touchcancel', cancel, {passive:true});
+    document.addEventListener('touchend', async event => {
+      if (!touch || !Array.from(event.changedTouches).some(point => point.identifier === touch.identifier)) return;
+      const armed = touch.distance >= threshold;
+      cancel();
+      if (!armed || blocked()) return;
+      running = true;
+      show('refreshing', 'در حال تازه‌سازی…');
+      try {
+        const refresh = state.sessionKnown || state.user ? route({pullRefresh:true}) : checkStartupSession();
+        await Promise.all([refresh, new Promise(resolve => setTimeout(resolve, 320))]);
+      } finally {
+        running = false;
+        indicator.hidden = true;
+      }
+    }, {passive:true});
+  }
+  installPullRefresh();
   document.addEventListener('click', async e => {
     const button = e.target.closest('[data-play]');
     if (!button) return;
+    const historyCard = button.hasAttribute('data-history-position');
+    if (historyCard) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+      e.preventDefault();
+    }
+    if (button.hasAttribute('data-opening-playback')) return;
+    button.setAttribute('data-opening-playback', '');
     button.disabled = true;
+    const sequence = state.sequence;
     try {
       const kind = button.dataset.kind;
       let id = Number(button.dataset.play);
+      let groups = state.playGroups || [];
+      if (historyCard && !id && kind === 'movie') {
+        const title = await api('/api/app/v1/title/movie/' + enc(button.dataset.historySlug) + '/');
+        if (sequence !== state.sequence) return;
+        groups = [title.videos || []];
+        id = Number(groups[0][0]?.id);
+        if (!id) throw Error('منبع پخش این فیلم در دسترس نیست.');
+      }
       const targetQuality = {VeryHigh:1080,High:720,Medium:480,Low:360}[state.user?.quality];
       if (targetQuality && !button.dataset.room) {
-        const variants = (state.playGroups || []).find(options => options.some(option => Number(option.id) === id));
+        const variants = groups.find(options => options.some(option => Number(option.id) === id));
         const ranked = (variants || []).map(option => ({id:Number(option.id), height:parseInt(option.quality,10)}))
           .filter(option => Number.isFinite(option.height)).sort((a,b) => b.height-a.height);
         id = (ranked.find(option => option.height <= targetQuality) || ranked.at(-1))?.id || id;
       }
       const room = button.dataset.room;
-      const sequence = state.sequence;
       const response = await native({ action: 'play', kind, id, room, inline: true });
       if (response.status !== 200) throw new Error(response.data.error || 'پخش ممکن نشد.');
       if (sequence === state.sequence) {
         if (!response.data.url) throw new Error('آدرس پخش در دسترس نیست.');
-        const groups = state.playGroups || [];
         const group = groups.findIndex(options => options.some(option => Number(option.id) === id));
-        const position = Number(response.data.position) || 0;
-        const start = button.hasAttribute('data-resume') || room || position <= 0 ? position : await PWAPlayer.chooseResume(position);
+        const position = Number(response.data.position) || (Number(button.dataset.historyPosition || button.dataset.savedPosition) || 0);
+        const ask = historyCard || (!button.hasAttribute('data-resume') && !room && position > 0);
+        const start = ask ? await PWAPlayer.chooseResume(position) : position;
         if (start === null || sequence !== state.sequence) return;
         document.querySelectorAll('.dm-inline-trailer').forEach(player => player.dmDispose?.());
         PWAPlayer.open({
@@ -2304,7 +2548,10 @@
         });
       }
     } catch (error) { toast(error); }
-    finally { button.disabled = false; }
+    finally {
+      button.disabled = false;
+      button.removeAttribute('data-opening-playback');
+    }
   });
   window.addEventListener('diastomy-browser-sign-in', async event => {
     if (!event.detail) { toast('ورود کامل نشد. دوباره تلاش کنید.'); return; }
@@ -2316,9 +2563,14 @@
   async function checkStartupSession() {
     state.checkingSession = true;
     route();
-    await refreshSession();
+    await refreshSession({showError:true});
     state.checkingSession = false;
-    if (state.user && (!location.hash || location.hash === '#/login')) history.replaceState(null, '', '#/home');
+    if (state.user?.language_selection_completed === false && window.diastomySecondaryTab !== true) {
+      if (location.hash && !['#/login','#/language'].includes(location.hash)) state.nextAfterLogin = location.hash;
+      history.replaceState(null, '', '#/language');
+    } else if (state.user && (!location.hash || location.hash === '#/login')) {
+      history.replaceState(null, '', '#/home');
+    }
     route();
   }
   document.addEventListener('click', event => {

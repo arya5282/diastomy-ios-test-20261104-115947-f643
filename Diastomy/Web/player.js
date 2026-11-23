@@ -71,6 +71,24 @@ window.PWAPlayer = (() => {
       });
     };
     let surface, surfaceStarting = false, polling, startupCheck, lastState, playbackRate = 1;
+    const sizes = {small:'0.8em',normal:'1em',large:'1.3em'};
+    const colors = {white:'#fff',yellow:'#ffe043',cyan:'#7bedff'};
+    let captionStyle = {size:'normal',color:'white',background:true};
+    try {
+      const saved = JSON.parse(localStorage.getItem('diastomy-caption-style'));
+      if (saved && Object.hasOwn(sizes,saved.size) && Object.hasOwn(colors,saved.color) && typeof saved.background === 'boolean') captionStyle = saved;
+    } catch (_) {}
+    function applyCaptionStyle() {
+      overlay.style.setProperty('--caption-size', sizes[captionStyle.size]);
+      overlay.style.setProperty('--caption-color', colors[captionStyle.color]);
+      overlay.style.setProperty('--caption-background', captionStyle.background ? '#000c' : 'transparent');
+      if (surface) controlSurface('captionStyle', captionStyle).catch(() => {});
+    }
+    function setCaptionStyle(key, value) {
+      captionStyle[key] = value;
+      try { localStorage.setItem('diastomy-caption-style', JSON.stringify(captionStyle)); } catch (_) {}
+      applyCaptionStyle();
+    }
     let scrubbing = false;
     let pendingSeek;
     const controlSurface = (command, value) => native({action:'inlineControl',command,value});
@@ -120,6 +138,7 @@ window.PWAPlayer = (() => {
         await controlSurface('rotate', overlay.classList.contains('local-player-rotated'));
         if (!overlay.isConnected || request !== revision) return;
         controlSurface('rate', playbackRate).catch(() => {});
+        applyCaptionStyle();
         controlSurface('volume', Number(volume.value)).catch(() => {});
         controlSurface('fill', overlay.classList.contains('local-player-fill')).catch(() => {});
         if (video.muted) controlSurface('mute').catch(() => {});
@@ -269,10 +288,15 @@ window.PWAPlayer = (() => {
         });
         return;
       }
+      if (settings.dataset.panel === 'captions') {
+        options('اندازهٔ زیرنویس', [['small','کوچک'],['normal','متوسط'],['large','بزرگ']], captionStyle.size, value => setCaptionStyle('size', value));
+        options('پس‌زمینه', [[true,'روشن'],[false,'خاموش']], captionStyle.background, value => setCaptionStyle('background', value));
+        options('رنگ زیرنویس', [['white','سفید'],['yellow','زرد'],['cyan','آبی روشن']], captionStyle.color, value => setCaptionStyle('color', value));
+      }
       if (surface) {
         if (settings.dataset.panel === 'captions') {
           const captions = lastState?.captions || [];
-          if (!captions.length) { settings.textContent = 'زیرنویس قابل پخش در دسترس نیست.'; return; }
+          if (!captions.length) { settings.append('زیرنویس قابل پخش در دسترس نیست.'); return; }
           options('زیرنویس', [[-1,'خاموش'], ...captions.map((name,i) =>
             [i, creditMarker.test(name) ? 'زیرنویس ' + (i + 1) : name])], lastState.selectedCaption,
           value => controlSurface('captions', value).catch(() => {}));
@@ -296,7 +320,7 @@ window.PWAPlayer = (() => {
           if (track.mode === 'disabled') track.mode = 'hidden';
           return cleanCaptionTrack(track);
         });
-        if (!captions.length) { settings.textContent = 'زیرنویس قابل پخش در دسترس نیست.'; return; }
+        if (!captions.length) { settings.append('زیرنویس قابل پخش در دسترس نیست.'); return; }
         options('زیرنویس', [[-1,'خاموش'], ...captions.map((track,i) => [i,
           track.label && !creditMarker.test(track.label) ? track.label : track.language || 'زیرنویس ' + (i + 1)])],
         captions.findIndex(track => track.mode === 'showing'), value => tracks.forEach(track => {
@@ -429,6 +453,7 @@ window.PWAPlayer = (() => {
           break;
       }
     };
+    applyCaptionStyle();
     document.body.append(overlay);
     document.body.classList.add('local-player-open');
     updateNext();

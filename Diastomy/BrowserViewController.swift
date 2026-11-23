@@ -1,6 +1,7 @@
 import UIKit
 import WebKit
 import AVKit
+import CoreMedia
 import CryptoKit
 import ImageIO
 
@@ -423,6 +424,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         ]
         if exact.contains(p) || p.hasPrefix("/api/app/v1/") || p.hasPrefix("/movie/api/actor/") || p.hasPrefix("/movie/api/watch-state/") ||
             p.range(of: #"^/accounts/notifications/[1-9][0-9]*/dismiss/$"#, options: .regularExpression) != nil ||
+            p.range(of: #"^/movie/(movie-comment|comment)/[1-9][0-9]*/(like|dislike)/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/accounts/api/devices/[1-9][0-9]*/terminate/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/api/watch-history/[1-9][0-9]*/remove/$"#, options: .regularExpression) != nil ||
             p.range(of: #"^/movie-room/r/[A-Za-z0-9_-]+/delete/$"#, options: .regularExpression) != nil {
@@ -463,7 +465,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             }
         }
         api.dataTask(with: request) { data, response, error in
-            if error != nil { completion(["status": 0, "data": ["error": "اتصال به سرور برقرار نشد."]]); return }
+            if let error {
+                let code = (error as? URLError)?.code
+                let offline = code == .notConnectedToInternet || code == .networkConnectionLost ||
+                    code == .dataNotAllowed || code == .internationalRoamingOff
+                completion(["status": offline ? 0 : 503,
+                            "data": ["error": offline ? "مشکل در اتصال اینترنت" : "خطای سرور"]])
+                return
+            }
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard let data = data, let json = try? JSONSerialization.jsonObject(with: data) else {
                 completion(["status": status == 200 ? 502 : status,
@@ -873,7 +882,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         view.layer.insertSublayer(layer, below: webView.layer)
         inlineLayer = layer
         inlineRoom = room
-        view.backgroundColor = UIColor(red: 16/255, green: 19/255, blue: 28/255, alpha: 1)
+        view.backgroundColor = .black
         layoutInlinePlayer()
         webView.underPageBackgroundColor = .clear
         webView.backgroundColor = .clear
@@ -934,6 +943,18 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             layoutInlinePlayer()
         case "fill":
             inlineLayer?.videoGravity = data["value"] as? Bool == true ? .resizeAspectFill : .resizeAspect
+        case "captionStyle":
+            let style = data["value"] as? [String: Any] ?? [:]
+            let sizes: [String: Int] = ["small": 80, "normal": 100, "large": 130]
+            let colors: [String: [Double]] = [
+                "white": [1, 1, 1, 1], "yellow": [1, 1, 0.88, 0.26], "cyan": [1, 0.48, 0.93, 1]
+            ]
+            let attributes: [String: Any] = [
+                kCMTextMarkupAttribute_RelativeFontSize as String: sizes[style["size"] as? String ?? ""] ?? 100,
+                kCMTextMarkupAttribute_ForegroundColorARGB as String: colors[style["color"] as? String ?? ""] ?? [1, 1, 1, 1],
+                kCMTextMarkupAttribute_BackgroundColorARGB as String: [(style["background"] as? Bool == false ? 0.0 : 0.78), 0.0, 0.0, 0.0]
+            ]
+            if let rule = AVTextStyleRule(textMarkupAttributes: attributes) { item?.textStyleRules = [rule] }
         case "audio":
             if let audioGroup, let index = data["value"] as? Int, audioGroup.options.indices.contains(index) {
                 item?.select(audioGroup.options[index], in: audioGroup)
