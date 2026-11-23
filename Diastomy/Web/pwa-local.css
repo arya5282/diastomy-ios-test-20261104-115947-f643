@@ -1633,3 +1633,46 @@ body #app .local-room-detail .mr-room-body{display:flex;flex-direction:column;ju
 }
 #app .local-room-detail .local-room-chat{background:#12151d;border-color:#333742}
 #app .local-room-detail .local-room-chat header{background:#191c27;border-color:#333742}
+
+html:has(body[data-page=local-title]),body[data-page=local-title]{overscroll-behavior-y:none}
+body[data-page=local-title] #toast.app-notice{top:calc(env(safe-area-inset-top,0px) + 60px)}
+html.dmf3-active body[data-page=local-account] .dmf3-root{
+  background:radial-gradient(ellipse 105% 35% at 0 0,#2b1018 0%,transparent 75%),
+    radial-gradient(ellipse 105% 38% at 100% 100%,#281018 0%,transparent 78%),#101118!important;
+}
+html.dmf3-active body[data-page=local-account],
+html.dmf3-active:has(body[data-page=local-account]){background:#101118!important}
+html body[data-page=local-account] #dm-app-menu :is(.dm-app-menu-row,.account-notice-row,.dm-viewing-summary){
+  background:#161924!important;border-color:#323541!important;
+}
+body[data-page=local-account] #dm-app-menu #logout{color:#e1454c}
+#local-logout-dialog{
+  width:min(238px,calc(100vw - 32px));margin:auto;padding:16px 14px 18px;text-align:center;
+  color:#fff;background:var(--title-dialog-bg);border:1px solid var(--title-dialog-border);border-radius:16px;
+}
+#local-logout-dialog::backdrop{background:var(--title-dialog-backdrop);backdrop-filter:blur(2px)}
+#local-logout-dialog .logout-dialog-icon{display:grid;place-items:center;margin-bottom:8px;color:#ed252d}
+#local-logout-dialog .logout-dialog-icon svg{width:34px;height:34px}
+#local-logout-dialog h2{margin:0;font-size:12px;font-weight:650;line-height:20px}
+#local-logout-dialog p{margin:2px 0 16px;font-size:9px;line-height:16px;color:#b9bbc4}
+#local-logout-dialog .logout-dialog-actions{display:flex;justify-content:center;gap:8px}
+#local-logout-dialog .logout-dialog-actions button{
+  min-width:65px;min-height:29px;padding:4px 8px;border:1px solid transparent;
+  border-radius:6px;color:#141414;background:#fff;font-size:9px;
+}
+#local-logout-dialog .logout-dialog-actions [data-logout-confirm]{background:#df0000;border-color:#ff5656;color:white}
+#local-logout-dialog .logout-dialog-actions button:focus-visible{outline:2px solid #ffc4c4;outline-offset:2px}
+#app .reference-episode-card{background:#10131c;border-color:#303440}
+#app #series-season{background:#161824;border-color:#424550}
+#app #series-sort{background:#0d0e13;border-color:#363943}
+#app .reference-episode-head .reference-episode-download{
+  display:grid;place-items:center;width:34px;height:34px;min-height:34px;padding:0;
+  border:1px solid #343946;border-radius:50%;background:#282b34;color:#fff;
+}
+#app .reference-episode-head .reference-episode-download:active{background:#421921;color:#ff585d}
+#app .film-download-pickers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}
+#app .film-download-pickers label{display:grid;gap:3px;color:#b6b9c3;font-size:10px}
+#app .film-download-pickers select{
+  width:100%;min-width:0;min-height:31px;padding:2px 5px;
+  background:#171a24;color:#fff;border:1px solid #343744;border-radius:7px;font-size:12px;
+}

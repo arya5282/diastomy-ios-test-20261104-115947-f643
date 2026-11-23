@@ -130,6 +130,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     private func updateNativeTitleButtons(_ data: [String: Any]) -> Bool {
+        webView.scrollView.bounces = data["detail"] as? Bool != true
         guard #available(iOS 26.0, *) else { return false }
         let size: CGFloat = 36
         guard data["visible"] as? Bool == true,

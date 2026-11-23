@@ -734,7 +734,8 @@
           let panelMotion;
           const selectDownloadTab = (variant, animate = false) => {
             const active = downloadOptions.querySelector('[data-download-panel]:not([hidden])');
-            if (active.dataset.downloadPanel === variant) return;
+            if (active.dataset.downloadPanel === variant &&
+                downloadOptions.querySelector('[data-download-tab][aria-pressed=true]').dataset.downloadTab === variant) return;
             panelMotion?.cancel();
             downloadOptions.querySelector('.film-download-content').scrollTop = 0;
             downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
@@ -753,9 +754,50 @@
           downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
             button.onclick = () => selectDownloadTab(button.dataset.downloadTab, true);
           });
-          $('#film-download').onclick = () => { selectDownloadTab('subbed'); downloadOptions.showModal(); };
+          const downloadSeason = $('#download-season');
+          const downloadEpisode = $('#download-episode');
+          const available = episodeList.filter(entry => entry.download_options?.length);
+          const variantInUse = () => downloadOptions.querySelector('[data-download-tab][aria-pressed=true]').dataset.downloadTab;
+          const resetEpisodes = number => {
+            downloadEpisode.replaceChildren(...available
+              .filter(entry => String(entry.season) === downloadSeason.value)
+              .map(entry => new Option('قسمت ' + entry.number, entry.number)));
+            if ([...downloadEpisode.options].some(option => option.value === number)) downloadEpisode.value = number;
+          };
+          const renderEpisodeDownloads = preferred => {
+            const entry = available.find(item => String(item.season) === downloadSeason.value && String(item.number) === downloadEpisode.value);
+            const options = entry?.download_options || [];
+            const content = downloadOptions.querySelector('.film-download-content');
+            content.innerHTML = PWA.filmDownloadPanels(options, true);
+            content.scrollTop = 0;
+            const variant = options.some(option => (option.variant || 'subbed') === preferred)
+              ? preferred : (options[0]?.variant || 'subbed');
+            selectDownloadTab(variant);
+          };
+          const showDownloads = (variant = 'subbed', key) => {
+            if (downloadSeason) {
+              const [season, episode] = (key || '').split(':');
+              if (season) downloadSeason.value = season;
+              resetEpisodes(episode ?? downloadEpisode.value);
+              renderEpisodeDownloads(variant);
+            } else {
+              selectDownloadTab(variant);
+            }
+            downloadOptions.showModal();
+          };
+          if (downloadSeason) {
+            const seasons = [...new Set(available.map(entry => entry.season))];
+            downloadSeason.replaceChildren(...seasons.map(season => new Option('فصل ' + season, season)));
+            downloadSeason.onchange = () => { resetEpisodes(); renderEpisodeDownloads(variantInUse()); };
+            downloadEpisode.onchange = () => renderEpisodeDownloads(variantInUse());
+            $('#series-episodes')?.addEventListener('click', event => {
+              const trigger = event.target.closest('[data-episode-download]');
+              if (trigger) showDownloads('subbed', trigger.dataset.episodeDownload);
+            });
+          }
+          $('#film-download').onclick = () => showDownloads();
           const audio = $('#film-audio');
-          if (audio) audio.onclick = () => { selectDownloadTab('dubbed'); downloadOptions.showModal(); };
+          if (audio) audio.onclick = () => showDownloads('dubbed');
           downloadOptions.querySelectorAll('[data-social]').forEach(button => button.onclick = async () => {
             try {
               const result = await native({action:'openSocial',site:button.dataset.social});
@@ -781,10 +823,6 @@
           } catch (error) { toast(error); }
           finally { button.disabled = false; }
         });
-        const create = $('#film-create-room');
-        if (create) {
-          create.onclick = async () => { try { const result = await api('/api/app/v1/rooms/', { body: { movie_id: data.id, title: data.title } }); location.hash = '#/room/' + enc(result.code); } catch (error) { toast(error); } };
-        }
         const bookmark = $('#bookmark');
         let bookmarkTouched = false;
         api('/api/app/v1/library/').then(result => whenCurrent(seq, () => {
@@ -1148,10 +1186,15 @@
     const user = state.user;
     const sequence = state.sequence;
     mount(PWA.account(user, PWA.accountBack || '#/home') +
-      '<dialog id="local-logout-dialog"><p>از حساب کاربری خارج می‌شوید؟</p><button type="button" data-logout-cancel>انصراف</button>' +
-      '<button type="button" data-logout-confirm>خروج</button></dialog>');
+      '<dialog id="local-logout-dialog" aria-labelledby="logout-title" aria-describedby="logout-description" dir="rtl">' +
+      '<div class="logout-dialog-icon" aria-hidden="true"></div><h2 id="logout-title">از حساب کاربریت خارج می‌شی؟</h2>' +
+      '<p id="logout-description">برای ادامه، باید دوباره وارد حسابت بشی.</p>' +
+      '<div class="logout-dialog-actions"><button type="button" data-logout-confirm>خروج از حساب</button>' +
+      '<button type="button" data-logout-cancel autofocus>انصراف</button></div></dialog>');
     const dialog = $('#local-logout-dialog');
-    $('#logout').onclick = () => dialog.showModal();
+    const logout = $('#logout');
+    dialog.querySelector('.logout-dialog-icon').append(logout.querySelector('svg').cloneNode(true));
+    logout.onclick = () => dialog.showModal();
     dialog.querySelector('[data-logout-cancel]').onclick = () => dialog.close();
     dialog.querySelector('[data-logout-confirm]').onclick = async event => {
       event.target.disabled = true;
@@ -2298,7 +2341,7 @@
       if (!root.classList.contains('diastomy-native-tabs')) return;
       const bookmark = topbar?.querySelector('#bookmark');
       const back = topbar?.querySelector('a');
-      let payload = {action:'nativeTitleButtons', visible:false};
+      let payload = {action:'nativeTitleButtons', visible:false, detail: Boolean(topbar)};
       if (bookmark && back && !document.body.classList.contains('local-player-open') &&
           !root.classList.contains('dm-trailer-is-fullscreen') && !$('#dm-playback-choice') && !document.querySelector('dialog[open]')) {
         const bounds = back.getBoundingClientRect();

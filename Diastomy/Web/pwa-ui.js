@@ -180,9 +180,6 @@ window.PWA = (() => {
       (home ? homeTime : time + ' باقی‌مانده') + '</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
       index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>') + '</div></article>';
   }
-  function downloadOptions(options) {
-    return options.map(option => '<button type="button" data-download="' + esc(option.id) + '">' + esc(option.quality) + '</button>').join('');
-  }
   function episodeCards(item, episodes, watchState, slug) {
     return episodes.map(episode => {
       const video = (episode.videos || [])[0];
@@ -198,14 +195,14 @@ window.PWA = (() => {
         media(episode.cover || item.banner || item.cover) + '" alt="" loading="lazy">' +
         (video ? '<span>' + PWA_SOURCE.detailPlay + '</span>' : '') + '</button><div><strong>' + title + seen + '</strong>' +
         (time ? '<small>' + time + '</small>' : '') + '</div>' +
-        (downloads.length ? '<details class="reference-episode-download"><summary aria-label="دانلود قسمت">' + PWA_SOURCE.detailDownload +
-          '</summary><div class="reference-download-options">' + downloadOptions(downloads) + '</div></details>' : '') +
+        (downloads.length ? '<button type="button" class="reference-episode-download" data-episode-download="' + esc(episode.season) + ':' +
+          esc(episode.number) + '" aria-haspopup="dialog" aria-label="دانلود قسمت، ' + title + '">' + PWA_SOURCE.detailDownload + '</button>' : '') +
         '</div>' + (episode.description ? '<p dir="auto">' + esc(episode.description) + '</p>' : '') + '</article>';
     }).join('');
   }
-  function filmDownloadDialog(options, series) {
+  function filmDownloadPanels(options, series) {
     const variants = ['subbed', 'dubbed'];
-    const panels = variants.map(variant => {
+    return variants.map(variant => {
       const dubbed = variant === 'dubbed';
       const rows = options.filter(option => (option.variant || 'subbed') === variant).map(option =>
         '<article class="film-download-card"><div class="film-download-meta"><strong dir="ltr">' +
@@ -221,12 +218,16 @@ window.PWA = (() => {
         (dubbed && !series ? 'دانلود نسخه دوبله · ' + '<bdi class="film-download-number">' + esc(option.quality) + '</bdi>' : PWA_SOURCE.filmDownloadArrow + 'دانلود با لینک مستقیم') + '</button></article>');
       return '<section data-download-panel="' + variant + '"' + (dubbed ? ' hidden' : '') + '>' +
         (rows.join('') || '<p class="film-download-empty">لینک دانلود این نسخه در دسترس نیست.</p>') + '</section>';
-    });
+    }).join('');
+  }
+  function filmDownloadDialog(options, series) {
     return '<dialog id="film-download-options" class="film-download-dialog" dir="rtl" aria-labelledby="film-download-title">' +
       '<div class="film-download-heading"><form method="dialog"><button class="film-download-close" aria-label="بازگشت">' +
       PWA_SOURCE.actorBack + '</button></form><h2 id="film-download-title" tabindex="-1" autofocus>لینک‌های دانلود</h2></div>' +
+      (series ? '<div class="film-download-pickers"><label>فصل<select id="download-season"></select></label>' +
+        '<label>قسمت<select id="download-episode"></select></label></div>' : '') +
       '<div class="film-download-tabs"><button type="button" data-download-tab="subbed" aria-pressed="true">نسخه زیرنویس</button><button type="button" data-download-tab="dubbed" aria-pressed="false">نسخه دوبله</button></div>' +
-      '<div class="film-download-content">' + panels.join('') + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 2h8a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm4 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm5.6-3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 3.1a1 1 0 0 0-1-.2L2.3 10.1c-1 .4-1 1 .1 1.3l4.8 1.5 11-7c.5-.3.8-.1.4.3l-9 8.3 6.7 5c.8.6 1.4.3 1.6-.7l3.9-14.4c.2-.6.2-1 0-1.3Z"/></svg>کانال تلگرام ما</button></div></dialog>';
+      '<div class="film-download-content">' + filmDownloadPanels(options, series) + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 2h8a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm4 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm5.6-3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 3.1a1 1 0 0 0-1-.2L2.3 10.1c-1 .4-1 1 .1 1.3l4.8 1.5 11-7c.5-.3.8-.1.4.3l-9 8.3 6.7 5c.8.6 1.4.3 1.6-.7l3.9-14.4c.2-.6.2-1 0-1.3Z"/></svg>کانال تلگرام ما</button></div></dialog>';
   }
 
   function detail(item, episodes) {
@@ -256,7 +257,6 @@ window.PWA = (() => {
       (options.length ? filmDownloadDialog(options, series) : '') +
       '<section class="reference-film-summary"><h2>' + (series ? 'خلاصه سریال' : 'خلاصه فیلم') + '</h2><p class="dm-film-description" dir="auto">' + esc(item.description) +
       '</p><button type="button" data-summary-more aria-expanded="false" hidden>بیشتر</button>' +
-      (series ? '' : '<div class="actions reference-summary-actions"><button type="button" id="film-create-room">ساخت اتاق فیلم</button></div>') +
       '</section><section class="reference-film-cast"><div class="film-cast-heading"><h2>بازیگران</h2>' +
       (cast.length > 6 ? '<button type="button" data-cast-more aria-expanded="false">بیشتر</button>' : '') + '</div><div class="rail reference-cast">' +
       cast.map((a,index) => '<a class="person" href="#/actor/' + encodeURIComponent(a.slug) + '"' + (index >= 6 ? ' data-extra-cast hidden' : '') +
@@ -506,5 +506,5 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, homePoster, savedCard:card, actorPage, actorProfile, home, historyCard, episodeCards, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
+  return {card, homePoster, savedCard:card, actorPage, actorProfile, home, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
 })();
