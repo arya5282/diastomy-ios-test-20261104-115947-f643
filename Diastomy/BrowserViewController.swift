@@ -155,7 +155,6 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         if let bookmark = titleBookmarkButton, bookmark.isSelected != saved {
             bookmark.isSelected = saved
             bookmark.configuration?.image = UIImage(systemName: saved ? "heart.fill" : "heart")
-            bookmark.configuration?.baseForegroundColor = saved ? .systemRed : .white
             bookmark.accessibilityLabel = saved ? "حذف از لیست من" : "ذخیره در لیست من"
         }
         titleBookmarkButton?.isEnabled = data["busy"] as? Bool != true
@@ -176,6 +175,12 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         configuration.baseForegroundColor = .white
         let button = TitleButton(type: .system)
         button.configuration = configuration
+        button.tintColor = .white
+        button.configurationUpdateHandler = { control in
+            var appearance = control.configuration
+            appearance?.baseForegroundColor = control.isHighlighted || control.isSelected ? .systemRed : .white
+            control.configuration = appearance
+        }
         button.accessibilityIdentifier = id
         button.accessibilityLabel = label
         button.addTarget(self, action: target, for: .touchUpInside)

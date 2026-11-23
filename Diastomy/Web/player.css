@@ -56,7 +56,13 @@
 .local-pwa-player [hidden]{display:none!important}
 .dm-trailer-thumb:has(>.local-trailer-card){display:block;position:relative;overflow:hidden;border-radius:12px}
 .dm-trailer-thumb:has(>.dm-inline-trailer){min-height:150px;aspect-ratio:16/9}
-html:has(body.local-player-native-open),body.local-player-native-open{background:transparent!important}
+/* The native video sits below WKWebView. Page themes must leave its canvas clear. */
+@layer native-player-surface{
+  html:has(body.local-player-native-open),body.local-player-native-open{
+    background:transparent!important;
+    color-scheme:only light;
+  }
+}
 body.local-player-native-open .dmf3-root{visibility:hidden}
 .local-pwa-player.local-player-native{background:transparent}
 .local-player-native video{visibility:hidden}

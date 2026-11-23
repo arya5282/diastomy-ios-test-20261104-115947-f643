@@ -503,6 +503,7 @@
   }
   async function browse(seq, kind, params) {
     const route = '#/browse/' + enc(kind);
+    const similarSource = params.get('similar')?.match(/^(movie|series)\/([^/]+)$/);
     const titles = state.user?.language === 'en'
       ? {movie:'Movies', series:'Series', all:'Movies and series'}
       : {movie:'آرشیو فیلم‌ها', series:'آرشیو سریال‌ها', all:'آرشیو فیلم و سریال'};
@@ -511,6 +512,22 @@
       '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><select id="sort">' +
       '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="most_viewed">پربازدیدترین</option>' +
       '<option value="highest_rating">بالاترین امتیاز</option></select></div><div id="catalogue"><div class="loading"></div></div></section>');
+    if (similarSource) {
+      const [, sourceKind, sourceSlug] = similarSource;
+      $('.archive-reference-header a').href = '#/title/' + sourceKind + '/' + enc(sourceSlug) + '?tab=similar';
+      $('[data-dm-archive-title]').textContent = kind === 'series' ? 'سریال‌های مشابه' : 'فیلم‌های مشابه';
+      $('.archive-reference-sort').hidden = true;
+      try {
+        const source = await api('/api/app/v1/title/' + sourceKind + '/' + enc(sourceSlug) + '/', {cache:true});
+        whenCurrent(seq, () => {
+          const items = (source.similar || []).filter(item => (item.type || sourceKind) === kind);
+          $('#catalogue').innerHTML = items.length ? '<div class="archive-reference-grid">' +
+            items.map(item => '<article class="archive-reference-card">' + PWA.savedCard(item) + '</article>').join('') +
+            '</div>' : empty('عنوانی پیدا نشد.');
+        });
+      } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
+      return;
+    }
     $('#sort').value = params.get('sort') || 'newest';
     $('#sort').onchange = event => {
       params.set('sort', event.target.value);
@@ -663,6 +680,30 @@
           if (!trailer) return;
           button.dataset.inlineTrailerSrc = imageURL(trailer.url);
         });
+        const trailerTab = $('[data-detail-tab="trailers"]');
+        trailerTab?.addEventListener('click', () => {
+          document.querySelectorAll('.detail-trailer-card').forEach((card, index) => {
+            const time = card.querySelector('time');
+            const paintDuration = seconds => {
+              if (!Number.isFinite(seconds) || seconds <= 0) return;
+              const total = Math.floor(seconds);
+              time.dateTime = 'PT' + total + 'S';
+              time.textContent = String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+              time.hidden = false;
+            };
+            paintDuration(Number(trailers[index].duration));
+            if (!time.hidden) return;
+            const video = document.createElement('video');
+            video.preload = 'metadata';
+            const release = () => { video.onerror = null; video.removeAttribute('src'); video.load(); };
+            video.onloadedmetadata = () => { paintDuration(video.duration); release(); };
+            video.onerror = release;
+            video.src = imageURL(trailers[index].url);
+          });
+        }, {once:true});
+        if (new URLSearchParams(location.hash.split('?')[1]).get('tab') === 'similar') {
+          requestAnimationFrame(() => $('[data-detail-tab="similar"]')?.click());
+        }
         const downloadOptions = $('#film-download-options');
         const showComments = () => {
           $('[data-detail-tab="comments"]').click();
@@ -670,17 +711,27 @@
         };
         $('#film-comments').onclick = showComments;
         if (downloadOptions) {
-          const selectDownloadTab = variant => {
+          let panelMotion;
+          const selectDownloadTab = (variant, animate = false) => {
+            const active = downloadOptions.querySelector('[data-download-panel]:not([hidden])');
+            if (active.dataset.downloadPanel === variant) return;
+            panelMotion?.cancel();
             downloadOptions.querySelector('.film-download-content').scrollTop = 0;
             downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
               button.setAttribute('aria-pressed', String(button.dataset.downloadTab === variant));
             });
             downloadOptions.querySelectorAll('[data-download-panel]').forEach(panel => {
               panel.hidden = panel.dataset.downloadPanel !== variant;
+              if (!panel.hidden && animate && !reduceMotion.matches) {
+                panelMotion = panel.animate([
+                  {opacity:0,transform:variant === 'dubbed' ? 'translateX(-12px)' : 'translateX(12px)'},
+                  {opacity:1,transform:'none'}
+                ], {duration:190,easing:'ease-out'});
+              }
             });
           };
           downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
-            button.onclick = () => selectDownloadTab(button.dataset.downloadTab);
+            button.onclick = () => selectDownloadTab(button.dataset.downloadTab, true);
           });
           $('#film-download').onclick = () => { selectDownloadTab('subbed'); downloadOptions.showModal(); };
           const audio = $('#film-audio');
@@ -710,9 +761,8 @@
           } catch (error) { toast(error); }
           finally { button.disabled = false; }
         });
-        if (kind === 'movie') {
-          const create = document.createElement('button'); create.textContent = 'ساخت اتاق فیلم';
-          document.querySelector('.actions').appendChild(create);
+        const create = $('#film-create-room');
+        if (create) {
           create.onclick = async () => { try { const result = await api('/api/app/v1/rooms/', { body: { movie_id: data.id, title: data.title } }); location.hash = '#/room/' + enc(result.code); } catch (error) { toast(error); } };
         }
         const bookmark = $('#bookmark');
@@ -724,14 +774,20 @@
         bookmark.onclick = async () => {
           if (bookmark.disabled) return;
           bookmarkTouched = true;
+          const previous = bookmark.getAttribute('aria-pressed');
+          bookmark.setAttribute('aria-pressed', String(previous !== 'true'));
           bookmark.disabled = true;
           try {
             const result = await api('/api/bookmark/toggle/?item_type=' + enc(kind) + '&item_id=' + data.id, {body:{}});
             whenCurrent(seq, () => {
               bookmark.setAttribute('aria-pressed', String(result.is_bookmarked === true));
-              toast(result.message || 'لیست به‌روز شد.');
             });
-          } catch (error) { whenCurrent(seq, () => toast(error)); }
+          } catch (error) {
+            if (bookmark.isConnected) {
+              bookmark.setAttribute('aria-pressed', previous);
+              toast(error);
+            }
+          }
           finally { bookmark.disabled = false; }
         };
       });

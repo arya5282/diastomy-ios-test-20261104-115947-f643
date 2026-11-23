@@ -221,10 +221,10 @@ window.PWA = (() => {
         (rows.join('') || '<p class="film-download-empty">لینک دانلود این نسخه در دسترس نیست.</p>') + '</section>';
     });
     return '<dialog id="film-download-options" class="film-download-dialog" dir="rtl" aria-labelledby="film-download-title">' +
-      '<div class="film-download-heading"><form method="dialog"><button class="film-download-close" aria-label="بستن">' +
-      PWA_SOURCE.filmDownloadClose + '</button></form><h2 id="film-download-title" tabindex="-1" autofocus>لینک‌های دانلود</h2></div>' +
+      '<div class="film-download-heading"><form method="dialog"><button class="film-download-close" aria-label="بازگشت">' +
+      PWA_SOURCE.actorBack + '</button></form><h2 id="film-download-title" tabindex="-1" autofocus>لینک‌های دانلود</h2></div>' +
       '<div class="film-download-tabs"><button type="button" data-download-tab="subbed" aria-pressed="true">نسخه زیرنویس</button><button type="button" data-download-tab="dubbed" aria-pressed="false">نسخه دوبله</button></div>' +
-      '<div class="film-download-content">' + panels.join('') + '</div><div class="film-download-social"><button type="button" data-social="telegram">کانال تلگرام ما</button><button type="button" data-social="instagram">اینستاگرام ما</button></div></dialog>';
+      '<div class="film-download-content">' + panels.join('') + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 3 2 11l5 2 12-7-10 9 1 5 4-4 5 4z"/></svg>کانال تلگرام ما</button></div></dialog>';
   }
 
   function detail(item, episodes) {
@@ -238,7 +238,7 @@ window.PWA = (() => {
     const download = '<button type="button" class="reference-download" id="film-download"' +
       (options.length ? '' : ' disabled') + '>Download ' + PWA_SOURCE.detailDownload + '</button>';
     const cast = item.actors || [];
-    return '<article class="movie-detail-shell"><div class="dm-detail-header-spacer" aria-hidden="true"></div><div class="dm-film-topbar" dir="ltr"><a href="#/home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="M20 12H4m7-7-7 7 7 7"/></svg></a><button id="bookmark" aria-label="ذخیره در لیست من" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 21S2 15 2 8a5.5 5.5 0 0 1 10-3 5.5 5.5 0 0 1 10 3c0 7-10 13-10 13Z"/></svg></button></div>' +
+    return '<article class="movie-detail-shell" data-title-kind="' + (series ? 'series' : 'movie') + '"><div class="dm-detail-header-spacer" aria-hidden="true"></div><div class="dm-film-topbar" dir="ltr"><a href="#/home" aria-label="بازگشت"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></a><button id="bookmark" aria-label="ذخیره در لیست من" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M12 21S2 15 2 8a5.5 5.5 0 0 1 10-3 5.5 5.5 0 0 1 10 3c0 7-10 13-10 13Z"/></svg></button></div>' +
       '<div class="movie-detail-hero"><img src="' + media(item.hero_cover || item.banner || item.cover) + '" alt="' + esc(item.title) + '">' + trailerButton + '</div>' +
       '<div class="dm-film-reference-info"><div class="dm-film-title-row"><h1>' + name(item) + '</h1><img src="' + logo + '" alt="Diastomy"></div>' +
       '<div class="dm-film-meta" dir="ltr">' + (series ? '<span>' + new Set(episodeList.map(episode => episode.season)).size + ' Season</span>' : item.duration ? '<span>' + esc(item.duration) + ' Min</span>' : '') + '<span>' + esc(item.production_year) + '</span><span>' + genres(item) + '</span></div>' +
@@ -253,7 +253,9 @@ window.PWA = (() => {
           '<button type="button" disabled>Play</button>') + download + '</div>' +
       (options.length ? filmDownloadDialog(options, series) : '') +
       '<section class="reference-film-summary"><h2>' + (series ? 'خلاصه سریال' : 'خلاصه فیلم') + '</h2><p class="dm-film-description" dir="auto">' + esc(item.description) +
-      '</p><button type="button" data-summary-more aria-expanded="false" hidden>بیشتر</button><div class="actions reference-summary-actions"></div></section><section class="reference-film-cast"><div class="film-cast-heading"><h2>بازیگران</h2>' +
+      '</p><button type="button" data-summary-more aria-expanded="false" hidden>بیشتر</button>' +
+      (series ? '' : '<div class="actions reference-summary-actions"><button type="button" id="film-create-room">ساخت اتاق فیلم</button></div>') +
+      '</section><section class="reference-film-cast"><div class="film-cast-heading"><h2>بازیگران</h2>' +
       (cast.length > 6 ? '<button type="button" data-cast-more aria-expanded="false">بیشتر</button>' : '') + '</div><div class="rail reference-cast">' +
       cast.map((a,index) => '<a class="person" href="#/actor/' + encodeURIComponent(a.slug) + '"' + (index >= 6 ? ' data-extra-cast hidden' : '') +
         '><img src="' + media(a.photo) + '" alt="' + esc(a.name) + '"><p>' + esc(a.name) + '</p></a>').join('') +
@@ -275,13 +277,16 @@ window.PWA = (() => {
         (comment.spoiler ? '<details><summary>دیدگاه حاوی اسپویل</summary><p>' + esc(comment.text) + '</p></details>' :
           '<p>' + esc(comment.text) + '</p>') + '</article>').join('') + '</div>' +
       (trailers.length ? '<div data-detail-panel="trailers" hidden>' + trailers.map((trailer, index) =>
-        '<article><div class="dm-trailer-thumb"><button type="button" class="local-trailer-preview" data-trailer-index="' + index +
+        '<article class="detail-trailer-card"><div class="dm-trailer-thumb"><button type="button" class="local-trailer-preview" data-trailer-index="' + index +
         '" aria-label="' + esc(trailer.title || 'پخش تریلر') + '"><img alt="" loading="lazy" src="' +
         media(trailer.thumbnail || item.hero_cover || item.banner || item.cover) + '">' + PWA_SOURCE.detailTrailer +
-        '</button></div><p>' + esc(trailer.title || 'تریلر ' + (index + 1)) + '</p></article>').join('') + '</div>' : '') +
-      '<div data-detail-panel="similar" hidden>' + [['movie','فیلم‌های مشابه'],['series','سریال‌های مشابه']].map(([kind,title]) => {
+        '</button></div><div class="detail-trailer-caption" dir="ltr"><strong dir="auto">' + esc(trailer.title || 'تریلر ' + (index + 1)) + '</strong><time hidden></time></div></article>').join('') + '</div>' : '') +
+      '<div data-detail-panel="similar" hidden>' + (series ? [['series','سریال‌های مشابه'],['movie','فیلم‌های مشابه']] : [['movie','فیلم‌های مشابه'],['series','سریال‌های مشابه']]).map(([kind,title]) => {
         const items = (item.similar || []).filter(entry => (entry.type || item.type) === kind);
-        return '<section><h2>' + title + '</h2>' + (items.length ? '<div class="local-similar-grid">' + items.map(card).join('') + '</div>' :
+        const source = encodeURIComponent(item.type + '/' + item.slug);
+        return '<section><header class="detail-similar-heading"><h2>' + title + '</h2>' +
+          (items.length ? '<a href="#/browse/' + kind + '?similar=' + source + '">بیشتر</a>' : '') + '</header>' +
+          (items.length ? '<div class="local-similar-grid">' + items.map(homePoster).join('') + '</div>' :
           '<p>عنوان مشابهی در دسترس نیست.</p>') + '</section>';
       }).join('') + '</div></div></article>';
   }

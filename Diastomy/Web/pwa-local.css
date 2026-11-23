@@ -149,7 +149,7 @@ body #app .dm-search-genre span{z-index:1}
 .reference-episode [data-play]{border-radius:20px;color:#fff;background:#dc0000;border:0}
 body .dm-film-buttons [data-play]{color:#fff}
 body[data-page=local-title] .movie-detail-shell{background:#000}
-body[data-page=local-title] .dm-film-topbar{height:58px;padding:0 16px;background:linear-gradient(#080201,#160301)}
+body[data-page=local-title] .movie-detail-shell[data-title-kind=series]{background:#10131c;color:#f5f5f7}
 body .dm-film-topbar svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .dm-film-topbar.native-title-buttons :is(a,button){visibility:hidden}
 .dm-film-topbar #bookmark[aria-pressed=true] svg{fill:#ef4444;stroke:#ef4444}
@@ -170,7 +170,7 @@ body .reference-film-actions button:disabled{opacity:.5}
 .reference-download-options[hidden]{display:none}
 .reference-film-summary{margin-top:32px}
 body .reference-film-summary h2,body .reference-film-cast h2{font-weight:500;font-size:14px;margin:0 0 14px}
-body .reference-film-summary .dm-film-description{font-weight:400;line-height:1.8;color:#aaa;margin:0}
+body .reference-film-summary .dm-film-description{font-weight:400;line-height:1.8;color:#aaa;margin:0;white-space:normal;text-wrap:wrap;text-align:start}
 .reference-summary-actions{margin:14px 0 0}
 .reference-summary-actions button{border-radius:999px;color:#aaa;background:#080808;font-size:11px}
 .reference-film-cast{margin-top:50px}
@@ -459,7 +459,6 @@ html.dmf3-active body[data-page=home] #app .nyx-prime-dots button[aria-pressed=t
 [data-detail-panel=comments] .nd-comment{border:1px solid #292929;border-radius:12px;padding:10px;margin-top:14px}
 [data-detail-panel=comments] .nd-comment header{position:static;display:flex;justify-content:space-between;gap:8px;background:none;border:0;padding:0}
 [data-detail-panel=comments] .nd-comment p{white-space:pre-line;color:#ccc}
-.local-similar-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots{display:flex;align-items:center;justify-content:center;gap:5px;direction:ltr}
 html.dmf3-active body[data-page=home] #app .nyx-prime-dots button{margin:0;flex:none}
 #app .dm-film-media button{display:inline-flex;align-items:center;gap:4px;min-height:0;background:none;border:0;padding:0;color:inherit}
@@ -469,20 +468,6 @@ html.dmf3-active body[data-page=home] #app .nyx-prime-dots button{margin:0;flex:
 #app #film-comments svg{width:15px;height:15px}
 #app .reference-media-dolby svg{width:54px;height:23px}
 #app .reference-trailer-play svg{width:14px;height:14px}
-#app .film-download-dialog{box-sizing:border-box;width:calc(100% - 48px);max-width:420px;max-height:80dvh;margin:auto;overflow:auto;padding:15px;border:1px solid #303030;border-radius:22px;background:#141414;color:white}
-.film-download-dialog::backdrop{background:#000a}
-#app .film-download-dialog h2{text-align:center;font-size:16px;margin:2px 28px 12px}
-#app .film-download-dialog .film-download-close{position:absolute;top:10px;right:10px;padding:0;width:24px;height:24px;min-height:0;border:1px solid #ddd;border-radius:8px;background:none;color:#fff}
-#app .film-download-tabs{display:flex;margin:0 8px 20px;border-radius:999px;background:#1a1a1a;border:1px solid #292929}
-#app .film-download-tabs button{flex:1;border:0;border-radius:999px;background:none;color:#aaa;font-weight:700;padding:8px 4px}
-#app .film-download-tabs [aria-pressed=true]{background:#e91515;color:#fff;box-shadow:0 5px 18px #f2222255}
-#app .film-download-card{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;margin:0 0 16px;padding:12px;border-radius:15px;background:#0a0a0a;border:1px solid #191919}
-#app .film-download-card:last-child{margin-bottom:0}
-#app .film-download-meta{display:grid;gap:2px;justify-items:start}
-#app [data-download-panel=subbed] .film-download-meta{grid-column:1/-1;justify-items:end}
-#app .film-download-meta strong{color:#e32222}
-#app .film-download-card small,#app .film-download-empty{color:#aaa}
-#app .film-download-card button{grid-column:1/-1;border:0;border-radius:999px;background:#1c1c1c;color:#fff;font-weight:700;padding:6px;min-height:32px}
 body[data-page=local-actor]{background:#000}
 body[data-page=local-actor] #app{padding:0 0 calc(80px + env(safe-area-inset-bottom))}
 #app .dm-actor-header{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;padding:12px 16px 8px}
@@ -642,24 +627,45 @@ html.dmf3-active body[data-page=my-library] #app .local-library-saved .dm54-post
     transform:translate3d(var(--hero-text-x,0px),0,0)!important;
   }
 }
-#app .film-download-dialog{max-width:420px;max-height:min(530px,calc(100dvh - 48px));padding:14px;overflow:hidden;background:linear-gradient(150deg,#171717ed,#101010f5);border-color:#ffffff2e}
+#app .film-download-dialog{
+  box-sizing:border-box;width:min(264px,calc(100% - 32px));max-height:min(340px,calc(100dvh - 40px));
+  margin:auto;padding:12px 19px 19px;overflow:hidden;border:1px solid #2e333f;border-radius:16px;
+  background:#12151f;color:white;
+}
+.film-download-dialog::backdrop{background:#10131bea;backdrop-filter:blur(2px)}
 #app .film-download-dialog[open]{display:flex;flex-direction:column}
-#app .film-download-heading{position:relative;flex:none}
+#app .film-download-heading{position:relative;flex:none;margin-bottom:8px}
 #app .film-download-heading form{margin:0;padding:0}
-#app .film-download-dialog h2{font-size:15px;font-weight:700;line-height:22px;margin:2px 28px 12px;outline:none}
-#app .film-download-dialog .film-download-close{top:-2px;right:-3px;border:0;width:23px;height:23px;background:none;display:grid;place-items:center}
-#app .film-download-close svg{display:block;width:22px;height:22px}
-#app .film-download-tabs{flex:none;margin-bottom:20px}
-#app .film-download-tabs button{font-size:13px;min-height:38px;padding:6px 4px}
+#app .film-download-dialog h2{margin:0 0 0 30px;text-align:right;font-size:12px;font-weight:600;line-height:24px;outline:none}
+#app .film-download-dialog .film-download-close{
+  position:absolute;top:50%;left:-4px;translate:0 -50%;width:32px;height:32px;min-height:0;
+  padding:0;border:0;border-radius:8px;background:none;color:white;display:grid;place-items:center;
+}
+#app .film-download-close svg{display:block;width:17px;height:17px}
+#app .film-download-tabs{display:flex;flex:none;margin-bottom:11px;border:1px solid #343744;border-radius:999px;background:#171a24}
+#app .film-download-tabs button{
+  flex:1;min-height:28px;padding:4px;border:1px solid transparent;border-radius:999px;
+  background:none;color:#b9bbc4;font-size:9px;transition:background-color 170ms,color 170ms;
+}
+#app .film-download-tabs [aria-pressed=true]{background:#e00000;border-color:#ff5656;color:white}
 #app .film-download-content{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
-#app .film-download-card{gap:8px;padding:10px}
-#app .film-download-meta{gap:7px}
-#app .film-download-meta strong{font-size:15px;font-weight:600;line-height:20px}
+#app .film-download-card{
+  display:grid;gap:4px;margin:0 0 7px;padding:8px 9px;border:1px solid #303441;border-radius:9px;
+  background:#171a24;text-align:left;
+}
+#app .film-download-card:last-child{margin-bottom:0}
+#app .film-download-meta{display:grid;justify-items:start;gap:2px}
+#app .film-download-meta strong{color:#ff666b;font-size:10px;font-weight:600}
 #app .film-download-number{font-family:"PWA Inter",Arial,sans-serif}
-#app .film-download-meta small{color:#888;font-size:12px}
-#app .film-download-format{grid-column:1/-1;display:flex;justify-content:space-between;color:#888;font-size:13px}
-#app .film-download-card button{display:flex;justify-content:center;align-items:center;gap:6px;min-height:35px;padding:6px;font-size:12px;line-height:18px}
-#app .film-download-card button svg{display:block;width:18px;height:18px;flex:none}
+#app .film-download-card small,#app .film-download-format,#app .film-download-empty{color:#a7a9b5;font-size:9px}
+#app .film-download-format{display:flex;justify-content:space-between}
+#app .film-download-card button{
+  display:flex;justify-content:center;align-items:center;gap:5px;min-height:28px;padding:3px 8px;
+  border:1px solid #383d4b;border-radius:999px;background:#171a24;color:#fff;font-size:9px;
+}
+#app .film-download-card button svg{width:14px;height:14px;flex:none}
+#app .film-download-dialog :is(button):focus-visible{outline:2px solid #eee;outline-offset:-2px}
+@media(prefers-reduced-motion:reduce){#app .film-download-tabs button{transition:none}}
 #route-loading[hidden]{display:none}
 #route-loading{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;background:#000;animation:route-slide-in 220ms ease-out}
 #route-loading>div{display:grid;justify-items:center;gap:15px;background:#171719;border:1px solid #29292c;border-radius:14px;padding:17px 26px;color:#bdbdbd;font:12px/18px "PWA Inter",Arial,sans-serif}
@@ -1176,7 +1182,10 @@ body #app .local-room-date-field:has(:disabled){color:#888}
 body .reference-film-summary .dm-film-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden}
 #app .dm-film-meta,#app .dm-film-media :is(button,span){font-size:9px}
 #app .dm-film-media .reference-age{padding:2px 4px}
-#app .dm-film-media .reference-media-hd svg{width:22px;height:16px}
+#app .dm-film-media .reference-media-hd svg{width:26px;height:19px}
+#app .dm-film-media .reference-media-dolby svg{width:47px;height:18px}
+#app .dm-film-media .reference-media-hd:active{color:#ff424b}
+#app .movie-detail-shell[data-title-kind=series] :is(.dm-film-meta,.dm-film-description){color:#b4b7c3}
 #app #film-comments svg{width:12px;height:12px}
 #app .dm-film-media .reference-ad svg{width:29px;height:10px}
 .film-cast-heading{display:flex;align-items:center;justify-content:space-between}
@@ -1200,10 +1209,14 @@ body .reference-film-summary .dm-film-description{display:-webkit-box;-webkit-bo
 @media(prefers-reduced-motion:no-preference){#app .episode-options:not([hidden]){animation:episode-options-in 145ms ease-out both}}
 @media(prefers-reduced-motion:reduce){#app #series-season svg{transition:none}}
 @keyframes episode-options-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-#app .film-download-dialog .film-download-social{display:flex;gap:8px;margin-top:12px;flex:none}
-#app .film-download-social button{flex:1;border:0;border-radius:30px;color:white;min-height:42px}
-#app .film-download-social [data-social=telegram]{background:#007eb2}
-#app .film-download-social [data-social=instagram]{background:linear-gradient(110deg,#6530ca,#cc1765,#e77808)}
+#app .film-download-dialog .film-download-social{display:flex;justify-content:center;gap:4px;margin-top:8px;flex:none}
+#app .film-download-social button{
+  display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;
+  min-height:28px;padding:4px 8px;border:0;border-radius:999px;color:white;font-size:8px;font-weight:650;
+}
+#app .film-download-social svg{width:13px;height:13px;flex:none}
+#app .film-download-social [data-social=telegram]{background:#087eb9}
+#app .film-download-social [data-social=instagram]{background:linear-gradient(100deg,#6a16da,#bd1878 55%,#bf4e06)}
 #app .local-comment-compose{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}
 #app .local-comment-compose button{position:static;margin:0;width:42px;height:42px}
 #app .local-comment-spoiler{position:relative;min-height:26px}
@@ -1218,7 +1231,24 @@ body .reference-film-summary .dm-film-description{display:-webkit-box;-webkit-bo
 #app .local-trailer-preview svg{position:absolute;inset:0;margin:auto;width:36px;height:36px;padding:8px;border-radius:50%;background:#000a}
 body .reference-film-summary .dm-film-description.expanded{-webkit-line-clamp:unset}
 .reference-film-summary [data-summary-more]{margin-top:5px;padding:3px 0;border:0;background:none;color:#aaa}
-#app .local-similar-grid{display:grid;grid-auto-flow:column;grid-auto-columns:clamp(86px,28vw,145px);grid-template-columns:none;overflow-x:auto;padding-bottom:6px;scrollbar-width:none}
+#app .detail-similar-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+#app .detail-similar-heading h2{margin:0}
+#app .detail-similar-heading a{color:#a4a6b0;font-size:12px}
+#app [data-detail-panel=similar] section + section{margin-top:24px}
+#app .local-similar-grid{
+  display:grid;direction:rtl;grid-auto-flow:column;grid-auto-columns:calc((100% - 24px) / 3.5);
+  gap:8px;margin-inline-end:-16px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;
+  scroll-snap-type:x proximity;
+}
+html body #app .local-similar-grid .home-poster-card.title-card{max-width:none!important;scroll-snap-align:start}
+html body #app .local-similar-grid .home-poster-card .dm54-poster{aspect-ratio:3/4!important;border:1px solid #393b46!important;border-radius:8px!important}
+#app .detail-trailer-card + .detail-trailer-card{margin-top:16px}
+#app .detail-trailer-card :is(.dm-trailer-thumb,.local-trailer-preview){aspect-ratio:2.1;min-height:0;border-radius:24px}
+#app .detail-trailer-card .local-trailer-preview{border:1px solid #ffffff26}
+#app .detail-trailer-card .local-trailer-preview svg{border:1px solid #ffffff80}
+#app .detail-trailer-caption{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:7px}
+#app .detail-trailer-caption strong{font-size:14px}
+#app .detail-trailer-caption time{font:12px "PWA Inter",Arial,sans-serif;color:#a7a9b5}
 .account-notice-item{position:relative}
 .account-notice-item [data-dismiss-notice]{position:absolute;top:4px;left:4px;min-width:32px;min-height:32px;padding:0;border:0;background:none;color:#aaa}
 .account-notice-item h2{padding-inline-end:22px}
