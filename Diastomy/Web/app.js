@@ -1920,7 +1920,7 @@
   async function room(seq, code) {
     const created = newlyCreatedRoom?.code === code ? newlyCreatedRoom : null;
     newlyCreatedRoom = null;
-    mount(PWA_SOURCE.libraryHeader + '<section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1><a href="#/rooms">← بازگشت</a></div>' +
+    mount('<div class="local-room-header">' + PWA_SOURCE.header + '</div><section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1></div>' +
       '<div id="room-data"><p role="status">اطلاعات اتاق از سرور دریافت می‌شود…</p></div></section>');
     try {
       const data = created || await api('/api/app/v1/rooms/' + enc(code) + '/');
@@ -1940,13 +1940,15 @@
         '<h2>کنترل کاربر</h2><div class="local-room-controls"><div class="local-room-volume">' +
         '<button type="button" id="room-mute" aria-label="قطع یا وصل صدا">' + PWA_PLAYER_ICONS.volume + '</button>' +
         '<input id="room-volume" type="range" min="0" max="1" step=".01" value="1" aria-label="صدا">' +
-        '<button type="button" id="room-fullscreen" aria-label="تمام‌صفحه">' + PWA_PLAYER_ICONS.fullscreen + '</button></div><div class="local-room-selects">' +
-        '<select id="room-subtitle" aria-label="زیرنویس" disabled><option value="-1">بدون زیرنویس</option></select>' +
+        '<span class="local-room-volume-up" aria-hidden="true">' + PWA_PLAYER_ICONS.volume + '</span></div>' +
+        '<select id="room-subtitle" aria-label="زیرنویس" disabled><option value="-1">انتخاب زیرنویس</option></select>' +
+        '<details class="local-room-media-options"><summary aria-label="تنظیمات صدا و کیفیت">' + PWA_PLAYER_ICONS.captions + '</summary><div class="local-room-selects">' +
         '<select id="room-audio" aria-label="زبان صدا" disabled><option value="">صدای اصلی</option></select>' +
         '<select id="room-quality" aria-label="کیفیت"' + (videos.length ? '' : ' disabled') + '>' +
-        (videos.length ? videos.map(v => '<option value="' + esc(v.id) + '">' + esc(v.quality) + '</option>').join('') : '<option>کیفیت پخش</option>') + '</select></div></div>' +
+        (videos.length ? videos.map(v => '<option value="' + esc(v.id) + '">' + esc(v.quality) + '</option>').join('') : '<option>کیفیت پخش</option>') + '</select></div></details>' +
+        '<button type="button" id="room-fullscreen" aria-label="تمام‌صفحه">' + PWA_PLAYER_ICONS.fullscreen + '</button></div>' +
         (data.is_host ? '<h2>کنترل میزبان</h2><div class="local-host-controls"><button data-control="toggle">توقف</button>' +
-          '<button data-control="forward">۱۰ ثانیه جلو</button><button data-control="back">۱۰ ثانیه عقب</button><button data-control="close">بستن اتاق</button></div>' : '') +
+          '<button data-control="forward">10 ثانیه جلو</button><button data-control="back">10 ثانیه عقب</button><button data-control="close">بستن اتاق</button></div>' : '') +
         '<h2>چت اتاق</h2><section class="local-room-chat"><header><strong>' + esc(data.title) + '</strong><small id="room-status">در حال اتصال…</small></header>' +
         '<div id="room-chat" aria-live="polite"><p>پیام‌ها برای همهٔ حاضرین اتاق نمایش داده می‌شوند.</p></div>' +
         '<div class="local-room-reactions">' + ['😂','😍','😱','😢','👏','🔥','🍿','❤️'].map(emoji => '<button type="button">' + emoji + '</button>').join('') +
@@ -1994,7 +1996,9 @@
         const upcoming = roomState.starts_at > Date.now() / 1000 + clockOffset;
         const ended = roomState.duration > 0 && position() >= roomState.duration;
         const paused = roomState.paused_position != null;
-        $('#room-live-state').textContent = roomState.closed ? 'بسته‌شده' : ended ? 'پایان‌یافته' : upcoming ? 'در انتظار شروع' : paused ? 'متوقف' : 'در حال پخش';
+        const liveState = $('#room-live-state');
+        liveState.textContent = roomState.closed ? 'بسته‌شده' : ended ? 'پایان‌یافته' : upcoming ? 'در انتظار شروع' : paused ? 'متوقف' : 'در حال پخش';
+        liveState.dataset.roomStatus = !roomState.closed && !ended && !upcoming && !paused ? 'live' : 'idle';
         $('#room-live-badge').hidden = roomState.closed || upcoming || ended;
         const toggle = $('[data-control=toggle]');
         if (toggle) toggle.textContent = upcoming ? 'شروع' : paused ? 'ادامه' : 'توقف';
@@ -2319,7 +2323,7 @@
   let lastNativeTabState;
   function syncNativeTabBar() {
     if (!root.classList.contains('diastomy-native-tabs')) return;
-    const visible = ['home','search','local-rooms','my-library','archive-reference','local-room'].includes(document.body.dataset.page)
+    const visible = ['home','search','local-rooms','my-library','archive-reference'].includes(document.body.dataset.page)
       && !document.body.classList.contains('local-player-open')
       && !root.classList.contains('dm-trailer-is-fullscreen')
       && !document.querySelector('dialog[open]');
