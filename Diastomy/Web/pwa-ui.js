@@ -211,12 +211,14 @@ window.PWA = (() => {
         '<article class="film-download-card"><div class="film-download-meta"><strong dir="ltr">' +
         '<bdi class="film-download-number">' + esc(option.quality) + '</bdi>' +
         (!dubbed && !series ? ' · <bdi dir="rtl">زیرنویس فارسی</bdi>' : '') +
-        '</strong>' + (option.size ? '<small class="film-download-number" dir="ltr">' + esc(option.size) + '</small>' : '') + '</div>' +
+        '</strong>' + (option.size || (series && option.format) ? '<small class="film-download-number film-download-specs" dir="ltr">' +
+          (option.size ? '<span>' + esc(option.size) + '</span>' : '') +
+          (series && option.format ? '<span>' + esc(option.format) + '</span>' : '') + '</small>' : '') + '</div>' +
         (option.audio ? '<small>' + esc(option.audio) + '</small>' : '') +
         (!dubbed && !series ? '<div class="film-download-format" dir="ltr"><span>دیاستومی</span>' +
           (option.format ? '<span class="film-download-number">' + esc(option.format) + '</span>' : '') + '</div>' : '') +
         '<button type="button" data-download="' + esc(option.id) + '" data-variant="' + variant + '">' +
-        (dubbed ? 'دانلود نسخه دوبله · ' + '<bdi class="film-download-number">' + esc(option.quality) + '</bdi>' : PWA_SOURCE.filmDownloadArrow + 'دانلود با لینک مستقیم') + '</button></article>');
+        (dubbed && !series ? 'دانلود نسخه دوبله · ' + '<bdi class="film-download-number">' + esc(option.quality) + '</bdi>' : PWA_SOURCE.filmDownloadArrow + 'دانلود با لینک مستقیم') + '</button></article>');
       return '<section data-download-panel="' + variant + '"' + (dubbed ? ' hidden' : '') + '>' +
         (rows.join('') || '<p class="film-download-empty">لینک دانلود این نسخه در دسترس نیست.</p>') + '</section>';
     });
@@ -224,7 +226,7 @@ window.PWA = (() => {
       '<div class="film-download-heading"><form method="dialog"><button class="film-download-close" aria-label="بازگشت">' +
       PWA_SOURCE.actorBack + '</button></form><h2 id="film-download-title" tabindex="-1" autofocus>لینک‌های دانلود</h2></div>' +
       '<div class="film-download-tabs"><button type="button" data-download-tab="subbed" aria-pressed="true">نسخه زیرنویس</button><button type="button" data-download-tab="dubbed" aria-pressed="false">نسخه دوبله</button></div>' +
-      '<div class="film-download-content">' + panels.join('') + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 3 2 11l5 2 12-7-10 9 1 5 4-4 5 4z"/></svg>کانال تلگرام ما</button></div></dialog>';
+      '<div class="film-download-content">' + panels.join('') + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 2h8a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm4 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm5.6-3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 3.1a1 1 0 0 0-1-.2L2.3 10.1c-1 .4-1 1 .1 1.3l4.8 1.5 11-7c.5-.3.8-.1.4.3l-9 8.3 6.7 5c.8.6 1.4.3 1.6-.7l3.9-14.4c.2-.6.2-1 0-1.3Z"/></svg>کانال تلگرام ما</button></div></dialog>';
   }
 
   function detail(item, episodes) {
@@ -266,10 +268,13 @@ window.PWA = (() => {
       (item.type === 'series' ? '<div data-detail-panel="episodes">' + episodes + '</div>' : '') +
       '<div data-detail-panel="comments"' + (item.type === 'series' ? ' hidden' : '') + '><div class="local-comments-head"><h2>دیدگاه‌های ' +
       name(item) + '</h2><small>' + esc(item.comment_count ?? (item.comments || []).length) + ' دیدگاه</small></div>' +
-      '<form id="title-comment"><label class="local-comment-spoiler"><input type="checkbox" name="spoiler"><span class="local-spoiler-check" aria-hidden="true">' +
+      '<form id="title-comment"><div class="local-comment-compose">' +
+      '<button type="button" class="local-comment-emoji" aria-label="ایموجی" aria-expanded="false" aria-controls="title-comment-emojis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 14a4 4 0 0 0 8 0M9 9h.1M15 9h.1"/></svg></button>' +
+      '<textarea name="text" rows="1" aria-label="دیدگاه" placeholder="نظرت رو اینجا بنویس…" maxlength="2000" required></textarea>' +
+      '<button type="submit" aria-label="ارسال دیدگاه"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m20 5-15 6a1 1 0 0 0 0 2l15 6a1 1 0 0 0 1-1l-2-6 2-6a1 1 0 0 0-1-1Z"/></svg></button></div>' +
+      '<div id="title-comment-emojis" hidden>' + ['😊','🙏','👍','❤️','😂'].map(emoji => '<button type="button">' + emoji + '</button>').join('') + '</div>' +
+      '<label class="local-comment-spoiler"><input type="checkbox" name="spoiler"><span class="local-spoiler-check" aria-hidden="true">' +
       '<svg viewBox="0 0 12 12" fill="none"><path d="m2.5 6 2.3 2.3 4.7-4.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> این نظر حاوی اسپویل است</label>' +
-      '<div class="local-comment-compose"><textarea name="text" rows="1" aria-label="دیدگاه" placeholder="نظرت رو اینجا بنویس ..." maxlength="2000" required></textarea>' +
-      '<button type="submit" aria-label="ارسال دیدگاه"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M21 3 3 10l8 3 3 8 7-18Z"/><path d="m11 13 10-10"/></svg></button></div>' +
       '<p id="title-comment-status" role="status"></p></form>' +
       (item.comments || []).map(comment => '<article class="nd-comment' + (comment.spoiler ? ' spoiler-comment' : '') +
         '"><header><strong>' + esc(comment.author) + '</strong>' +

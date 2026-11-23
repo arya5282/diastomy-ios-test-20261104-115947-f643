@@ -587,7 +587,7 @@
     try {
       const data = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/', { cache: true });
       whenCurrent(seq, () => {
-        state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => episode.videos).filter(videos => videos.length) : [data.videos || []];
+        state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => (episode.videos || []).map(video => ({...video, season:episode.season, episode:episode.number}))).filter(videos => videos.length) : [data.videos || []];
         const episodeList = data.episodes || [];
         const seasons = [...new Set(episodeList.map(episode => episode.season))];
         const episodes = seasons.length ? '<div class="reference-season-controls" dir="rtl">' +
@@ -613,6 +613,26 @@
           summary.classList.toggle('expanded', expanded);
           summaryToggle.textContent = expanded ? 'کمتر' : 'بیشتر';
         };
+        const commentEmoji = $('.local-comment-emoji');
+        if (commentEmoji) {
+          const palette = $('#title-comment-emojis');
+          const input = $('#title-comment textarea');
+          const setPalette = open => {
+            palette.hidden = !open;
+            commentEmoji.setAttribute('aria-expanded', String(open));
+          };
+          commentEmoji.onclick = () => setPalette(palette.hidden);
+          palette.onclick = event => {
+            const button = event.target.closest('button');
+            if (!button) return;
+            const emoji = button.textContent;
+            if (input.value.length - (input.selectionEnd - input.selectionStart) + emoji.length <= input.maxLength) {
+              input.setRangeText(emoji, input.selectionStart, input.selectionEnd, 'end');
+            }
+            setPalette(false);
+            input.focus();
+          };
+        }
         submit('title-comment', async (values, output) => {
           const result = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/comments/', {
             body:{text:values.text.trim(),is_spoiler:values.spoiler === 'on'}
@@ -1909,9 +1929,11 @@
       const videos = data.videos || [];
       $('#room-data').innerHTML = '<article class="local-room-card mr-room">' + image(data.cover, 'local-room-cover', '') +
         '<div class="mr-room-body"><strong>' + esc(data.title) + '</strong><small>میزبان: ' + esc(data.is_host ? 'خودت' : data.host || '—') +
-        (data.starts_at ? ' · ' + esc(roomDate(data.starts_at)) + '<br>ساعت <bdi>' + esc(roomDate(data.starts_at, true)) + '</bdi>' : '') + '</small><span id="room-live-state" class="mr-status"></span>' +
+        (data.starts_at ? ' · ' + esc(roomDate(data.starts_at)) + ' · ساعت <bdi>' + esc(roomDate(data.starts_at, true)) + '</bdi>' : '') + '</small><span id="room-live-state" class="mr-status"></span>' +
         '<div class="local-room-card-buttons"><button type="button" id="share-inside-room">دعوت</button><a href="#/rooms">اتاق‌های من</a></div></div></article>' +
         '<h2>پنل مدیریت پخش</h2><div class="local-room-screen"><span id="room-live-badge">● پخش زنده</span><video playsinline hidden></video>' +
+        '<div class="local-room-preview-controls" hidden><button type="button" aria-label="باز کردن پلیر">' + PWA_PLAYER_ICONS.play +
+        '</button><div class="local-room-preview-timeline" dir="ltr"><div><output>00:00</output><output>00:00</output></div><progress max="1" value="0" aria-label="پیشرفت پخش"></progress></div></div>' +
         '<div class="local-room-join"><strong>پخش هم‌زمان</strong>' +
         (videos.length ? '<button type="button" id="room-join-play">ورود به پخش</button><p id="room-play-status" role="status" hidden></p>' :
           '<p>' + (data.can_watch === false ? 'دسترسی به پخش این فیلم برای حساب شما فعال نیست.' : 'این فیلم فعلاً منبع پخش معتبر ندارد.') + '</p>') + '</div></div>' +
@@ -1941,6 +1963,23 @@
       let quality;
       let playbackTimeout;
       let nativeFallback = false;
+      let roomSource;
+      const previewControls = $('.local-room-preview-controls');
+      const [elapsed, remaining] = previewControls.querySelectorAll('output');
+      const previewProgress = previewControls.querySelector('progress');
+      const formatTime = seconds => {
+        const total = Math.floor(Math.max(0, seconds));
+        return [Math.floor(total / 3600), Math.floor(total / 60) % 60, total % 60]
+          .map(part => String(part).padStart(2, '0')).join(':');
+      };
+      const sendControl = async (control, value) => {
+        const message = {type:'control',action:control};
+        if (control === 'toggle') message.action = roomState?.starts_at > Date.now()/1000 + clockOffset ? 'start_now' :
+          roomState?.paused_position != null ? 'resume' : 'pause';
+        if (control === 'seek') message.position = value;
+        try { const response = await native({action:'roomSend',message}); if (!response.ok) throw Error('فرمان اتاق ارسال نشد.'); }
+        catch (error) { toast(error); }
+      };
       const setPlayStatus = (message, busy = false) => {
         playStatus.textContent = message;
         playStatus.hidden = !message;
@@ -1959,11 +1998,17 @@
         $('#room-live-badge').hidden = roomState.closed || upcoming || ended;
         const toggle = $('[data-control=toggle]');
         if (toggle) toggle.textContent = upcoming ? 'شروع' : paused ? 'ادامه' : 'توقف';
-        if (player.hidden) return;
         const target = position();
+        const total = roomState.duration || (Number.isFinite(player.duration) ? player.duration : 0);
+        elapsed.textContent = formatTime(Math.min(target, total || target));
+        remaining.textContent = formatTime(Math.max(0, total - target));
+        previewProgress.max = total || 1;
+        previewProgress.value = total ? Math.min(target, total) : 0;
+        previewControls.querySelector('button').innerHTML = upcoming || paused || ended ? PWA_PLAYER_ICONS.play : PWA_PLAYER_ICONS.pause;
+        if (player.hidden || nativeFallback) return;
         if (player.readyState && !player.seeking && Math.abs(player.currentTime - target) > 1.5) player.currentTime = target;
         if (roomState.closed || upcoming || ended || paused) player.pause();
-        else if (player.paused && !nativeFallback) player.play().catch(error => {
+        else if (player.paused) player.play().catch(error => {
           if (error.name === 'NotAllowedError' && seq === state.sequence && !player.hidden) playInNativePlayer();
         });
       }
@@ -1988,27 +2033,18 @@
         audioInput.onchange = () => audio.forEach((track,i) => { track.enabled = i === Number(audioInput.value); });
         subtitleInput.onchange = () => subtitles.forEach((track,i) => { track.mode = i === Number(subtitleInput.value) ? 'showing' : 'disabled'; });
       }
-      async function playInNativePlayer() {
-        if (nativeFallback || !quality || seq !== state.sequence) return;
+      function playInNativePlayer() {
+        if (nativeFallback || !roomSource || seq !== state.sequence) return;
         nativeFallback = true;
-        const request = mediaRequest;
         clearTimeout(playbackTimeout);
         player.pause();
-        player.hidden = true;
-        player.removeAttribute('src');
-        player.load();
-        joinPanel.hidden = false;
-        setPlayStatus('در حال باز کردن پلیر آیفون…', true);
-        try {
-          const response = await native({action:'play', kind:'movie', room:code, id:quality, presentRoom:true});
-          if (seq !== state.sequence || request !== mediaRequest) return;
-          if (!response.data?.presented) throw Error(response.data?.error || 'پخش این کیفیت ممکن نشد. دوباره تلاش کنید یا کیفیت دیگری انتخاب کنید.');
-          setPlayStatus('');
-        } catch (error) {
-          if (seq === state.sequence && request === mediaRequest) setPlayStatus(error.message);
-        } finally {
-          if (request === mediaRequest) nativeFallback = false;
-        }
+        setPlayStatus('');
+        PWAPlayer.open({
+          info:{...roomSource, position:position(), target:null}, groups:[], group:0, kind:'movie',
+          id:quality, room:code, native, onError:toast, save:() => {}, initialVolume:player.muted ? 0 : player.volume,
+          roomControl:data.is_host ? sendControl : undefined,
+          onClose:() => { nativeFallback = false; if (seq === state.sequence) sync(); }
+        });
       }
       async function playRoom() {
         const selected = Number($('#room-quality').value);
@@ -2022,7 +2058,8 @@
           if (seq !== state.sequence || request !== mediaRequest) return;
           if (response.status !== 200 || !response.data?.url) throw Error(response.data?.error || 'پخش ممکن نشد.');
           quality = selected;
-          player.src = response.data.url;
+          roomSource = response.data;
+          player.src = roomSource.url;
           player.hidden = false;
           playbackTimeout = setTimeout(() => {
             if (seq === state.sequence && request === mediaRequest) playInNativePlayer();
@@ -2042,6 +2079,7 @@
         clearTimeout(playbackTimeout);
         setPlayStatus('');
         joinPanel.hidden = true;
+        previewControls.hidden = false;
       };
       player.addEventListener('playing', finishBuffering);
       player.addEventListener('canplay', () => {
@@ -2052,10 +2090,8 @@
       });
       $('#room-volume').oninput = event => { player.volume = Number(event.target.value); player.muted = Number(event.target.value) === 0; };
       $('#room-mute').onclick = () => { player.muted = !player.muted; };
-      $('#room-fullscreen').onclick = () => {
-        if (!player.hidden && player.webkitEnterFullscreen) player.webkitEnterFullscreen();
-        else if (!player.hidden && player.requestFullscreen) player.requestFullscreen().catch(() => {});
-      };
+      $('#room-fullscreen').onclick = playInNativePlayer;
+      previewControls.querySelector('button').onclick = playInNativePlayer;
       $('#share-inside-room').onclick = () => native({action:'shareRoom',code}).catch(error => toast(error));
       document.querySelectorAll('.local-room-reactions button').forEach(button => {
         button.onclick = () => { $('#room-chat-form input').value += button.textContent; $('#room-chat-form input').focus(); };
@@ -2065,17 +2101,12 @@
         if (!result.ok) throw Error('ارسال پیام ناموفق بود.');
         whenCurrent(seq, () => { $('#room-chat-form input').value = ''; });
       });
-      document.querySelectorAll('[data-control]').forEach(button => button.onclick = async () => {
+      document.querySelectorAll('[data-control]').forEach(button => button.onclick = () => {
         const control = button.dataset.control;
-        const message = {type:'control',action:control};
-        if (control === 'toggle') message.action = roomState?.starts_at > Date.now()/1000 + clockOffset ? 'start_now' :
-          roomState?.paused_position != null ? 'resume' : 'pause';
         if (control === 'forward' || control === 'back') {
-          message.action = 'seek';
-          message.position = Math.max(0, Math.min(roomState?.duration || Infinity, position() + (control === 'forward' ? 10 : -10)));
+          return sendControl('seek', Math.max(0, Math.min(roomState?.duration || Infinity, position() + (control === 'forward' ? 10 : -10))));
         }
-        try { const response = await native({action:'roomSend',message}); if (!response.ok) throw Error('فرمان اتاق ارسال نشد.'); }
-        catch (error) { toast(error); }
+        return sendControl(control);
       });
       state.handleRoomState = event => {
         if (event.type === 'state') {

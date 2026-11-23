@@ -43,6 +43,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var startupTimer: Timer?
     private var startupNavigation: WKNavigation?
     private var startupDocumentCommitted = false
+    private var inlineRoom: String?
     private var inlineLayer: AVPlayerLayer?
     private var inlineGeneration = 0
     private var inlineRotated = false
@@ -622,7 +623,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                         replyHandler(["status": 409], nil)
                         return
                     }
-                    self.startInlinePlayer(url, position: data["position"] as? Double ?? 0)
+                    self.startInlinePlayer(url, position: data["position"] as? Double ?? 0, room: code)
                     replyHandler(["status": 200, "data": ["surface": true]], nil)
                     return
                 }
@@ -747,6 +748,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             roomTimer = nil
             roomCode = nil
             roomState = nil
+            if inlineRoom != nil { stopInlinePlayer() }
             if playingRoom != nil { player?.pause() }
             playingRoom = nil
             replyHandler(["ok": true], nil)
@@ -848,6 +850,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         inlineLayer?.player?.pause()
         inlineLayer?.removeFromSuperlayer()
         inlineLayer = nil
+        inlineRoom = nil
+        view.backgroundColor = .black
         inlineRotated = false
         inlineRate = 1
         inlineHasCaptions = false
@@ -856,7 +860,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         webView.scrollView.backgroundColor = .black
     }
 
-    private func startInlinePlayer(_ url: URL, position: Double) {
+    private func startInlinePlayer(_ url: URL, position: Double, room: String?) {
         stopInlinePlayer()
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         let asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
@@ -867,14 +871,23 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         layer.videoGravity = .resizeAspect
         view.layer.insertSublayer(layer, below: webView.layer)
         inlineLayer = layer
+        inlineRoom = room
+        view.backgroundColor = UIColor(red: 16/255, green: 19/255, blue: 28/255, alpha: 1)
         layoutInlinePlayer()
         webView.underPageBackgroundColor = .clear
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
-        if position.isFinite, position > 0 {
-            playback.seek(to: CMTime(seconds: position, preferredTimescale: 600))
+        if room != nil {
+            syncRoom()
+        } else if position.isFinite, position > 0 {
+            let time = CMTime(seconds: position, preferredTimescale: 600)
+            playback.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak layer] _ in
+                guard let self, let layer, self.inlineLayer === layer else { return }
+                layer.player?.play()
+            }
+        } else {
+            playback.play()
         }
-        playback.play()
         if var subtitle = URLComponents(url: url, resolvingAgainstBaseURL: false) {
             subtitle.path = url.deletingLastPathComponent().appendingPathComponent("subtitles.m3u8").path
             if let subtitleURL = subtitle.url {
@@ -1023,12 +1036,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     private func syncRoom() {
-        guard playingRoom != nil, playingRoom == roomCode, playerController?.presentingViewController != nil, let state = roomState, let player = player else { return }
+        guard let code = roomCode, let state = roomState else { return }
+        let roomPlayer = inlineRoom == code ? inlineLayer?.player :
+            (playingRoom == code && playerController?.presentingViewController != nil ? player : nil)
+        guard let player = roomPlayer else { return }
         if state["closed"] as? Bool == true { player.pause(); return }
         let paused = state["paused_position"] as? Double
         let start = state["starts_at"] as? Double ?? Date().timeIntervalSince1970
         let position = paused ?? Date().timeIntervalSince1970 + serverOffset - start
-        if position < 0 { player.pause(); return }
+        let duration = state["duration"] as? Double ?? 0
+        if position < 0 || (duration > 0 && position >= duration) { player.pause(); return }
         let current = player.currentTime().seconds
         if !current.isFinite || abs(current - position) > 2 { player.seek(to: CMTime(seconds: position, preferredTimescale: 600)) }
         if paused != nil { player.pause() } else { player.play() }

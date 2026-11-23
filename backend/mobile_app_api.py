@@ -5,6 +5,7 @@ Existing authentication, CSRF, media entitlement and playback routes stay active
 """
 import json
 from functools import wraps
+from urllib.parse import urlsplit
 
 from django.http import JsonResponse, Http404
 from django.middleware.csrf import get_token
@@ -272,7 +273,11 @@ def detail(request, kind, slug):
                 if not is_usable_source_url(url):
                     continue
                 variant = 'dubbed' if video.download_variant == 'dubbed' else 'subbed'
-                downloads.append({'id': video.pk, 'quality': video.quality.title, 'variant': variant})
+                extension = urlsplit(url).path.rsplit('.', 1)[-1].lower()
+                downloads.append({
+                    'id': video.pk, 'quality': video.quality.title, 'variant': variant,
+                    'size': video.file_size_label, 'format': extension.upper() if extension in ('mkv', 'mp4') else '',
+                })
             data['episodes'].append({'id': episode.pk, 'season': episode.season.season_number,
                                      'number': episode.episode_number, 'videos': videos, 'download_options': downloads,
                                      'cover': file_url(episode.cover), 'duration': episode.duration,
