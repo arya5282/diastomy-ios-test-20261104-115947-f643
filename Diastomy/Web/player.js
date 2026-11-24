@@ -67,7 +67,9 @@ window.PWAPlayer = (() => {
       '<div class="local-player-title"><h2></h2><p hidden></p></div>' + control('rotate','چرخش تصویر','player-phone-rotate') + '</div>' +
       '<label class="local-player-side local-player-brightness"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 1v3m0 16v3M1 12h3m16 0h3M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/></svg></span><input type="range" min="0" max="1" value="1" step=".01" aria-label="روشنایی تصویر"></label>' +
       '<label class="local-player-side local-player-volume">' + icons.volume + '<input type="range" min="0" max="1" value="1" step=".01" aria-label="بلندی صدا"></label>' +
-      '<div class="local-player-center">' + control('toggle','پخش یا توقف','play') + '</div><div class="local-player-bottom"><div class="local-player-bar">' +
+      '<div class="local-player-center">' + control('toggle','پخش یا توقف','play') + '</div>' +
+      '<div class="local-player-loading" role="status" dir="rtl" hidden><span class="startup-spinner" aria-hidden="true"></span>در حال بارگذاری ویدیو…</div>' +
+      '<div class="local-player-caption-status" role="status" dir="rtl" hidden></div><div class="local-player-bottom"><div class="local-player-bar">' +
       control('back','۱۰ ثانیه عقب','backward') + control('toggle','پخش یا توقف','play') + control('forward','۱۰ ثانیه جلو','forward') +
       '<div class="local-player-timeline"><div><output>0:00</output><output>0:00</output></div><div class="local-player-seek"><span aria-hidden="true"></span><input type="range" min="0" max="0" value="0" step=".1" aria-label="موقعیت پخش" disabled></div></div>' +
       (kind === 'series' ? control('next','قسمت بعد','forward') : '') + control('captions','زیرنویس','captions') + control('audio','زبان صدا','microphone') + control('settings','تنظیمات پخش','setting-2') + control('fullscreen','پر کردن صفحه','fullscreen') +
@@ -106,6 +108,24 @@ window.PWAPlayer = (() => {
       try { localStorage.setItem('diastomy-caption-style', JSON.stringify(captionStyle)); } catch (_) {}
       applyCaptionStyle();
     }
+    const loading = get('.local-player-loading');
+    const captionStatus = get('.local-player-caption-status');
+    let captionNoticeTimer;
+    let captionChange = 0;
+    function setLoading(active) {
+      loading.hidden = !active;
+      get('.local-player-center').classList.toggle('local-player-center-loading', active);
+    }
+    function playbackFailed() {
+      setLoading(false);
+      get('.local-player-error').hidden = false;
+    }
+    function captionNotice(message) {
+      clearTimeout(captionNoticeTimer);
+      captionStatus.textContent = message;
+      captionStatus.hidden = false;
+      captionNoticeTimer = setTimeout(() => { captionStatus.hidden = true; }, 2500);
+    }
     let scrubbing = false;
     let pendingSeek;
     const controlSurface = (command, value) => native({action:'inlineControl',command,value});
@@ -137,10 +157,11 @@ window.PWAPlayer = (() => {
     }
     async function startSurface() {
       if (surface || surfaceStarting) return;
-      if (kind === 'trailer') { get('.local-player-error').hidden = false; return; }
+      if (kind === 'trailer') { playbackFailed(); return; }
       const request = revision;
       const position = time() || resume;
       surfaceStarting = true;
+      setLoading(true);
       try {
         const response = await native({action:'play',inline:true,surface:true,kind,room,id:selected,position});
         if (!overlay.isConnected || request !== revision) return;
@@ -162,8 +183,10 @@ window.PWAPlayer = (() => {
         const frameDeadline = Date.now() + 30000;
         const sync = async () => {
           try {
+            const selection = captionChange;
             const state = await controlSurface('status');
             if (!overlay.isConnected || request !== revision || !surface || !state.ok) return;
+            if (captionChange !== selection || captionButton.disabled) return;
             const optionsChanged = (lastState?.captions?.length || 0) !== (state.captions?.length || 0) ||
               (lastState?.audio?.length || 0) !== (state.audio?.length || 0);
             lastState = state;
@@ -172,7 +195,9 @@ window.PWAPlayer = (() => {
             updateTransport(state.paused || !state.frameReady);
             if (state.failed || (!played && Date.now() > frameDeadline)) {
               clearInterval(polling);
-              get('.local-player-error').hidden = false;
+              playbackFailed();
+            } else {
+              setLoading(!state.frameReady || state.buffering === true);
             }
             refresh();
             if (optionsChanged && !settings.hidden) renderSettings();
@@ -182,7 +207,7 @@ window.PWAPlayer = (() => {
         sync();
         if (!settings.hidden) renderSettings();
       } catch (_) {
-        if (overlay.isConnected && request === revision) get('.local-player-error').hidden = false;
+        if (overlay.isConnected && request === revision) playbackFailed();
       } finally {
         if (request === revision) surfaceStarting = false;
       }
@@ -243,14 +268,21 @@ window.PWAPlayer = (() => {
       source = next;
       resume = position;
       played = false;
+      setLoading(true);
+      captionStatus.hidden = true;
       paintTitle(next.title);
       get('.local-player-error').hidden = true;
       if (preferSurface || (room && onClose)) { startSurface(); return; }
       video.src = next.url;
       video.playbackRate = playbackRate;
-      video.play().catch(() => {});
+      const request = revision;
+      video.play().catch(error => {
+        if (error.name !== 'NotAllowedError' || !overlay.isConnected || request !== revision) return;
+        clearTimeout(startupCheck);
+        setLoading(false);
+      });
       startupCheck = setTimeout(() => {
-        if (overlay.isConnected && (!video.videoWidth || video.readyState < 2)) startSurface();
+        if (overlay.isConnected && !played) startSurface();
       }, 6500);
     }
     async function changeSource(id, nextGroup) {
@@ -334,7 +366,6 @@ window.PWAPlayer = (() => {
       }
     }
     const captionButton = get('[data-player=captions]');
-    let lastNativeCaption = 0;
     let lastWebCaption;
     function captionTracks() {
       return Array.from(video.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
@@ -346,16 +377,23 @@ window.PWAPlayer = (() => {
     }
     async function selectNativeCaption(index) {
       const request = revision;
+      if (captionButton.disabled) return;
+      captionChange++;
       captionButton.disabled = true;
       try {
-        const state = await controlSurface('captions', index);
-        if (!surface || request !== revision || !state.ok) return;
+        const state = await controlSurface(index === undefined ? 'toggleCaptions' : 'captions', index);
+        if (!surface || request !== revision) return;
+        if (!state.ok) {
+          captionNotice(state.captionsLoading ? 'زیرنویس هنوز در حال بارگذاری است.' :
+            state.captionsUnavailable ? 'زیرنویس قابل تغییر در دسترس نیست.' : 'تغییر زیرنویس انجام نشد.');
+          return;
+        }
         lastState = state;
-        if (state.selectedCaption >= 0) lastNativeCaption = state.selectedCaption;
         syncCaptionButton();
         if (!settings.hidden && settings.dataset.panel === 'settings') renderSettings();
-      } catch (_) {}
-      finally { captionButton.disabled = false; }
+      } catch (_) {
+        if (request === revision && overlay.isConnected) captionNotice('تغییر زیرنویس انجام نشد.');
+      } finally { captionButton.disabled = false; }
     }
     function selectWebCaption(selected) {
       for (const track of captionTracks()) track.mode = track === selected ? 'showing' : 'hidden';
@@ -363,20 +401,18 @@ window.PWAPlayer = (() => {
       syncCaptionButton();
     }
     function toggleCaptions() {
-      if (surface) {
-        if (!lastState?.captions?.length) return;
-        const current = lastState.selectedCaption;
-        if (current >= 0) lastNativeCaption = current;
-        return selectNativeCaption(current >= 0 ? -1 : Math.min(lastNativeCaption, lastState.captions.length - 1));
-      }
+      if (surface) return selectNativeCaption();
+      if (surfaceStarting) { captionNotice('زیرنویس هنوز در حال بارگذاری است.'); return; }
       const tracks = captionTracks();
       const current = tracks.find(track => track.mode === 'showing');
       if (current) lastWebCaption = current;
-      if (tracks.length) selectWebCaption(current ? null : tracks.includes(lastWebCaption) ? lastWebCaption : tracks[0]);
+      if (!tracks.length) { captionNotice('زیرنویس قابل تغییر در دسترس نیست.'); return; }
+      selectWebCaption(current ? null : tracks.includes(lastWebCaption) ? lastWebCaption : tracks[0]);
     }
     function audioLabel(index, count) { return count === 1 ? 'صدای اصلی' : 'مسیر صوتی ' + (index + 1); }
     function dismiss() {
       progress(true);
+      clearTimeout(captionNoticeTimer);
       document.removeEventListener('keydown', closePanelOnEscape);
       closeCurrent = null;
       revision++;
@@ -423,8 +459,17 @@ window.PWAPlayer = (() => {
       if (resume > 0 && Math.abs(video.currentTime - resume) < 2) resume = 0;
       refresh();
     });
-    video.addEventListener('play', () => { played = true; updateTransport(false); });
-    video.addEventListener('pause', () => { updateTransport(true); });
+    video.addEventListener('playing', () => {
+      if (surface) return;
+      played = true;
+      setLoading(false);
+      updateTransport(false);
+    });
+    video.addEventListener('waiting', () => { if (!surface && !video.paused) setLoading(true); });
+    video.addEventListener('pause', () => {
+      if (!surface && !surfaceStarting) setLoading(false);
+      updateTransport(true);
+    });
     video.addEventListener('error', () => { if (overlay.isConnected) startSurface(); });
     seek.oninput = () => {
       scrubbing = true;

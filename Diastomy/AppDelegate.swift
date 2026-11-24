@@ -153,6 +153,15 @@ final class DiastomyTabController: UITabBarController, UITabBarControllerDelegat
         }
     }
 
+    func selectGenreSearch() -> Bool {
+        guard let search = viewControllers?.compactMap({ $0 as? BrowserViewController })
+            .first(where: { $0.initialTabRoute == "search" }) else { return false }
+        search.openGenreSearch()
+        selectedViewController = search
+        updateTabBar()
+        return true
+    }
+
     func clearOtherTabs(except current: BrowserViewController) {
         for case let controller as BrowserViewController in viewControllers ?? [] where controller !== current {
             controller.resetTabOnAppearance()

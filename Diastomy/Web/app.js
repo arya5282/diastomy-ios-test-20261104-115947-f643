@@ -194,11 +194,13 @@
     if (reduceMotion.matches || !dialog.animate) { close(); return; }
     const {opacity, transform} = getComputedStyle(dialog);
     dialog.setAttribute('data-closing','');
-    const sheet = dialog.matches('#local-filters,#settings-choice');
+    const download = dialog.matches('.film-download-dialog');
+    const exitTransform = download ? 'translateY(calc(-50dvh - 50%))' :
+      dialog.matches('#local-filters,#settings-choice') ? 'translateY(18px)' : 'translateY(6px) scale(.985)';
     const motion = dialog.animate([
       {opacity, transform},
-      {opacity:0, transform:sheet ? 'translateY(18px)' : 'translateY(6px) scale(.985)'}
-    ], {duration:125, easing:'ease-in', fill:'forwards'});
+      {opacity:0, transform:exitTransform}
+    ], {duration:download ? 255 : 125, easing:'ease-in', fill:'forwards'});
     motion.finished.catch(() => {}).then(() => {
       close();
       dialog.removeAttribute('data-closing');
@@ -2574,6 +2576,16 @@
     }, {passive:true});
   }
   installPullRefresh();
+  document.addEventListener('click', async event => {
+    const link = event.target.closest('.dm54-genres a[href="#/search?genres=all"]');
+    if (!link || !root.classList.contains('diastomy-native-tabs') ||
+        event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    try {
+      if ((await native({action:'openGenreSearch'}))?.ok) return;
+    } catch (_) {}
+    location.hash = link.hash;
+  });
   document.addEventListener('click', async e => {
     const button = e.target.closest('[data-play]');
     if (!button) return;
@@ -2582,9 +2594,16 @@
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
       e.preventDefault();
     }
-    if (button.hasAttribute('data-opening-playback')) return;
+    if (app.querySelector('[data-opening-playback]') || $('#dm-playback-choice')) return;
     button.setAttribute('data-opening-playback', '');
+    button.setAttribute('aria-busy', 'true');
     button.disabled = true;
+    const loading = document.createElement('div');
+    loading.className = 'playback-opening';
+    loading.dir = 'rtl';
+    loading.setAttribute('role','status');
+    loading.innerHTML = '<span class="startup-spinner" aria-hidden="true"></span>در حال آماده‌سازی پخش…';
+    app.append(loading);
     const sequence = state.sequence;
     try {
       const kind = button.dataset.kind;
@@ -2606,7 +2625,8 @@
       }
       const room = button.dataset.room;
       const response = await native({ action: 'play', kind, id, room, inline: true });
-      if (response.status !== 200) throw new Error(response.data.error || 'پخش ممکن نشد.');
+      loading.remove();
+      if (response.status !== 200) throw new Error(response.data?.error || 'پخش ممکن نشد.');
       if (sequence === state.sequence) {
         if (!response.data.url) throw new Error('آدرس پخش در دسترس نیست.');
         const group = groups.findIndex(options => options.some(option => Number(option.id) === id));
@@ -2620,9 +2640,11 @@
           save:body => api('/api/watch-progress/', {body}).catch(() => {})
         });
       }
-    } catch (error) { toast(error); }
+    } catch (error) { if (sequence === state.sequence) toast(error); }
     finally {
+      loading.remove();
       button.disabled = false;
+      button.removeAttribute('aria-busy');
       button.removeAttribute('data-opening-playback');
     }
   });
