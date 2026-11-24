@@ -1,6 +1,7 @@
 import UIKit
 import WebKit
 import AVKit
+import MediaPlayer
 import CoreMedia
 import CryptoKit
 import ImageIO
@@ -124,6 +125,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         webView.backgroundColor = .black
         webView.scrollView.backgroundColor = .black
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.alwaysBounceHorizontal = false
+        webView.scrollView.showsHorizontalScrollIndicator = false
+        webView.scrollView.isDirectionalLockEnabled = true
+        webView.scrollView.pinchGestureRecognizer?.isEnabled = false
         if #available(iOS 26.0, *) { setContentScrollView(webView.scrollView, for: .bottom) }
         webView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(webView)
@@ -136,6 +141,48 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         loadBundledInterface()
     }
 
+    private var playerViewportActive = false
+    private var playerVolumeView: MPVolumeView?
+    private var savedBackGesture = false
+
+    private func updatePlayerViewport(_ data: [String: Any]) -> Bool {
+        let active = data["active"] as? Bool == true
+        if active != playerViewportActive {
+            playerViewportActive = active
+            if active {
+                savedBackGesture = webView.allowsBackForwardNavigationGestures
+                webView.allowsBackForwardNavigationGestures = false
+            } else {
+                webView.allowsBackForwardNavigationGestures = savedBackGesture
+            }
+        }
+        let scrolling = webView.scrollView
+        scrolling.isScrollEnabled = !active
+        scrolling.bounces = !active && data["detail"] as? Bool != true
+        guard active, let x = data["x"] as? Double, let y = data["y"] as? Double,
+              let length = data["length"] as? Double, [x, y, length].allSatisfy(\.isFinite),
+              (20...300).contains(length), webView.bounds.contains(CGPoint(x: x, y: y)) else {
+            playerVolumeView?.isHidden = true
+            return false
+        }
+        let slider: MPVolumeView
+        if let existing = playerVolumeView {
+            slider = existing
+        } else {
+            slider = MPVolumeView(frame: .zero)
+            slider.showsRouteButton = false
+            slider.tintColor = .systemRed
+            slider.accessibilityLabel = "بلندی صدا"
+            view.addSubview(slider)
+            playerVolumeView = slider
+        }
+        slider.bounds = CGRect(x: 0, y: 0, width: length, height: 28)
+        slider.center = webView.convert(CGPoint(x: x, y: y), to: view)
+        slider.transform = CGAffineTransform(rotationAngle: data["horizontal"] as? Bool == true ? 0 : -.pi / 2)
+        slider.isHidden = false
+        return true
+    }
+
     private final class TitleButton: UIButton {
         override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             let inset = max(0, (44 - bounds.width) / 2)
@@ -144,16 +191,18 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     }
 
     private func updateNativeTitleButtons(_ data: [String: Any]) -> Bool {
-        webView.scrollView.bounces = data["detail"] as? Bool != true
+        webView.scrollView.bounces = !playerViewportActive && data["detail"] as? Bool != true
         guard #available(iOS 26.0, *) else { return false }
         let size: CGFloat = 36
         guard data["visible"] as? Bool == true,
               let y = data["y"] as? Double, let backX = data["backX"] as? Double,
               let bookmarkX = data["bookmarkX"] as? Double,
-              [y, backX, bookmarkX].allSatisfy(\.isFinite) else {
+              [y, backX, bookmarkX].allSatisfy(\.isFinite),
+              y >= 0, y <= webView.bounds.height, backX >= 0,
+              bookmarkX <= webView.bounds.width, bookmarkX - backX >= 36 else {
             titleBackButton?.isHidden = true
             titleBookmarkButton?.isHidden = true
-            return true
+            return data["visible"] as? Bool != true
         }
         let backCenter = webView.convert(CGPoint(x: backX, y: y), to: view)
         let bookmarkCenter = webView.convert(CGPoint(x: bookmarkX, y: y), to: view)
@@ -218,6 +267,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         startupTimer?.invalidate()
         startupNavigation = nil
         startupDocumentCommitted = false
+        _ = updatePlayerViewport(["active": false])
         webView.stopLoading()
         waitingForTabRoute = true
         if !isSecondaryTab {
@@ -601,6 +651,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             replyHandler(["ok": true], nil)
         } else if action == "openGenreSearch" {
             replyHandler(["ok": (tabBarController as? DiastomyTabController)?.selectGenreSearch() == true], nil)
+        } else if action == "playerViewport" {
+            replyHandler(["ok": updatePlayerViewport(data)], nil)
         } else if action == "nativeTitleButtons" {
             replyHandler(["ok": updateNativeTitleButtons(data)], nil)
         } else if action == "nativeTabSessionEnded" {
@@ -988,21 +1040,21 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             if let audioGroup, let index = data["value"] as? Int, audioGroup.options.indices.contains(index) {
                 item?.select(audioGroup.options[index], in: audioGroup)
             }
-        case "captions", "toggleCaptions":
+        case "captions", "enableCaptions":
             guard let item, let captionGroup, !captions.isEmpty else {
                 return ["ok": false, "captionsUnavailable": true, "captionsLoading": item?.status == .unknown]
             }
             let selected = item.currentMediaSelection.selectedMediaOption(in: captionGroup)
             let current = selected.flatMap { captions.firstIndex(of: $0) }
             let index: Int
-            if command == "toggleCaptions" {
-                if let current { lastInlineCaption = captions[current] }
-                index = current == nil ? (lastInlineCaption.flatMap { captions.firstIndex(of: $0) } ?? 0) : -1
+            if command == "enableCaptions" {
+                index = current ?? lastInlineCaption.flatMap { captions.firstIndex(of: $0) } ?? 0
             } else {
                 index = data["value"] as? Int ?? -1
             }
             playback.appliesMediaSelectionCriteriaAutomatically = false
             if index == -1 {
+                if let current { lastInlineCaption = captions[current] }
                 item.select(nil, in: captionGroup)
             } else if captions.indices.contains(index) {
                 lastInlineCaption = captions[index]

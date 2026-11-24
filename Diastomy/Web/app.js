@@ -338,6 +338,11 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#home-data'), error)); }
   }
+  const countryNames = {
+    'hong-kong':'هنگ‌کنگ', id:'اندونزی', indonesia:'اندونزی', ireland:'ایرلند',
+    philippines:'فیلیپین', 'soviet-union':'اتحاد جماهیر شوروی', thailand:'تایلند',
+    'united-arab-emirates':'امارات متحده عربی'
+  };
   function installFilterChoices(form) {
     const refresh = [];
     let openMenu;
@@ -499,7 +504,10 @@
       for (const [field, choices] of [['genre', data.genres], ['country', data.countries]]) {
         if (!choices?.length) continue;
         const select = form.elements[field], value = select.value;
-        select.replaceChildren(new Option('همه',''), ...choices.map(item => new Option(item.name,item.slug)));
+        const options = choices.map(item =>
+          new Option(field === 'country' ? countryNames[item.slug] || item.name : item.name, item.slug));
+        if (field === 'country') options.sort((a,b) => a.text.localeCompare(b.text,'fa'));
+        select.replaceChildren(new Option('همه',''), ...options);
         select.value = value;
       }
       form.refreshChoices();
@@ -673,8 +681,10 @@
     try {
       const data = await api('/api/app/v1/title/' + enc(kind) + '/' + enc(slug) + '/', { cache: true });
       whenCurrent(seq, () => {
-        state.playGroups = kind === 'series' ? (data.episodes || []).map(episode => (episode.videos || []).map(video => ({...video, season:episode.season, episode:episode.number}))).filter(videos => videos.length) : [data.videos || []];
-        const episodeList = data.episodes || [];
+        const episodeList = (data.episodes || []).filter(episode =>
+          Number.isInteger(Number(episode.number)) && Number(episode.number) > 0);
+        state.playGroups = kind === 'series' ? episodeList.map(episode => (episode.videos || [])
+          .map(video => ({...video, season:episode.season, episode:episode.number}))).filter(videos => videos.length) : [data.videos || []];
         const seasons = [...new Set(episodeList.map(episode => episode.season))];
         const episodes = seasons.length ? '<div class="reference-season-controls" dir="rtl">' +
           '<div class="reference-season-picker"><button type="button" id="series-season" aria-expanded="false" aria-controls="series-season-options"><span>فصل ' +
@@ -683,7 +693,7 @@
           '<div class="reference-sort-picker"><button type="button" id="series-sort" aria-label="مرتب‌سازی قسمت‌ها" aria-expanded="false" aria-controls="series-sort-options"><svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></button>' +
           '<div class="episode-options" id="series-sort-options" hidden></div></div></div><div id="series-episodes"></div>' :
           empty('قسمت یا منبع قابل پخش موجود نیست.');
-        mount(PWA.detail({...data,type:kind}, episodes));
+        mount(PWA.detail({...data,type:kind,episodes:episodeList}, episodes));
         const summary = $('.dm-film-description');
         const summaryToggle = $('[data-summary-more]');
         const checkSummary = () => {
@@ -1337,16 +1347,6 @@
       '<p id="logout-description">برای ادامه، باید دوباره وارد حسابت بشی.</p>' +
       '<div class="logout-dialog-actions"><button type="button" data-logout-confirm>خروج از حساب</button>' +
       '<button type="button" data-logout-cancel autofocus>انصراف</button></div></dialog>');
-    const accountMenu = $('#dm-app-menu');
-    const back = accountMenu.querySelector('.dm-app-menu-close');
-    back.onclick = event => {
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || reduceMotion.matches || !accountMenu.animate) return;
-      event.preventDefault();
-      if (accountMenu.inert) return;
-      accountMenu.inert = true;
-      const motion = accountMenu.animate([{opacity:1}, {opacity:0}], {duration:125,fill:'forwards'});
-      motion.finished.then(() => whenCurrent(sequence, () => { location.href = back.href; }), () => {});
-    };
     const dialog = $('#local-logout-dialog');
     const logout = $('#logout');
     dialog.querySelector('.logout-dialog-icon').append(logout.querySelector('svg').cloneNode(true));
@@ -1953,7 +1953,8 @@
     } catch (error) { whenCurrent(seq, () => fail($('#devices'),error)); }
   }
   let newlyCreatedRoom;
-  function rooms(seq) {
+  function rooms(seq, params) {
+    let jumpedToMyRooms = false;
     const slides = [
       ['ساخت اتاق', 'room-slide-0-610dd008bbb4.webp'],
       ['تنظیم ساعت پخش', 'room-slide-1-0ff3f26b8200.webp'],
@@ -2043,6 +2044,10 @@
         (query ? 'اتاقی پیدا نشد.' : 'اولین اتاق عمومی را بساز!') + '</h3><p>اتاق‌های عمومی فعال و برنامه‌ریزی‌شده اینجا نمایش داده می‌شوند.</p>' +
         '<button type="button" data-room-create>+ ساخت اتاق عمومی</button></div>';
       $('#my-rooms').innerHTML = roomCards(roomData.mine, true) || '<p>هنوز اتاقی نداری.</p>';
+      if (params.get('tab') === 'mine' && !jumpedToMyRooms) {
+        jumpedToMyRooms = true;
+        $('#my-rooms').previousElementSibling.scrollIntoView({block:'start'});
+      }
     }
     async function refreshRooms() {
       try {
@@ -2189,7 +2194,7 @@
     newlyCreatedRoom = null;
     mount('<div class="local-room-header"><header class="dmf3-header" dir="ltr" aria-label="هدر دیاستومی">' +
       '<a href="#/home" aria-label="دیاستومی"><img src="/static/pwa/generated/25cc514e5be789c9db17.svg" alt="" width="106" height="18"></a>' +
-      '<button type="button" class="dmf3-menu" data-local-menu aria-label="منو">' + PWA_SOURCE.actorMenu + '</button></header></div><section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1></div>' +
+      '<button type="button" class="dmf3-menu" data-local-menu aria-label="منو">' + PWA_SOURCE.actorMenu + '</button></header></div><section class="local-room-detail"><div class="mr-room-topline"><h1>سینما از راه دور!</h1><a href="#/rooms?tab=mine" aria-label="بازگشت به اتاق‌های من">' + PWA_SOURCE.actorBack + '</a></div>' +
       '<div id="room-data"><p role="status">اطلاعات اتاق از سرور دریافت می‌شود…</p></div></section>');
     try {
       const data = created || await api('/api/app/v1/rooms/' + enc(code) + '/');
@@ -2199,7 +2204,7 @@
       $('#room-data').innerHTML = '<article class="local-room-card mr-room">' + image(data.cover, 'local-room-cover', '') +
         '<div class="mr-room-body"><strong>' + esc(data.title) + '</strong><small>میزبان: ' + esc(data.is_host ? 'خودت' : data.host || '—') +
         (data.starts_at ? ' · ' + esc(roomDate(data.starts_at)) + ' · ساعت <bdi>' + esc(roomDate(data.starts_at, true)) + '</bdi>' : '') + '</small><span id="room-live-state" class="mr-status"></span>' +
-        '<div class="local-room-card-buttons"><button type="button" id="share-inside-room">دعوت</button><a href="#/rooms">اتاق‌های من</a></div></div></article>' +
+        '<div class="local-room-card-buttons"><button type="button" id="share-inside-room">دعوت</button><a href="#/rooms?tab=mine">اتاق‌های من</a></div></div></article>' +
         '<h2>پنل مدیریت پخش</h2><div class="local-room-screen"><span id="room-live-badge">● پخش زنده</span><video playsinline hidden></video>' +
         '<div class="local-room-preview-controls" hidden><button type="button" aria-label="باز کردن پلیر">' + PWA_PLAYER_ICONS.play +
         '</button><div class="local-room-preview-timeline" dir="ltr"><div><output>00:00</output><output>00:00</output></div><progress max="1" value="0" aria-label="پیشرفت پخش"></progress></div></div>' +
@@ -2210,12 +2215,12 @@
         '<button type="button" id="room-mute" aria-label="قطع یا وصل صدا">' + PWA_PLAYER_ICONS.volume + '</button>' +
         '<input id="room-volume" type="range" min="0" max="1" step=".01" value="1" aria-label="صدا">' +
         '<span class="local-room-volume-up" aria-hidden="true">' + PWA_PLAYER_ICONS.volume + '</span></div>' +
-        '<select id="room-subtitle" aria-label="زیرنویس" disabled><option value="-1">انتخاب زیرنویس</option></select>' +
-        '<details class="local-room-media-options"><summary aria-label="تنظیمات صدا و کیفیت">' + PWA_PLAYER_ICONS.captions + '</summary><div class="local-room-selects">' +
-        '<select id="room-audio" aria-label="زبان صدا" disabled><option value="">صدای اصلی</option></select>' +
-        '<select id="room-quality" aria-label="کیفیت"' + (videos.length ? '' : ' disabled') + '>' +
-        (videos.length ? videos.map(v => '<option value="' + esc(v.id) + '">' + esc(v.quality) + '</option>').join('') : '<option>کیفیت پخش</option>') + '</select></div></details>' +
+        '<button type="button" id="room-subtitle-toggle" aria-label="انتخاب زیرنویس" aria-haspopup="dialog">' + PWA_PLAYER_ICONS.captions + '</button>' +
+        '<button type="button" id="room-media-toggle" aria-label="تنظیمات صدا و کیفیت" aria-haspopup="dialog">' + PWA_PLAYER_ICONS['setting-2'] + '</button>' +
         '<button type="button" id="room-fullscreen" aria-label="تمام‌صفحه">' + PWA_PLAYER_ICONS.fullscreen + '</button></div>' +
+        '<dialog id="room-media-dialog" aria-labelledby="room-media-title" dir="rtl"><div class="room-media-heading">' +
+        '<h2 id="room-media-title"></h2><form method="dialog"><button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></div>' +
+        '<div id="room-media-choices"></div></dialog>' +
         (data.is_host ? '<h2>کنترل میزبان</h2><div class="local-host-controls"><button data-control="toggle">توقف</button>' +
           '<button data-control="forward">10 ثانیه جلو</button><button data-control="back">10 ثانیه عقب</button><button data-control="close">بستن اتاق</button></div>' : '') +
         '<h2>چت اتاق</h2><section class="local-room-chat"><header><strong>' + esc(data.title) + '</strong><small id="room-status">در حال اتصال…</small></header>' +
@@ -2294,18 +2299,83 @@
         player.removeAttribute('src');
         player.load();
       };
-      function updateTracks() {
-        const audio = Array.from(player.audioTracks || []);
-        const subtitles = Array.from(player.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
-        const audioInput = $('#room-audio');
-        const subtitleInput = $('#room-subtitle');
-        audioInput.disabled = audio.length < 2;
-        subtitleInput.disabled = !subtitles.length;
-        audioInput.replaceChildren(...(audio.length ? audio.map((track,i) => new Option(track.label || track.language || String(i+1),i,false,track.enabled)) : [new Option('صدای اصلی','')]));
-        subtitleInput.replaceChildren(new Option('بدون زیرنویس',-1), ...subtitles.map((track,i) => new Option(track.label || track.language || String(i+1),i,false,track.mode === 'showing')));
-        audioInput.onchange = () => audio.forEach((track,i) => { track.enabled = i === Number(audioInput.value); });
-        subtitleInput.onchange = () => subtitles.forEach((track,i) => { track.mode = i === Number(subtitleInput.value) ? 'showing' : 'disabled'; });
+      const roomSettings = $('#room-media-dialog');
+      let roomSettingPanel;
+      let subtitleMode = 'auto';
+      let roomAudio = 0;
+      let roomQuality = videos[0]?.id;
+      function roomSubtitleTracks() {
+        return Array.from(player.textTracks || []).filter(track =>
+          ['captions','subtitles'].includes(track.kind) && track.label.trim().toLowerCase() !== 'diastomy');
       }
+      function applyRoomTracks() {
+        const tracks = roomSubtitleTracks();
+        const preferred = tracks.find(track => track.label === subtitleMode) ||
+          tracks.find(track => /^(fa|fas|per)(-|$)/i.test(track.language)) || tracks[0];
+        for (const track of Array.from(player.textTracks || [])) {
+          if (['captions','subtitles'].includes(track.kind)) track.mode = subtitleMode !== 'off' && track === preferred ? 'showing' : 'hidden';
+        }
+        const audio = Array.from(player.audioTracks || []);
+        if (audio[roomAudio]) audio.forEach((track,i) => { track.enabled = i === roomAudio; });
+      }
+      function renderRoomSettings() {
+        const choices = $('#room-media-choices');
+        choices.replaceChildren();
+        const addOptions = (label, options, current, onChoose) => {
+          const group = document.createElement('fieldset');
+          const heading = document.createElement('legend');
+          heading.textContent = label;
+          group.append(heading);
+          for (const [value, title] of options) {
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.textContent = title;
+            option.setAttribute('aria-pressed', String(current === value));
+            option.onclick = () => {
+              onChoose(value);
+              group.querySelector('[aria-pressed=true]')?.setAttribute('aria-pressed','false');
+              option.setAttribute('aria-pressed','true');
+            };
+            group.append(option);
+          }
+          choices.append(group);
+        };
+        if (roomSettingPanel === 'subtitles') {
+          const tracks = roomSubtitleTracks();
+          addOptions('زیرنویس', [['auto','روشن'],['off','خاموش'],
+            ...tracks.filter(track => track.label).map(track => [track.label,track.label])],
+          subtitleMode, value => { subtitleMode = value; applyRoomTracks(); });
+          if (!tracks.length) {
+            const note = document.createElement('p');
+            note.className = 'room-media-note';
+            note.textContent = player.hidden || !player.readyState ? 'انتخاب زیرنویس با شروع پخش اعمال می‌شود.' :
+              'برای این منبع زیرنویس قابل انتخاب پیدا نشد.';
+            choices.append(note);
+          }
+          return;
+        }
+        const audio = Array.from(player.audioTracks || []);
+        addOptions('زبان صدا', audio.length ? audio.map((track,index) =>
+          [index, track.label || track.language || 'مسیر صوتی ' + (index + 1)]) : [[0,'صدای اصلی']],
+        roomAudio, value => { roomAudio = value; applyRoomTracks(); });
+        addOptions('کیفیت پخش', videos.map(video => [video.id,video.quality]), roomQuality, value => {
+          if (value === roomQuality) return;
+          roomQuality = value;
+          if (!player.hidden) playRoom();
+        });
+      }
+      function openRoomSettings(panel) {
+        roomSettingPanel = panel;
+        $('#room-media-title').textContent = panel === 'subtitles' ? 'انتخاب زیرنویس' : 'تنظیمات پخش';
+        renderRoomSettings();
+        roomSettings.showModal();
+      }
+      $('#room-subtitle-toggle').onclick = () => openRoomSettings('subtitles');
+      $('#room-media-toggle').onclick = () => openRoomSettings('media');
+      player.textTracks?.addEventListener('addtrack', () => {
+        applyRoomTracks();
+        if (roomSettings.open && roomSettingPanel === 'subtitles') renderRoomSettings();
+      });
       function playInNativePlayer() {
         if (nativeFallback || !roomSource || seq !== state.sequence) return;
         nativeFallback = true;
@@ -2314,13 +2384,13 @@
         setPlayStatus('');
         PWAPlayer.open({
           info:{...roomSource, position:position(), target:null}, groups:[], group:0, kind:'movie',
-          id:quality, room:code, native, onError:toast, save:() => {}, initialVolume:player.muted ? 0 : player.volume,
+          id:quality, room:code, native, onError:toast, save:() => {}, initialVolume:player.muted ? 0 : player.volume, roomSubtitleMode:subtitleMode, roomAudio,
           roomControl:data.is_host ? sendControl : undefined,
           onClose:() => { nativeFallback = false; if (seq === state.sequence) sync(); }
         });
       }
       async function playRoom() {
-        const selected = Number($('#room-quality').value);
+        const selected = Number(roomQuality);
         if (!selected || nativeFallback) return;
         const request = ++mediaRequest;
         clearTimeout(playbackTimeout);
@@ -2340,13 +2410,13 @@
           sync();
         } catch (error) {
           if (seq !== state.sequence || request !== mediaRequest) return;
-          if (quality) $('#room-quality').value = quality;
+          if (quality) roomQuality = quality;
+          if (roomSettings.open) renderRoomSettings();
           setPlayStatus(error.message);
         }
       }
       if (join) join.onclick = playRoom;
-      $('#room-quality').onchange = () => { if (!player.hidden) playRoom(); };
-      player.addEventListener('loadedmetadata', () => { if (seq === state.sequence) { updateTracks(); sync(); } });
+      player.addEventListener('loadedmetadata', () => { if (seq === state.sequence) { applyRoomTracks(); if (roomSettings.open) renderRoomSettings(); sync(); } });
       const finishBuffering = () => {
         if (seq !== state.sequence || player.hidden) return;
         clearTimeout(playbackTimeout);
@@ -2411,11 +2481,38 @@
     if (data.type === 'error') { $('#room-status').textContent = 'اتصال قطع شد'; toast(data.message, 'error'); }
     if (state.handleRoomState) state.handleRoomState(data);
   });
+  const accountRoutes = new Set([
+    'account','profile','payments','notifications','support','subscription','settings','about','followed-actors'
+  ]);
+  document.addEventListener('click', event => {
+    const link = event.target.closest('a[href]');
+    if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0 ||
+        reduceMotion.matches || !app.animate) return;
+    const currentPage = document.body.dataset.page?.replace(/^local-/,'');
+    if (!accountRoutes.has(currentPage) ||
+        !link.matches('.dm-app-menu-close,.pwa-internal-head a[href="#/account"],.profile-editor header a')) return;
+    event.preventDefault();
+    if (app.inert) return;
+    app.inert = true;
+    const sequence = state.sequence;
+    const destination = link.href;
+    const surface = $('#dm-app-menu') || app;
+    const motion = surface.animate([{translate:'0'}, {translate:'100vw 0'}], {
+      duration:240,easing:'cubic-bezier(.5,0,.8,.2)',fill:'forwards'
+    });
+    motion.finished.then(() => {
+      if (sequence !== state.sequence) return;
+      if (location.href === destination) { app.inert = false; motion.cancel(); }
+      else location.href = destination;
+    }, () => { if (sequence === state.sequence) app.inert = false; });
+  });
   let previousRoute;
   async function route({pullRefresh = false} = {}) {
     const loader = $('#route-loading');
     loader.hidden = true;
-    app.classList.remove('route-enter');
+    app.inert = false;
+    app.getAnimations().filter(motion => !motion.animationName).forEach(motion => motion.cancel());
+    app.classList.remove('route-enter','route-account-enter');
     historyFrameObserver?.disconnect();
     PWAPlayer.close();
     document.querySelectorAll('.dm-inline-trailer').forEach(player => player.dmDispose?.());
@@ -2456,6 +2553,7 @@
     const animateRoute = path !== previousRoute && (!footerDrag || name === 'title');
     const firstSecondaryRoute = !previousRoute && window.diastomySecondaryTab === true;
     previousRoute = path;
+    loader.dataset.direction = accountRoutes.has(name) ? 'right' : 'left';
     const loadingTimer = animateRoute && !firstSecondaryRoute && !['login','otp','forgot','rooms','room'].includes(name)
       ? setTimeout(() => whenCurrent(seq, () => { if (!document.activeElement?.matches('.reference-search-form input')) loader.hidden = false; }), 100) : null;
     PWA.page(name);
@@ -2492,7 +2590,7 @@
       else if (name === 'notifications') await notifications(seq, params);
       else if (name === 'support') await support(seq);
       else if (name === 'subscription') await subscription(seq);
-      else if (name === 'rooms') await rooms(seq);
+      else if (name === 'rooms') await rooms(seq, params);
       else if (name === 'room') await room(seq, parts[1]);
       else if (name === 'settings') await settings(seq, params);
       else if (name === 'about') mount(shell('دربارهٔ دیاستومی', '<div class="panel"><img class="logo" src="assets/logo.svg" alt="دیاستومی"><p>نسخهٔ ۲٫۱٫۷۳ — رابط نصب‌شده روی دستگاه</p><p>صفحات و فایل‌های برنامه محلی هستند. اطلاعات حساب، فهرست محتوا، پوسترها و ویدیوها از سرور دریافت می‌شوند.</p></div>'));
@@ -2503,7 +2601,7 @@
       clearTimeout(loadingTimer);
       whenCurrent(seq, () => {
         loader.hidden = true;
-        if (animateRoute) app.classList.add('route-enter');
+        if (animateRoute) app.classList.add(accountRoutes.has(name) ? 'route-account-enter' : 'route-enter');
       });
     }
   }
@@ -2512,13 +2610,15 @@
     indicator.className = 'pull-refresh';
     indicator.dir = 'rtl';
     indicator.hidden = true;
-    indicator.innerHTML = '<span class="startup-spinner" aria-hidden="true"></span><span role="status"></span>';
+    indicator.innerHTML = '<svg class="pull-refresh-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2 6m2-11v5h-5"/></svg>' +
+      '<span class="startup-spinner" aria-hidden="true"></span><span class="pull-refresh-label" role="status"></span>';
     document.body.append(indicator);
     const label = indicator.querySelector('[role=status]');
     const threshold = 72;
     let touch, running = false;
     const atTop = () => window.scrollY <= 1;
-    const blocked = () => document.body.classList.contains('local-player-open') ||
+    const blocked = () => !['home','local-title'].includes(document.body.dataset.page) ||
+      document.body.classList.contains('local-player-open') ||
       document.querySelector('dialog[open], #dm-playback-choice, .dm-inline-trailer');
     const show = (phase, message) => {
       const home = document.body.dataset.page === 'home';
@@ -2540,11 +2640,11 @@
         if (node.scrollTop > 1 && /^(auto|scroll)$/.test(getComputedStyle(node).overflowY)) return;
       }
       const {identifier, clientX, clientY} = event.touches[0];
-      touch = {identifier, x:clientX, y:clientY, distance:0};
+      touch = {identifier, x:clientX, y:clientY, distance:0, page:document.body.dataset.page};
     }, {passive:true});
     document.addEventListener('touchmove', event => {
       if (!touch) return;
-      if (event.touches.length !== 1 || blocked() || !atTop()) { cancel(); return; }
+      if (event.touches.length !== 1 || blocked() || !atTop() || touch.page !== document.body.dataset.page) { cancel(); return; }
       const {identifier, clientX, clientY} = event.touches[0];
       const deltaX = clientX - touch.x, deltaY = clientY - touch.y;
       if (identifier !== touch.identifier || deltaY < -6 || Math.abs(deltaX) > Math.max(12, deltaY)) {
@@ -2554,21 +2654,20 @@
       if (deltaY < 8 && !touch.distance) return;
       if (event.cancelable) event.preventDefault();
       touch.distance = Math.max(0, deltaY);
-      indicator.style.setProperty('--pull-offset', Math.min(20, touch.distance / 5) + 'px');
+      indicator.style.setProperty('--pull-turn', Math.min(1, touch.distance / threshold) * 180 + 'deg');
       const armed = touch.distance >= threshold;
       show(armed ? 'armed' : 'pulling', armed ? 'برای تازه‌سازی رها کن' : 'برای تازه‌سازی بکش');
     }, {passive:false});
     document.addEventListener('touchcancel', cancel, {passive:true});
     document.addEventListener('touchend', async event => {
       if (!touch || !Array.from(event.changedTouches).some(point => point.identifier === touch.identifier)) return;
-      const armed = touch.distance >= threshold;
+      const armed = touch.distance >= threshold && touch.page === document.body.dataset.page;
       cancel();
       if (!armed || blocked()) return;
       running = true;
       show('refreshing', 'در حال تازه‌سازی…');
       try {
-        const refresh = state.sessionKnown || state.user ? route({pullRefresh:true}) : checkStartupSession();
-        await Promise.all([refresh, new Promise(resolve => setTimeout(resolve, 320))]);
+        await Promise.all([route({pullRefresh:true}), new Promise(resolve => setTimeout(resolve, 320))]);
       } finally {
         running = false;
         indicator.hidden = true;
@@ -2603,7 +2702,9 @@
     loading.dir = 'rtl';
     loading.setAttribute('role','status');
     loading.innerHTML = '<span class="startup-spinner" aria-hidden="true"></span>در حال آماده‌سازی پخش…';
-    app.append(loading);
+    const historyTile = button.closest('.library-history-card');
+    if (historyTile) historyTile.append(loading);
+    else (button.closest('.reference-film-actions,.dm-film-reference-info,.reference-episode-card') || button.parentElement).after(loading);
     const sequence = state.sequence;
     try {
       const kind = button.dataset.kind;
@@ -2689,13 +2790,17 @@
       const bookmark = topbar?.querySelector('#bookmark');
       const back = topbar?.querySelector('a');
       let payload = {action:'nativeTitleButtons', visible:false, detail: Boolean(topbar)};
-      if (bookmark && back && !document.body.classList.contains('local-player-open') &&
+      const enteringTitle = app.getAnimations().some(animation =>
+        animation.animationName === 'route-title-in' && animation.playState === 'running');
+      if (bookmark && back && !enteringTitle && !document.body.classList.contains('local-player-open') &&
           !root.classList.contains('dm-trailer-is-fullscreen') && !$('#dm-playback-choice') && !document.querySelector('dialog[open]')) {
         const bounds = back.getBoundingClientRect();
         const heart = bookmark.getBoundingClientRect();
-        if (bounds.height && bounds.bottom > 0 && bounds.top < innerHeight) {
-          payload = {...payload, visible:true, y:bounds.top + bounds.height / 2,
-            backX:bounds.left + bounds.width / 2, bookmarkX:heart.left + heart.width / 2,
+        const backX = bounds.left + bounds.width / 2;
+        const bookmarkX = heart.left + heart.width / 2;
+        if (bounds.height && backX >= 0 && bookmarkX <= innerWidth && bookmarkX - backX >= 36 &&
+            bounds.bottom > 0 && bounds.top < innerHeight) {
+          payload = {...payload, visible:true, y:bounds.top + bounds.height / 2, backX, bookmarkX,
             saved:bookmark.getAttribute('aria-pressed') === 'true', busy:bookmark.disabled};
         }
       }
@@ -2703,11 +2808,17 @@
       if (key === lastNativeTitleState && topbar === lastNativeTopbar) return;
       lastNativeTitleState = key;
       lastNativeTopbar = topbar;
+      if (!payload.visible) topbar?.classList.remove('native-title-buttons');
       native(payload).then(result => {
         if (topbar?.isConnected && topbar === lastNativeTopbar && key === lastNativeTitleState) {
-          topbar.classList.toggle('native-title-buttons', result.ok === true);
+          topbar.classList.toggle('native-title-buttons', payload.visible && result.ok === true);
         }
       }).catch(() => { lastNativeTitleState = undefined; });
+    });
+  }
+  for (const event of ['animationstart','animationend','animationcancel']) {
+    app.addEventListener(event, motion => {
+      if (motion.target === app && motion.animationName === 'route-title-in') scheduleNativeTitleButtons();
     });
   }
   let lastNativeTabState;

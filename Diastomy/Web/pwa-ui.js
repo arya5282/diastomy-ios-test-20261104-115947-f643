@@ -303,9 +303,9 @@ window.PWA = (() => {
       '<div data-detail-panel="comments"' + (item.type === 'series' ? ' hidden' : '') + '><div class="local-comments-head"><h2>دیدگاه‌های ' +
       name(item) + '</h2><small>' + esc(item.comment_count ?? (item.comments || []).length) + ' دیدگاه</small></div>' +
       '<form id="title-comment"><div class="local-comment-compose">' +
-      '<button type="button" class="local-comment-emoji" aria-label="ایموجی" aria-expanded="false" aria-controls="title-comment-emojis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 14a4 4 0 0 0 8 0M9 9h.1M15 9h.1"/></svg></button>' +
+      '<button type="button" class="local-comment-emoji" aria-label="ایموجی" aria-expanded="false" aria-controls="title-comment-emojis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M8 13.5c.7 2.2 2 3.2 4 3.2s3.3-1 4-3.2M9 9.5h.2M14.8 9.5h.2"/></svg></button>' +
       '<textarea name="text" rows="1" aria-label="دیدگاه" placeholder="نظرت رو اینجا بنویس…" maxlength="2000" required></textarea>' +
-      '<button type="submit" aria-label="ارسال دیدگاه"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m20 5-15 6a1 1 0 0 0 0 2l15 6a1 1 0 0 0 1-1l-2-6 2-6a1 1 0 0 0-1-1Z"/></svg></button></div>' +
+      '<button type="submit" aria-label="ارسال دیدگاه"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M19.2 4.8 5.3 10.1a2 2 0 0 0 0 3.8l13.9 5.3a1.8 1.8 0 0 0 2.2-2.5l-2-3.9a1.8 1.8 0 0 1 0-1.6l2-3.9a1.8 1.8 0 0 0-2.2-2.5Z"/></svg></button></div>' +
       '<p id="title-comment-reply" hidden></p><div id="title-comment-emojis" hidden>' + ['😊','🙏','👍','❤️','😂'].map(emoji => '<button type="button">' + emoji + '</button>').join('') + '</div>' +
       '<label class="local-comment-spoiler"><input type="checkbox" name="spoiler"><span class="local-spoiler-check" aria-hidden="true">' +
       '<svg viewBox="0 0 12 12" fill="none"><path d="m2.5 6 2.3 2.3 4.7-4.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span> این نظر حاوی اسپویل است</label>' +
@@ -594,23 +594,6 @@ window.PWA = (() => {
     // Keep details content available for the closing transition.
     details.open = true;
     const done = () => { details.open = !open; };
-    const floating = details.querySelector(':scope > .local-room-selects');
-    if (floating) {
-      // The room menu is positioned absolutely, so its parent does not grow.
-      if (motionDisabled.matches) { done(); return true; }
-      const hidden = {opacity:0,translate:'0 -5px'};
-      const visible = {opacity:1,translate:'none'};
-      const motion = floating.animate(open ? [visible, hidden] : [hidden, visible],
-        {duration:165,easing:'ease-out',fill:'both'});
-      motion.opens = !open;
-      heightMotions.set(details, motion);
-      motion.finished.then(() => {
-        done();
-        heightMotions.delete(details);
-        motion.cancel();
-      }, () => {});
-      return true;
-    }
     playHeight(details, from, to, done);
     const motion = heightMotions.get(details);
     if (motion) motion.opens = !open;

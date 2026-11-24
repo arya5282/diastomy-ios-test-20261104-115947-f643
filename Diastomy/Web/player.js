@@ -55,7 +55,7 @@ window.PWAPlayer = (() => {
       dialog.querySelector('[data-resume-continue]').focus({preventScroll:true});
     });
   }
-  function open({info, groups, group, kind, id, room, roomControl, onClose, initialVolume = 1, native, save, onError}) {
+  function open({info, groups, group, kind, id, room, roomControl, onClose, initialVolume = 1, roomSubtitleMode, roomAudio, native, save, onError}) {
     close();
     const overlay = document.createElement('section');
     overlay.className = 'local-pwa-player';
@@ -80,6 +80,7 @@ window.PWAPlayer = (() => {
     const timelineFill = get('.local-player-seek > span');
     const [elapsed, end] = overlay.querySelectorAll('output');
     const settings = get('.local-player-settings');
+    settings.addEventListener('click', event => event.stopPropagation());
     let source = info, selected = id, revision = 0, resume = Number(info.position) || 0, lastSaved = 0, played = false;
     const updateTransport = paused => {
       overlay.classList.toggle('local-player-playing', !paused);
@@ -181,6 +182,8 @@ window.PWAPlayer = (() => {
         controlSurface('fill', overlay.classList.contains('local-player-fill')).catch(() => {});
         if (video.muted) controlSurface('mute').catch(() => {});
         const frameDeadline = Date.now() + 30000;
+        let pendingRoomSubtitle = roomSubtitleMode !== undefined;
+        let pendingRoomAudio = Number.isInteger(roomAudio);
         const sync = async () => {
           try {
             const selection = captionChange;
@@ -190,7 +193,17 @@ window.PWAPlayer = (() => {
             const optionsChanged = (lastState?.captions?.length || 0) !== (state.captions?.length || 0) ||
               (lastState?.audio?.length || 0) !== (state.audio?.length || 0);
             lastState = state;
+            if (pendingRoomSubtitle && state.captions?.length) {
+              pendingRoomSubtitle = false;
+              const index = state.captions.indexOf(roomSubtitleMode);
+              selectNativeCaption(roomSubtitleMode === 'off' ? -1 : index < 0 ? undefined : index);
+            }
+            if (pendingRoomAudio && state.audio?.length) {
+              pendingRoomAudio = false;
+              if (state.audio[roomAudio] && roomAudio !== state.selectedAudio) controlSurface('audio', roomAudio).catch(() => {});
+            }
             syncCaptionButton();
+            const firstFrame = state.frameReady && !played;
             if (state.frameReady) played = true;
             updateTransport(state.paused || !state.frameReady);
             if (state.failed || (!played && Date.now() > frameDeadline)) {
@@ -200,7 +213,7 @@ window.PWAPlayer = (() => {
               setLoading(!state.frameReady || state.buffering === true);
             }
             refresh();
-            if (optionsChanged && !settings.hidden) renderSettings();
+            if (settings.dataset.panel && (optionsChanged || (firstFrame && settings.dataset.panel === 'captions'))) renderSettings();
           } catch (_) {}
         };
         polling = setInterval(sync, 500);
@@ -229,6 +242,31 @@ window.PWAPlayer = (() => {
       if (surface) controlSurface('volume', level).catch(() => {});
       else if (kind !== 'trailer' && /iP(?:hone|ad|od)/.test(navigator.userAgent)) startSurface();
     };
+    const nativeViewport = document.documentElement.classList.contains('diastomy-native-tabs');
+    let viewportRequest = 0;
+    let rotationTimer;
+    function updateViewport(active = true) {
+      if (!nativeViewport) return;
+      const request = ++viewportRequest;
+      const showVolume = active && !rotationTimer && !settings.dataset.panel && !overlay.classList.contains('local-player-controls-hidden');
+      const rect = volume.getBoundingClientRect();
+      const horizontal = overlay.classList.contains('local-player-rotated');
+      const geometry = showVolume ? {
+        x:rect.left + rect.width / 2, y:rect.top + rect.height / 2,
+        length:horizontal ? rect.width : rect.height, horizontal
+      } : {};
+      native({action:'playerViewport', active, detail:Boolean(document.querySelector('.movie-detail-shell')), ...geometry}).then(result => {
+        if (request !== viewportRequest) return;
+        const systemVolume = result?.ok === true;
+        volume.inert = systemVolume;
+        overlay.classList.toggle('local-player-system-volume', systemVolume);
+      }).catch(() => {
+        if (request !== viewportRequest) return;
+        volume.inert = false;
+        overlay.classList.remove('local-player-system-volume');
+      });
+    }
+    const resizeViewport = () => updateViewport();
     function paintTitle(title) {
       get('h2').textContent = title || '';
       const subtitle = get('.local-player-title p');
@@ -325,6 +363,16 @@ window.PWAPlayer = (() => {
         }
         settings.append(group);
       };
+      if (settings.dataset.panel === 'captions') {
+        const available = surface ? Boolean(lastState?.captions?.length) : captionTracks().length > 0;
+        if (!available) {
+          settings.textContent = surfaceStarting || !played ? 'زیرنویس هنوز در حال بارگذاری است.' : 'زیرنویس قابل تغییر در دسترس نیست.';
+          return;
+        }
+        options('زیرنویس', [[true,'روشن'],[false,'خاموش']],
+          captionButton.getAttribute('aria-pressed') === 'true', setCaptions);
+        return;
+      }
       if (settings.dataset.panel === 'settings') {
         const qualities = (groups[group] || []).map(v => [Number(v.id),v.quality]);
         if (qualities.length) options('کیفیت پخش', qualities, selected, value => {
@@ -381,7 +429,7 @@ window.PWAPlayer = (() => {
       captionChange++;
       captionButton.disabled = true;
       try {
-        const state = await controlSurface(index === undefined ? 'toggleCaptions' : 'captions', index);
+        const state = await controlSurface(index === undefined ? 'enableCaptions' : 'captions', index);
         if (!surface || request !== revision) return;
         if (!state.ok) {
           captionNotice(state.captionsLoading ? 'زیرنویس هنوز در حال بارگذاری است.' :
@@ -390,7 +438,7 @@ window.PWAPlayer = (() => {
         }
         lastState = state;
         syncCaptionButton();
-        if (!settings.hidden && settings.dataset.panel === 'settings') renderSettings();
+        if (!settings.hidden && ['settings','captions'].includes(settings.dataset.panel)) renderSettings();
       } catch (_) {
         if (request === revision && overlay.isConnected) captionNotice('تغییر زیرنویس انجام نشد.');
       } finally { captionButton.disabled = false; }
@@ -400,19 +448,21 @@ window.PWAPlayer = (() => {
       if (selected) lastWebCaption = selected;
       syncCaptionButton();
     }
-    function toggleCaptions() {
-      if (surface) return selectNativeCaption();
-      if (surfaceStarting) { captionNotice('زیرنویس هنوز در حال بارگذاری است.'); return; }
+    function setCaptions(enabled) {
+      if (surface) return selectNativeCaption(enabled ? undefined : -1);
       const tracks = captionTracks();
       const current = tracks.find(track => track.mode === 'showing');
       if (current) lastWebCaption = current;
       if (!tracks.length) { captionNotice('زیرنویس قابل تغییر در دسترس نیست.'); return; }
-      selectWebCaption(current ? null : tracks.includes(lastWebCaption) ? lastWebCaption : tracks[0]);
+      selectWebCaption(!enabled ? null : tracks.includes(lastWebCaption) ? lastWebCaption : tracks[0]);
     }
     function audioLabel(index, count) { return count === 1 ? 'صدای اصلی' : 'مسیر صوتی ' + (index + 1); }
     function dismiss() {
       progress(true);
       clearTimeout(captionNoticeTimer);
+      clearTimeout(rotationTimer);
+      window.removeEventListener('resize', resizeViewport);
+      updateViewport(false);
       document.removeEventListener('keydown', closePanelOnEscape);
       closeCurrent = null;
       revision++;
@@ -448,6 +498,7 @@ window.PWAPlayer = (() => {
       if (!['captions','subtitles'].includes(track.kind)) return;
       track.addEventListener('cuechange', () => cleanCaptionTrack(track));
       syncCaptionButton();
+      if (settings.dataset.panel === 'captions') renderSettings();
     });
     video.addEventListener('loadedmetadata', () => {
       if (resume > 0 && Number.isFinite(video.duration)) video.currentTime = Math.min(resume, video.duration);
@@ -464,6 +515,7 @@ window.PWAPlayer = (() => {
       played = true;
       setLoading(false);
       updateTransport(false);
+      if (settings.dataset.panel === 'captions') renderSettings();
     });
     video.addEventListener('waiting', () => { if (!surface && !video.paused) setLoading(true); });
     video.addEventListener('pause', () => {
@@ -484,10 +536,11 @@ window.PWAPlayer = (() => {
     function setPanel(panel) {
       PWA.setDisclosure(settings, Boolean(panel));
       settings.dataset.panel = panel || '';
-      overlay.querySelectorAll('[data-player=audio],[data-player=settings]').forEach(trigger => {
+      overlay.querySelectorAll('[data-player=captions],[data-player=audio],[data-player=settings]').forEach(trigger => {
         trigger.setAttribute('aria-expanded', String(panel === trigger.dataset.player));
       });
       if (panel) renderSettings();
+      if (overlay.isConnected) updateViewport();
     }
     setPanel(null);
     function closePanelOnEscape(event) {
@@ -505,6 +558,7 @@ window.PWAPlayer = (() => {
         if (event.target.closest('input, label, .local-player-top, .local-player-bottom, .local-player-settings')) return;
         setPanel(null);
         overlay.classList.toggle('local-player-controls-hidden');
+        updateViewport();
         return;
       }
       switch (button.dataset.player) {
@@ -523,9 +577,6 @@ window.PWAPlayer = (() => {
           break;
         }
         case 'captions':
-          setPanel(null);
-          await toggleCaptions();
-          break;
         case 'audio':
         case 'settings': {
           const panel = button.dataset.player;
@@ -541,6 +592,12 @@ window.PWAPlayer = (() => {
         case 'rotate': {
           const rotated = overlay.classList.toggle('local-player-rotated');
           button.setAttribute('aria-pressed', String(rotated));
+          clearTimeout(rotationTimer);
+          rotationTimer = setTimeout(() => {
+            rotationTimer = undefined;
+            updateViewport();
+          }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 340);
+          updateViewport();
           if (surface) await controlSurface('rotateAnimated', rotated);
           break;
         }
@@ -553,6 +610,11 @@ window.PWAPlayer = (() => {
     applyCaptionStyle();
     document.body.append(overlay);
     document.body.classList.add('local-player-open');
+    window.addEventListener('resize', resizeViewport);
+    updateViewport();
+    overlay.addEventListener('touchmove', event => {
+      if (event.cancelable && !event.target.closest('input[type=range],.local-player-settings')) event.preventDefault();
+    }, {passive:false});
     updateNext();
     if (room && !roomControl) {
       overlay.querySelectorAll('[data-player=toggle],[data-player=back],[data-player=forward]').forEach(button => {
