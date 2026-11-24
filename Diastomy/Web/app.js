@@ -242,12 +242,18 @@
     }, {rootMargin:'150px'});
     container.querySelectorAll('[data-history-frame]').forEach(image => observer.observe(image));
   }
-  async function home(seq) {
+  async function home(seq, pullRefresh) {
     const search = PWA.searchInput('');
     search.classList.add('home-search-form');
-    mount('<section class="dmf3-search-discovery home-live-search" aria-label="جست‌وجو" hidden><div id="catalogue"></div></section>' +
-      '<div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
-    bindLiveSearch(seq, search, $('#catalogue'), $('#home-data'));
+    if (!pullRefresh || !$('#home-data')) {
+      mount('<section class="dmf3-search-discovery home-live-search" aria-label="جست‌وجو" hidden><div id="catalogue"></div></section>' +
+        '<div id="home-data"><div class="loading"></div><p>دریافت تازه‌ترین‌ها…</p></div>');
+    }
+    const homeContent = $('#home-data');
+    homeContent.hidden = false;
+    homeContent.onclick = null;
+    $('#catalogue').closest('.home-live-search').hidden = true;
+    bindLiveSearch(seq, search, $('#catalogue'), homeContent);
     try {
       const data = await api('/api/app/v1/home/', { cache: true });
       whenCurrent(seq, () => {
@@ -260,27 +266,43 @@
               '<dialog id="home-history-menu" aria-labelledby="home-history-title" dir="rtl"><div class="home-history-heading">' +
               '<h2 id="home-history-title">ادامه تماشا</h2><form method="dialog"><button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></div>' +
               '<p class="home-history-title" dir="auto"></p><div class="home-history-actions">' +
-              '<button type="button" id="home-history-resume" data-play="" data-resume>ادامه تماشا</button><a>اطلاعات فیلم</a></div></dialog>';
+              '<button type="button" id="home-history-remove">حذف از ادامه تماشا</button><a>اطلاعات فیلم</a></div></dialog>';
             loadHistoryFrames(container);
             const menu = $('#home-history-menu');
             container.onclick = event => {
               const trigger = event.target.closest('[data-history-more]');
               if (!trigger) return;
               const item = entries[Number(trigger.dataset.historyMore)];
-              const resume = $('#home-history-resume');
+              if (menu.dataset.removing) return;
+              const remove = $('#home-history-remove');
               const details = menu.querySelector('a');
               details.href = trigger.closest('article').querySelector('a').href;
               details.textContent = item.type === 'series' ? 'اطلاعات سریال' : 'اطلاعات فیلم';
               menu.querySelector('.home-history-title').textContent = item.title || '';
               details.onclick = () => menu.close();
-              resume.dataset.play = item.video_id || '';
-              resume.dataset.kind = item.type;
-              resume.dataset.savedPosition = item.position || 0;
-              resume.onclick = event => {
-                menu.close();
-                if (!item.video_id) {
-                  event.stopPropagation();
-                  location.href = details.href;
+              const id = item.history_id || String(item.snapshot || '').match(/\/api\/watch-frame\/(\d+)\//)?.[1];
+              remove.disabled = !id;
+              remove.onclick = async () => {
+                menu.dataset.removing = 'true';
+                remove.disabled = true;
+                try {
+                  await api('/api/watch-history/' + enc(id) + '/remove/', {body:{}});
+                  whenCurrent(seq, () => {
+                    const section = container.querySelector('.reference-continue-section');
+                    const scrollLeft = section.querySelector('.reference-continue').scrollLeft;
+                    entries.splice(entries.indexOf(item), 1);
+                    section.outerHTML = PWA.continueWatching(entries);
+                    const track = container.querySelector('.reference-continue');
+                    if (track) {
+                      track.scrollLeft = scrollLeft;
+                      loadHistoryFrames(track);
+                    }
+                    menu.close();
+                  });
+                } catch (error) { toast(error); }
+                finally {
+                  delete menu.dataset.removing;
+                  remove.disabled = false;
                 }
               };
               menu.showModal();
@@ -1343,8 +1365,8 @@
         profileField('username','نام کاربری',user.username || '','dir="ltr" autocomplete="username" required') +
         profileField('email','ایمیل',user.email || '','dir="ltr" type="email" autocomplete="email" readonly') +
         profileField('phone','شماره تماس',user.phone || '','dir="ltr" type="tel" autocomplete="tel" readonly'), 'ذخیره اطلاعات') +
-      '<dialog id="profile-avatar-dialog" aria-labelledby="profile-avatar-title"><header><h2 id="profile-avatar-title">انتخاب آواتار</h2>' +
-      '<form method="dialog"><button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></header>' +
+      '<dialog id="profile-avatar-dialog" aria-labelledby="profile-avatar-title"><div class="profile-avatar-heading"><h2 id="profile-avatar-title">انتخاب آواتار</h2>' +
+      '<form method="dialog"><button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></div>' +
       '<div class="profile-avatar-presets">' + presets + '</div>' +
       '<label class="profile-avatar-upload">بارگذاری تصویر شخصی<input id="profile-avatar-file" type="file" accept="image/*"></label>' +
       '<p id="profile-avatar-status" role="status"></p><button id="profile-avatar-save" type="button" disabled>انتخاب آواتار</button></dialog></section>');
@@ -1783,7 +1805,7 @@
           $('#settings-follows').innerHTML = (data.following || []).filter(item => item.kind === 'person').map(item =>
             '<div class="account-notice-row settings-follow-row">' + (item.slug ? '<a href="#/actor/' + enc(item.slug) + '">' + esc(item.name) + '</a>' : '<span>' + esc(item.name) + '</span>') +
             '<button type="button" class="settings-pill" aria-pressed="true" data-follow="' + esc(item.id) +
-            '" data-kind="' + esc(item.kind) + '">' + PWA_SOURCE.detailFollow + ' دنبال‌کردن <span aria-hidden="true">✓</span></button></div>').join('') ||
+            '" data-kind="' + esc(item.kind) + '">' + PWA_SOURCE.detailFollow + ' دنبال‌کردن <span class="settings-follow-check" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="m3 8 3 3 7-7"/></svg></span></button></div>').join('') ||
             '<p class="account-reference-empty">هنوز بازیگری را دنبال نکرده‌اید.</p>';
           for (const button of document.querySelectorAll('[data-follow]')) button.onclick = async () => {
             const following = button.getAttribute('aria-pressed') !== 'true';
@@ -1912,8 +1934,9 @@
       '<form id="room-search"><input name="q" type="search" aria-label="جستجوی اتاق" placeholder="جستجوی اتاق، فیلم یا میزبان"><button type="submit">جستجو</button></form>' +
       '<div id="public-rooms" role="status">در حال دریافت اتاق‌ها…</div>' +
       '<form id="join-room"><input name="code" required placeholder="کد دعوت اتاق" aria-label="کد دعوت اتاق"><button type="submit">ورود</button></form></section></section>' +
-      '<dialog id="room-delete-dialog"><p>اتاق و پیام‌های آن حذف شوند؟</p><button type="button" data-room-cancel>انصراف</button>' +
-      '<button type="button" data-room-confirm>حذف اتاق</button></dialog>');
+      '<dialog id="room-delete-dialog" aria-labelledby="room-delete-title" dir="rtl"><h2 id="room-delete-title">اتاق و پیام‌های آن حذف شوند؟</h2>' +
+      '<div class="logout-dialog-actions"><button type="button" data-room-confirm>حذف اتاق</button>' +
+      '<button type="button" data-room-cancel autofocus>انصراف</button></div></dialog>');
 
     const form = $('#mr-create-form');
     let roomData;
@@ -2391,7 +2414,7 @@
     document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === name));
     window.scrollTo(0,0);
     try {
-      if (name === 'home') await home(seq);
+      if (name === 'home') await home(seq, pullRefresh);
       else if (name === 'browse') await browse(seq, parts[1] || 'all', params);
       else if (name === 'search') await searchPage(seq, params.get('q') || '');
       else if (name === 'title') await detail(seq, parts[1], parts[2]);
@@ -2450,6 +2473,10 @@
     const blocked = () => document.body.classList.contains('local-player-open') ||
       document.querySelector('dialog[open], #dm-playback-choice, .dm-inline-trailer');
     const show = (phase, message) => {
+      const home = document.body.dataset.page === 'home';
+      indicator.classList.toggle('pull-refresh-inline', home);
+      if (home && indicator.nextElementSibling !== app) app.before(indicator);
+      if (!home && indicator.parentElement !== document.body) document.body.append(indicator);
       indicator.hidden = false;
       indicator.dataset.phase = phase;
       if (label.textContent !== message) label.textContent = message;

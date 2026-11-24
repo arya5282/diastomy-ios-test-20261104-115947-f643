@@ -134,6 +134,10 @@ window.PWA = (() => {
       "romance": "/static/public/assets/images/genre-user-v2/romance-0c130a671b81.jpg",
       "sci-fi": "/static/public/assets/images/genre-user-v2/sci-fi-a837508e6156.jpg"
     };
+  function continueWatching(history) {
+    return history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
+      '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';
+  }
   function home(data, history = []) {
     const order = [
       'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_movies',
@@ -146,10 +150,8 @@ window.PWA = (() => {
       illustratedGenres.map((slug,index) => '<a class="home-genre-card" data-genre="' + slug + '" href="#/browse/all?genre=' + slug +
         '"><img' + (index < 3 ? '' : ' loading="lazy"') + ' decoding="async" draggable="false" alt="" src="' + genreArt[slug] + '"><span>' +
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
-    const continueHTML = history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
-      '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';
     sections.set('genres', genreHTML);
-    sections.set('continue_watching', continueHTML);
+    sections.set('continue_watching', continueWatching(history));
     for (const rail of data.rails || []) {
       const key = rail.key || 'pwa_latest_movies';
       if (key === 'pwa_free_series' || !rail.items.length) continue;
@@ -255,7 +257,7 @@ window.PWA = (() => {
   function reportDialog() {
     return '<button class="title-report-open" id="title-report-open" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 22V3m0 1c5-5 9 5 15 0v11c-6 5-10-5-15 0"/></svg>گزارش مشکل پخش یا دانلود</button>' +
       '<dialog id="title-report-dialog" dir="rtl" aria-labelledby="title-report-heading"><div class="title-report-heading"><h2 id="title-report-heading">گزارش مشکل</h2>' +
-      '<form method="dialog"><button aria-label="بستن">×</button></form></div>' +
+      '<form method="dialog"><button aria-label="بستن"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6m0-6-6 6"/></svg></button></form></div>' +
       '<form id="title-report-form"><fieldset><legend>چه مشکلی با این فیلم یا سریال داری؟</legend>' +
       reportReasons.map(reason => '<label><span>' + reason + '</span><input type="checkbox" name="reason" value="' + reason + '"></label>').join('') +
       '</fieldset><label class="report-description">توضیحات بیشتر (اختیاری)<textarea name="description" rows="2" maxlength="1200" placeholder="اگه نیاز بود، مشکل رو برامون توضیح بده"></textarea></label>' +
@@ -534,5 +536,5 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
+  return {card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, continueWatching, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
 })();
