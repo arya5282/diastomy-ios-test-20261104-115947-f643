@@ -843,16 +843,35 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         layoutInlinePlayer()
     }
 
-    private func layoutInlinePlayer() {
+    private func layoutInlinePlayer(animated: Bool = false) {
         guard let layer = inlineLayer else { return }
+        let current = layer.presentation() ?? layer
+        let previousBounds = current.bounds
+        let previousTransform = current.affineTransform()
         let bounds = view.bounds
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layer.bounds = CGRect(origin: .zero, size: inlineRotated
             ? CGSize(width: bounds.height, height: bounds.width) : bounds.size)
         layer.position = CGPoint(x: bounds.midX, y: bounds.midY)
-        layer.setAffineTransform(CGAffineTransform(rotationAngle: inlineRotated ? .pi / 2 : 0))
+        let angle: CGFloat = inlineRotated ? .pi / 2 : 0
+        layer.setAffineTransform(CGAffineTransform(rotationAngle: angle))
         CATransaction.commit()
+        guard animated, !UIAccessibility.isReduceMotionEnabled else { return }
+
+        let resize = CABasicAnimation(keyPath: "bounds")
+        resize.fromValue = NSValue(cgRect: previousBounds)
+        resize.toValue = NSValue(cgRect: layer.bounds)
+        let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+        rotation.fromValue = atan2(previousTransform.b, previousTransform.a)
+        rotation.toValue = angle
+        for animation in [resize, rotation] { animation.duration = 0.32 }
+
+        let transition = CAAnimationGroup()
+        transition.animations = [resize, rotation]
+        transition.duration = 0.32
+        transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(transition, forKey: "playerRotation")
     }
 
     private func stopInlinePlayer() {
@@ -938,9 +957,9 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                 inlineRate = Float(rate)
                 if playback.rate != 0 { playback.rate = Float(rate) }
             }
-        case "rotate":
+        case "rotate", "rotateAnimated":
             inlineRotated = data["value"] as? Bool == true
-            layoutInlinePlayer()
+            layoutInlinePlayer(animated: command == "rotateAnimated")
         case "fill":
             inlineLayer?.videoGravity = data["value"] as? Bool == true ? .resizeAspectFill : .resizeAspect
         case "captionStyle":

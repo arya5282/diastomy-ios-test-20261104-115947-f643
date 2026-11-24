@@ -180,9 +180,18 @@
     el.innerHTML = noticeMarkup(errorNotice(error));
   }
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  function closeWithMotion(dialog) {
-    if (!dialog.open || dialog.hasAttribute('data-closing')) return;
-    if (reduceMotion.matches || !dialog.animate) { dialog.close(); return; }
+  function closeWithMotion(dialog, returnValue, afterClose) {
+    if (!dialog.open) { afterClose?.(); return; }
+    if (dialog.hasAttribute('data-closing')) {
+      if (afterClose) dialog.addEventListener('close', afterClose, {once:true});
+      return;
+    }
+    const close = () => {
+      if (returnValue === undefined) dialog.close();
+      else dialog.close(returnValue);
+      afterClose?.();
+    };
+    if (reduceMotion.matches || !dialog.animate) { close(); return; }
     const {opacity, transform} = getComputedStyle(dialog);
     dialog.setAttribute('data-closing','');
     const sheet = dialog.matches('#local-filters,#settings-choice');
@@ -191,22 +200,29 @@
       {opacity:0, transform:sheet ? 'translateY(18px)' : 'translateY(6px) scale(.985)'}
     ], {duration:125, easing:'ease-in', fill:'forwards'});
     motion.finished.catch(() => {}).then(() => {
-      dialog.close();
+      close();
       dialog.removeAttribute('data-closing');
       motion.cancel();
     });
   }
   document.addEventListener('submit', event => {
-    const dialog = event.target.closest('#home-history-menu,.film-download-dialog,#local-filters,#settings-choice');
+    const dialog = event.target.closest('dialog[open]');
     if (!dialog || event.target.method !== 'dialog') return;
     event.preventDefault();
-    closeWithMotion(dialog);
+    closeWithMotion(dialog, event.submitter?.value);
   });
   document.addEventListener('cancel', event => {
-    if (!event.target.matches('#home-history-menu,.film-download-dialog,#local-filters,#settings-choice')) return;
+    if (!(event.target instanceof HTMLDialogElement)) return;
     event.preventDefault();
     closeWithMotion(event.target);
   }, true);
+  document.addEventListener('click', event => {
+    const summary = event.target.closest('summary');
+    const details = summary?.parentElement;
+    if (!(details instanceof HTMLDetailsElement) || event.defaultPrevented ||
+        event.target.closest('a,button,input,select,textarea') || reduceMotion.matches) return;
+    if (PWA.animateDetails(details)) event.preventDefault();
+  });
   function mount(html) { app.innerHTML = html; }
   function whenCurrent(seq, fn) { if (state.sequence === seq) fn(); }
   function form(name, fields, button) { return '<form id="' + name + '">' + fields + '<button class="primary" type="submit">' + esc(button) + '</button>' + status(name + '-status') + '</form>'; }
@@ -242,6 +258,13 @@
     }, {rootMargin:'150px'});
     container.querySelectorAll('[data-history-frame]').forEach(image => observer.observe(image));
   }
+  function historyMenu(id) {
+    return '<dialog id="' + id + '" class="watch-history-menu" aria-labelledby="' + id + '-title" dir="rtl">' +
+      '<div class="home-history-heading"><h2 id="' + id + '-title">ادامه تماشا</h2><form method="dialog">' +
+      '<button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></div>' +
+      '<p class="home-history-title" dir="auto"></p><div class="home-history-actions">' +
+      '<button type="button" data-remove-history>حذف از ادامه تماشا</button><a>اطلاعات فیلم</a></div></dialog>';
+  }
   async function home(seq, pullRefresh) {
     const search = PWA.searchInput('');
     search.classList.add('home-search-form');
@@ -263,10 +286,7 @@
             const container = $('#home-data');
             const entries = library.history || [];
             container.innerHTML = PWA.home(data, entries) +
-              '<dialog id="home-history-menu" aria-labelledby="home-history-title" dir="rtl"><div class="home-history-heading">' +
-              '<h2 id="home-history-title">ادامه تماشا</h2><form method="dialog"><button aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</button></form></div>' +
-              '<p class="home-history-title" dir="auto"></p><div class="home-history-actions">' +
-              '<button type="button" id="home-history-remove">حذف از ادامه تماشا</button><a>اطلاعات فیلم</a></div></dialog>';
+              historyMenu('home-history-menu');
             loadHistoryFrames(container);
             const menu = $('#home-history-menu');
             container.onclick = event => {
@@ -274,12 +294,16 @@
               if (!trigger) return;
               const item = entries[Number(trigger.dataset.historyMore)];
               if (menu.dataset.removing) return;
-              const remove = $('#home-history-remove');
+              const remove = menu.querySelector('[data-remove-history]');
               const details = menu.querySelector('a');
               details.href = trigger.closest('article').querySelector('a').href;
               details.textContent = item.type === 'series' ? 'اطلاعات سریال' : 'اطلاعات فیلم';
               menu.querySelector('.home-history-title').textContent = item.title || '';
-              details.onclick = () => menu.close();
+              details.onclick = event => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                closeWithMotion(menu, undefined, () => { location.href = details.href; });
+              };
               const id = item.history_id || String(item.snapshot || '').match(/\/api\/watch-frame\/(\d+)\//)?.[1];
               remove.disabled = !id;
               remove.onclick = async () => {
@@ -297,7 +321,7 @@
                       track.scrollLeft = scrollLeft;
                       loadHistoryFrames(track);
                     }
-                    menu.close();
+                    closeWithMotion(menu);
                   });
                 } catch (error) { toast(error); }
                 finally {
@@ -317,7 +341,7 @@
     let openMenu;
     function closeMenu() {
       if (!openMenu) return;
-      openMenu.list.hidden = true;
+      PWA.setDisclosure(openMenu.list, false);
       openMenu.toggle.setAttribute('aria-expanded', 'false');
       openMenu = null;
     }
@@ -375,7 +399,7 @@
         closeMenu();
         if (alreadyOpen) return;
         openMenu = {list, toggle};
-        list.hidden = false;
+        PWA.setDisclosure(list, true);
         toggle.setAttribute('aria-expanded','true');
         list.replaceChildren(...[...select.options].map(option => {
           const button = document.createElement('button');
@@ -462,8 +486,9 @@
         data.forEach((value,key) => { if (key !== 'type' && value.trim()) query.append(key,value.trim()); });
         const term = document.querySelector('.reference-search-form input')?.value.trim();
         if (term) query.set('q',term);
-        dialog.close();
-        location.hash = '#/browse/' + (data.get('type') || 'all') + (query.size ? '?' + query : '');
+        closeWithMotion(dialog, undefined, () => {
+          location.hash = '#/browse/' + (data.get('type') || 'all') + (query.size ? '?' + query : '');
+        });
       };
     }
     dialog.showModal();
@@ -478,12 +503,12 @@
       form.refreshChoices();
     }).catch(() => {});
   }
-  function searchPage(seq, initialQuery) {
+  function searchPage(seq, initialQuery, expandGenres) {
     const search = PWA.searchInput(initialQuery);
     mount('<section class="dmf3-search-discovery" aria-label="جست‌وجو"><div id="catalogue"></div></section>');
-    return bindLiveSearch(seq, search, $('#catalogue'));
+    return bindLiveSearch(seq, search, $('#catalogue'), null, expandGenres);
   }
-  function bindLiveSearch(seq, search, catalogue, homeContent) {
+  function bindLiveSearch(seq, search, catalogue, homeContent, expandGenres) {
     const input = search.elements.q;
     let timer;
     let searchRequest = 0;
@@ -508,6 +533,7 @@
             extra.inert = !expanded;
             extra.setAttribute('aria-hidden', String(!expanded));
           };
+          if (expandGenres) toggle.click();
         });
       } catch (error) { if (request === searchRequest) whenCurrent(seq, () => fail($('#catalogue'), error)); }
         return;
@@ -543,7 +569,7 @@
         catalogue.parentElement.hidden = !term;
         if (!term) catalogue.replaceChildren();
       } else {
-        history.replaceState(null, '', term ? '#/search?q=' + enc(term) : '#/search');
+        history.replaceState(null, '', term ? '#/search?q=' + enc(term) : expandGenres ? '#/search?genres=all' : '#/search');
       }
       if (term) catalogue.innerHTML = '<div class="live-search-loading" role="status">' +
         '<span class="startup-spinner" aria-hidden="true"></span><strong>در حال جستجو...</strong>' +
@@ -668,7 +694,7 @@
         summaryToggle.onclick = () => {
           const expanded = summaryToggle.getAttribute('aria-expanded') !== 'true';
           summaryToggle.setAttribute('aria-expanded', String(expanded));
-          summary.classList.toggle('expanded', expanded);
+          PWA.animateHeight(summary, () => summary.classList.toggle('expanded', expanded));
           summaryToggle.textContent = expanded ? 'کمتر' : 'بیشتر';
         };
         const commentEmoji = $('.local-comment-emoji');
@@ -676,10 +702,10 @@
           const palette = $('#title-comment-emojis');
           const input = $('#title-comment textarea');
           const setPalette = open => {
-            palette.hidden = !open;
+            PWA.setDisclosure(palette, open);
             commentEmoji.setAttribute('aria-expanded', String(open));
           };
-          commentEmoji.onclick = () => setPalette(palette.hidden);
+          commentEmoji.onclick = () => setPalette(commentEmoji.getAttribute('aria-expanded') === 'false');
           palette.onclick = event => {
             const button = event.target.closest('button');
             if (!button) return;
@@ -746,7 +772,7 @@
           whenCurrent(seq, () => {
             $('#title-report-form').reset();
             output.textContent = '';
-            report.close();
+            closeWithMotion(report);
             toast('گزارش برای پشتیبانی ارسال شد.', 'success');
           });
         });
@@ -778,10 +804,10 @@
               return button;
             }));
             trigger.onclick = () => {
-              const open = list.hidden;
+              const open = trigger.getAttribute('aria-expanded') === 'false';
               closeEpisodeMenus();
               if (open) {
-                list.hidden = false;
+                PWA.setDisclosure(list, true);
                 trigger.setAttribute('aria-expanded','true');
               }
             };
@@ -956,7 +982,7 @@
   function closeEpisodeMenus() {
     const trigger = $('.reference-season-controls button[aria-expanded=true]');
     if (!trigger) return;
-    document.getElementById(trigger.getAttribute('aria-controls')).hidden = true;
+    PWA.setDisclosure(document.getElementById(trigger.getAttribute('aria-controls')), false);
     trigger.setAttribute('aria-expanded','false');
     return trigger;
   }
@@ -1005,7 +1031,8 @@
         const more = $('.dm-actor-more');
         const measure = () => { if (!facts.classList.contains('dm-expanded')) more.hidden = facts.scrollHeight <= facts.clientHeight + 1; };
         more.onclick = () => {
-          const expanded = facts.classList.toggle('dm-expanded');
+          const expanded = !facts.classList.contains('dm-expanded');
+          PWA.animateHeight(facts, () => facts.classList.toggle('dm-expanded', expanded));
           more.setAttribute('aria-expanded', String(expanded));
           more.textContent = expanded ? 'کمتر' : 'بیشتر';
           measure();
@@ -1018,10 +1045,7 @@
   }
   function library(seq, params) {
     const tabs = [['history','ادامه تماشا'], ['saved','فیلم و سریال من'], ['downloads','دانلودها']];
-    mount(PWA_SOURCE.libraryHeader + '<dialog id="history-menu" aria-labelledby="history-menu-title">' +
-      '<form method="dialog"><h2 id="history-menu-title" tabindex="-1" autofocus>گزینه‌های ادامه تماشا</h2>' +
-      '<button class="history-menu-close" aria-label="بستن"><span aria-hidden="true">×</span></button></form>' +
-      '<a class="history-menu-action">مشاهده جزئیات</a><button class="history-menu-action" type="button" data-remove-history>حذف از ادامه تماشا</button></dialog>' +
+    mount(PWA_SOURCE.libraryHeader + historyMenu('history-menu') +
       '<dialog id="delete-download-dialog"><p>فایل دانلودشده حذف شود؟</p><button type="button" data-cancel-delete>انصراف</button>' +
       '<button type="button" data-confirm-delete>حذف فایل</button></dialog><section class="library-shell" aria-label="لیست من"><div class="library-tabs" role="tablist">' +
       tabs.map(([id,label]) => '<button type="button" role="tab" id="library-tab-' + id + '" aria-controls="library-' + id +
@@ -1048,7 +1072,15 @@
       panel('history').querySelectorAll('[data-history-more]').forEach(button => {
         button.onclick = () => {
           const item = data.history[Number(button.dataset.historyMore)];
-          menu.querySelector('a').href = '#/title/' + enc(item.type) + '/' + enc(item.slug);
+          const details = menu.querySelector('a');
+          details.href = '#/title/' + enc(item.type) + '/' + enc(item.slug);
+          details.textContent = item.type === 'series' ? 'اطلاعات سریال' : 'اطلاعات فیلم';
+          details.onclick = event => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            closeWithMotion(menu, undefined, () => { location.href = details.href; });
+          };
+          menu.querySelector('.home-history-title').textContent = item.title || '';
           const remove = menu.querySelector('[data-remove-history]');
           const id = item.history_id || String(item.snapshot || '').match(/\/api\/watch-frame\/(\d+)\//)?.[1];
           remove.hidden = !id;
@@ -1057,7 +1089,7 @@
             try {
               await api('/api/watch-history/' + enc(id) + '/remove/', {body:{}});
               if (seq !== state.sequence) return;
-              menu.close();
+              closeWithMotion(menu);
               await loadCollection();
             } catch (error) { toast(error); }
             finally { remove.disabled = false; }
@@ -1090,8 +1122,8 @@
     function confirmDelete() {
       const dialog = $('#delete-download-dialog');
       return new Promise(resolve => {
-        dialog.querySelector('[data-cancel-delete]').onclick = () => dialog.close('cancel');
-        dialog.querySelector('[data-confirm-delete]').onclick = () => dialog.close('delete');
+        dialog.querySelector('[data-cancel-delete]').onclick = () => closeWithMotion(dialog, 'cancel');
+        dialog.querySelector('[data-confirm-delete]').onclick = () => closeWithMotion(dialog, 'delete');
         dialog.addEventListener('close', () => resolve(dialog.returnValue === 'delete'), {once:true});
         dialog.returnValue = '';
         dialog.showModal();
@@ -1303,11 +1335,21 @@
       '<p id="logout-description">برای ادامه، باید دوباره وارد حسابت بشی.</p>' +
       '<div class="logout-dialog-actions"><button type="button" data-logout-confirm>خروج از حساب</button>' +
       '<button type="button" data-logout-cancel autofocus>انصراف</button></div></dialog>');
+    const accountMenu = $('#dm-app-menu');
+    const back = accountMenu.querySelector('.dm-app-menu-close');
+    back.onclick = event => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || reduceMotion.matches || !accountMenu.animate) return;
+      event.preventDefault();
+      if (accountMenu.inert) return;
+      accountMenu.inert = true;
+      const motion = accountMenu.animate([{opacity:1}, {opacity:0}], {duration:125,fill:'forwards'});
+      motion.finished.then(() => whenCurrent(sequence, () => { location.href = back.href; }), () => {});
+    };
     const dialog = $('#local-logout-dialog');
     const logout = $('#logout');
     dialog.querySelector('.logout-dialog-icon').append(logout.querySelector('svg').cloneNode(true));
     logout.onclick = () => dialog.showModal();
-    dialog.querySelector('[data-logout-cancel]').onclick = () => dialog.close();
+    dialog.querySelector('[data-logout-cancel]').onclick = () => closeWithMotion(dialog);
     dialog.querySelector('[data-logout-confirm]').onclick = async event => {
       event.target.disabled = true;
       try {
@@ -1316,8 +1358,8 @@
         state.user = null;
         state.sessionKnown = true;
         state.nextAfterLogin = '#/home';
-        location.hash = '#/login';
-      } catch (error) { dialog.close(); toast(error); }
+        closeWithMotion(dialog, undefined, () => { location.hash = '#/login'; });
+      } catch (error) { closeWithMotion(dialog); toast(error); }
       finally { event.target.disabled = false; }
     };
     document.querySelectorAll('[data-social]').forEach(link => link.onclick = async event => {
@@ -1404,7 +1446,7 @@
         await refreshSession();
         whenCurrent(sequence, () => {
           $('#profile-avatar-current').src = imageURL(state.user?.avatar) || avatar;
-          dialog.close();
+          closeWithMotion(dialog);
         });
       } catch (error) { output.textContent = error.message; }
       finally {
@@ -1576,7 +1618,11 @@
     const emojiToggle = $('.local-support-emoji-toggle');
     const scrollLatest = () => { log.scrollTop = log.scrollHeight; };
     for (const button of $('.local-support-quick').children) button.onclick = () => { input.value = button.textContent; };
-    emojiToggle.onclick = () => { emojis.hidden = !emojis.hidden; emojiToggle.setAttribute('aria-expanded',String(!emojis.hidden)); };
+    emojiToggle.onclick = () => {
+      const open = emojiToggle.getAttribute('aria-expanded') === 'false';
+      PWA.setDisclosure(emojis, open);
+      emojiToggle.setAttribute('aria-expanded', String(open));
+    };
     for (const button of emojis.children) button.onclick = () => {
       input.setRangeText(button.textContent,input.selectionStart,input.selectionEnd,'end');
       emojiToggle.click();
@@ -1631,7 +1677,7 @@
               const close = document.createElement('button');
               close.type = 'button';
               close.textContent = 'بستن';
-              close.onclick = () => viewer.close();
+              close.onclick = () => closeWithMotion(viewer);
               viewer.append(close, image.cloneNode());
               viewer.addEventListener('close', () => viewer.remove(), {once:true});
               log.after(viewer);
@@ -1779,7 +1825,7 @@
       const options = [...dialog.querySelectorAll('[data-choice]')];
       for (const button of options) button.onclick = async () => {
         const value = button.dataset.choice;
-        if (value === selected()[0]) { dialog.close(); return; }
+        if (value === selected()[0]) { closeWithMotion(dialog); return; }
         options.forEach(option => { option.disabled = true; });
         try {
           const result = await api(endpoint, {body:{[key]:value}});
@@ -1791,7 +1837,7 @@
             applyLanguage();
           }
           renderTrigger();
-          dialog.close();
+          closeWithMotion(dialog);
         } catch (error) { dialog.querySelector('.settings-choice-error').textContent = error.message; }
         finally { options.forEach(option => { option.disabled = false; }); }
       };
@@ -1867,7 +1913,7 @@
     dialog.onclick = event => {
       if (event.target !== dialog) return;
       const rect = dialog.getBoundingClientRect();
-      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) dialog.close();
+      if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeWithMotion(dialog);
     };
     $('#clear').onclick = async () => { await native({action:'clearCache'}); toast('اطلاعات عمومی پاک شد.'); };
     preferenceSheet({key:'quality',title:'کیفیت پخش',caption:'کیفیت پیش‌فرض فیلم‌ها و سریال‌ها',choices:qualityChoices,endpoint:'/accounts/api/update-player-quality/'});
@@ -2018,9 +2064,9 @@
       if (!button) return;
       const item = roomData.mine[Number(button.dataset.roomDelete)];
       const dialog = $('#room-delete-dialog');
-      dialog.querySelector('[data-room-cancel]').onclick = () => dialog.close();
+      dialog.querySelector('[data-room-cancel]').onclick = () => closeWithMotion(dialog);
       dialog.querySelector('[data-room-confirm]').onclick = async () => {
-        dialog.close();
+        closeWithMotion(dialog);
         button.disabled = true;
         try { await api('/movie-room/r/' + enc(item.code) + '/delete/', {body:{}}); await refreshRooms(); }
         catch (error) { toast(error); }
@@ -2405,7 +2451,7 @@
       return route();
     }
     const footerDrag = $('#dm-app-bottom-nav').hasAttribute('data-footer-dragging');
-    const animateRoute = path !== previousRoute && !footerDrag;
+    const animateRoute = path !== previousRoute && (!footerDrag || name === 'title');
     const firstSecondaryRoute = !previousRoute && window.diastomySecondaryTab === true;
     previousRoute = path;
     const loadingTimer = animateRoute && !firstSecondaryRoute && !['login','otp','forgot','rooms','room'].includes(name)
@@ -2416,7 +2462,7 @@
     try {
       if (name === 'home') await home(seq, pullRefresh);
       else if (name === 'browse') await browse(seq, parts[1] || 'all', params);
-      else if (name === 'search') await searchPage(seq, params.get('q') || '');
+      else if (name === 'search') await searchPage(seq, params.get('q') || '', params.get('genres') === 'all');
       else if (name === 'title') await detail(seq, parts[1], parts[2]);
       else if (name === 'actors' || name === 'actor') await actors(seq, parts[1], parts[2], params);
       else if (name === 'library') await library(seq, params);

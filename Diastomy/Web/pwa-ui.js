@@ -146,7 +146,7 @@ window.PWA = (() => {
     ];
     const sections = new Map();
     const illustratedGenres = ['drama', 'adventure', 'fantasy', 'action', 'comedy', 'sci-fi', 'horror', 'romance', 'family', 'musical', 'documentary', 'animation', 'art', 'kids'];
-    const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search">بیشتر</a></div><div class="dm54-genre-track">' +
+    const genreHTML = '<section class="dm54-genres"><div class="dm54-head"><h2>ژانرها</h2><a href="#/search?genres=all">بیشتر</a></div><div class="dm54-genre-track">' +
       illustratedGenres.map((slug,index) => '<a class="home-genre-card" data-genre="' + slug + '" href="#/browse/all?genre=' + slug +
         '"><img' + (index < 3 ? '' : ' loading="lazy"') + ' decoding="async" draggable="false" alt="" src="' + genreArt[slug] + '"><span>' +
         slug.toUpperCase() + '</span></a>').join('') + '</div></section>';
@@ -536,5 +536,85 @@ window.PWA = (() => {
       if (start) event.preventDefault();
     });
   }
-  return {card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, continueWatching, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page};
+  const motionDisabled = matchMedia('(prefers-reduced-motion: reduce)');
+  const disclosures = new WeakMap();
+  function setDisclosure(panel, open) {
+    disclosures.get(panel)?.cancel();
+    disclosures.delete(panel);
+    panel.inert = !open;
+    if (motionDisabled.matches || !panel.animate) {
+      panel.hidden = !open;
+      return;
+    }
+    if (!open && panel.hidden) return;
+    panel.hidden = false;
+    const visible = {opacity:1,translate:'none'};
+    const concealed = {opacity:0,translate:'0 -5px'};
+    const motion = panel.animate(open ? [concealed, visible] : [visible, concealed],
+      {duration:open ? 165 : 125, easing:'ease-out', fill:'both'});
+    disclosures.set(panel, motion);
+    motion.finished.then(() => {
+      if (disclosures.get(panel) !== motion) return;
+      panel.hidden = !open;
+      disclosures.delete(panel);
+      motion.cancel();
+    }, () => {});
+  }
+  const heightMotions = new WeakMap();
+  function animateHeight(element, change) {
+    const from = element.getBoundingClientRect().height;
+    heightMotions.get(element)?.cancel();
+    heightMotions.delete(element);
+    change();
+    playHeight(element, from, element.getBoundingClientRect().height);
+  }
+  function playHeight(element, from, to, done) {
+    if (motionDisabled.matches || !element.animate || Math.abs(from - to) < 1) {
+      done?.();
+      return;
+    }
+    const frame = height => ({height:height + 'px',overflow:'hidden',boxSizing:'border-box'});
+    const motion = element.animate([frame(from), frame(to)], {duration:200,easing:'ease-out',fill:'both'});
+    heightMotions.set(element, motion);
+    motion.finished.then(() => {
+      done?.();
+      heightMotions.delete(element);
+      motion.cancel();
+    }, () => {});
+  }
+  function animateDetails(details) {
+    if (!details.animate) return false;
+    const previous = heightMotions.get(details);
+    const open = previous ? previous.opens : details.open;
+    const from = details.getBoundingClientRect().height;
+    previous?.cancel();
+    heightMotions.delete(details);
+    details.open = !open;
+    const to = details.getBoundingClientRect().height;
+    // Keep details content available for the closing transition.
+    details.open = true;
+    const done = () => { details.open = !open; };
+    const floating = details.querySelector(':scope > .local-room-selects');
+    if (floating) {
+      // The room menu is positioned absolutely, so its parent does not grow.
+      if (motionDisabled.matches) { done(); return true; }
+      const hidden = {opacity:0,translate:'0 -5px'};
+      const visible = {opacity:1,translate:'none'};
+      const motion = floating.animate(open ? [visible, hidden] : [hidden, visible],
+        {duration:165,easing:'ease-out',fill:'both'});
+      motion.opens = !open;
+      heightMotions.set(details, motion);
+      motion.finished.then(() => {
+        done();
+        heightMotions.delete(details);
+        motion.cancel();
+      }, () => {});
+      return true;
+    }
+    playHeight(details, from, to, done);
+    const motion = heightMotions.get(details);
+    if (motion) motion.opens = !open;
+    return true;
+  }
+  return {card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, continueWatching, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page, setDisclosure, animateHeight, animateDetails};
 })();

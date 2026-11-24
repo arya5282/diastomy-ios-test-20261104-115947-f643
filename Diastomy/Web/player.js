@@ -23,12 +23,29 @@ window.PWAPlayer = (() => {
     const previousFocus = document.activeElement;
     document.body.append(dialog);
     return new Promise(resolve => {
-      const finish = value => {
-        dialog.remove();
-        if (value === null) previousFocus?.focus({preventScroll:true});
-        resolve(value);
+      let finishing = false;
+      const finish = (value, immediate = false) => {
+        if (finishing) {
+          if (immediate) dialog.remove();
+          return;
+        }
+        finishing = true;
+        const remove = () => {
+          const attached = dialog.isConnected;
+          dialog.remove();
+          if (value === null && attached) previousFocus?.focus({preventScroll:true});
+          resolve(value);
+        };
+        if (immediate || matchMedia('(prefers-reduced-motion: reduce)').matches || !dialog.animate) {
+          remove();
+          return;
+        }
+        dialog.inert = true;
+        const panel = dialog.querySelector('[role=dialog]');
+        panel.animate([{translate:'none'}, {translate:'0 6px'}], {duration:125,fill:'forwards'});
+        dialog.animate([{opacity:1}, {opacity:0}], {duration:125,fill:'forwards'}).finished.then(remove, remove);
       };
-      dialog.addEventListener('cancel', () => finish(null));
+      dialog.addEventListener('cancel', () => finish(null, true));
       dialog.onkeydown = event => { if (event.key === 'Escape') finish(null); };
       dialog.onclick = event => {
         if (event.target === dialog || event.target.closest('[data-resume-close]')) finish(null);
@@ -150,6 +167,7 @@ window.PWAPlayer = (() => {
             const optionsChanged = (lastState?.captions?.length || 0) !== (state.captions?.length || 0) ||
               (lastState?.audio?.length || 0) !== (state.audio?.length || 0);
             lastState = state;
+            syncCaptionButton();
             if (state.frameReady) played = true;
             updateTransport(state.paused || !state.frameReady);
             if (state.failed || (!played && Date.now() > frameDeadline)) {
@@ -157,7 +175,7 @@ window.PWAPlayer = (() => {
               get('.local-player-error').hidden = false;
             }
             refresh();
-            if (optionsChanged && !settings.hidden && settings.dataset.panel !== 'settings') renderSettings();
+            if (optionsChanged && !settings.hidden) renderSettings();
           } catch (_) {}
         };
         polling = setInterval(sync, 500);
@@ -280,28 +298,28 @@ window.PWAPlayer = (() => {
         if (qualities.length) options('کیفیت پخش', qualities, selected, value => {
           if (value !== selected) changeSource(value, group);
         });
-        if (room) return;
-        options('سرعت پخش', [.5,.75,1,1.25,1.5,2].map(rate => [rate,rate + '×']), playbackRate, value => {
+        if (!room) options('سرعت پخش', [.5,.75,1,1.25,1.5,2].map(rate => [rate,rate + '×']), playbackRate, value => {
           playbackRate = value;
           video.playbackRate = value;
           if (surface) controlSurface('rate', value).catch(() => {});
         });
-        return;
-      }
-      if (settings.dataset.panel === 'captions') {
         options('اندازهٔ زیرنویس', [['small','کوچک'],['normal','متوسط'],['large','بزرگ']], captionStyle.size, value => setCaptionStyle('size', value));
         options('پس‌زمینه', [[true,'روشن'],[false,'خاموش']], captionStyle.background, value => setCaptionStyle('background', value));
         options('رنگ زیرنویس', [['white','سفید'],['yellow','زرد'],['cyan','آبی روشن']], captionStyle.color, value => setCaptionStyle('color', value));
+        const nativeCaptions = lastState?.captions || [];
+        if (surface && nativeCaptions.length > 1) {
+          options('زبان زیرنویس', nativeCaptions.map((name,i) =>
+            [i, name && !creditMarker.test(name) ? name : 'زیرنویس ' + (i + 1)]),
+          lastState.selectedCaption, selectNativeCaption);
+        } else if (!surface) {
+          const tracks = captionTracks();
+          if (tracks.length > 1) options('زبان زیرنویس', tracks.map((track,i) => [i,
+            track.label && !creditMarker.test(track.label) ? track.label : track.language || 'زیرنویس ' + (i + 1)]),
+          tracks.findIndex(track => track.mode === 'showing'), value => selectWebCaption(tracks[value]));
+        }
+        return;
       }
       if (surface) {
-        if (settings.dataset.panel === 'captions') {
-          const captions = lastState?.captions || [];
-          if (!captions.length) { settings.append('زیرنویس قابل پخش در دسترس نیست.'); return; }
-          options('زیرنویس', [[-1,'خاموش'], ...captions.map((name,i) =>
-            [i, creditMarker.test(name) ? 'زیرنویس ' + (i + 1) : name])], lastState.selectedCaption,
-          value => controlSurface('captions', value).catch(() => {}));
-          return;
-        }
         const audio = lastState?.audio || [];
         if (!audio.length) { settings.textContent = 'مسیر صوتی دیگری در دسترس نیست.'; return; }
         options('زبان صدا', audio.map((name,i) => [i, name || audioLabel(i,audio.length)]), lastState.selectedAudio,
@@ -314,19 +332,47 @@ window.PWAPlayer = (() => {
         options('زبان صدا', audio.map((track,i) => [i,track.label || track.language || audioLabel(i,audio.length)]),
           audio.findIndex(track => track.enabled), value => audio.forEach((track,i) => { track.enabled = i === value; }));
       }
-      if (settings.dataset.panel === 'captions') {
-        const tracks = Array.from(video.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
-        const captions = tracks.filter(track => {
-          if (track.mode === 'disabled') track.mode = 'hidden';
-          return cleanCaptionTrack(track);
-        });
-        if (!captions.length) { settings.append('زیرنویس قابل پخش در دسترس نیست.'); return; }
-        options('زیرنویس', [[-1,'خاموش'], ...captions.map((track,i) => [i,
-          track.label && !creditMarker.test(track.label) ? track.label : track.language || 'زیرنویس ' + (i + 1)])],
-        captions.findIndex(track => track.mode === 'showing'), value => tracks.forEach(track => {
-          track.mode = captions[value] === track ? 'showing' : 'hidden';
-        }));
+    }
+    const captionButton = get('[data-player=captions]');
+    let lastNativeCaption = 0;
+    let lastWebCaption;
+    function captionTracks() {
+      return Array.from(video.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
+    }
+    function syncCaptionButton() {
+      const enabled = surface ? (lastState?.selectedCaption ?? -1) >= 0 :
+        captionTracks().some(track => track.mode === 'showing');
+      captionButton.setAttribute('aria-pressed', String(enabled));
+    }
+    async function selectNativeCaption(index) {
+      const request = revision;
+      captionButton.disabled = true;
+      try {
+        const state = await controlSurface('captions', index);
+        if (!surface || request !== revision || !state.ok) return;
+        lastState = state;
+        if (state.selectedCaption >= 0) lastNativeCaption = state.selectedCaption;
+        syncCaptionButton();
+        if (!settings.hidden && settings.dataset.panel === 'settings') renderSettings();
+      } catch (_) {}
+      finally { captionButton.disabled = false; }
+    }
+    function selectWebCaption(selected) {
+      for (const track of captionTracks()) track.mode = track === selected ? 'showing' : 'hidden';
+      if (selected) lastWebCaption = selected;
+      syncCaptionButton();
+    }
+    function toggleCaptions() {
+      if (surface) {
+        if (!lastState?.captions?.length) return;
+        const current = lastState.selectedCaption;
+        if (current >= 0) lastNativeCaption = current;
+        return selectNativeCaption(current >= 0 ? -1 : Math.min(lastNativeCaption, lastState.captions.length - 1));
       }
+      const tracks = captionTracks();
+      const current = tracks.find(track => track.mode === 'showing');
+      if (current) lastWebCaption = current;
+      if (tracks.length) selectWebCaption(current ? null : tracks.includes(lastWebCaption) ? lastWebCaption : tracks[0]);
     }
     function audioLabel(index, count) { return count === 1 ? 'صدای اصلی' : 'مسیر صوتی ' + (index + 1); }
     function dismiss() {
@@ -359,10 +405,13 @@ window.PWAPlayer = (() => {
       }
       return cues.some(cue => typeof cue.text === 'string' && cue.text.trim() && cue.endTime > cue.startTime);
     }
+    syncCaptionButton();
+    video.textTracks?.addEventListener('change', syncCaptionButton);
     video.textTracks?.addEventListener('addtrack', event => {
       const track = event.track;
       if (!['captions','subtitles'].includes(track.kind)) return;
       track.addEventListener('cuechange', () => cleanCaptionTrack(track));
+      syncCaptionButton();
     });
     video.addEventListener('loadedmetadata', () => {
       if (resume > 0 && Number.isFinite(video.duration)) video.currentTime = Math.min(resume, video.duration);
@@ -388,16 +437,16 @@ window.PWAPlayer = (() => {
     seek.onpointercancel = () => { scrubbing = false; refresh(); };
     seek.onblur = () => { if (scrubbing) seek.onchange(); };
     function setPanel(panel) {
-      settings.hidden = !panel;
-      if (panel) settings.dataset.panel = panel;
-      overlay.querySelectorAll('[data-player=captions],[data-player=audio],[data-player=settings]').forEach(trigger => {
+      PWA.setDisclosure(settings, Boolean(panel));
+      settings.dataset.panel = panel || '';
+      overlay.querySelectorAll('[data-player=audio],[data-player=settings]').forEach(trigger => {
         trigger.setAttribute('aria-expanded', String(panel === trigger.dataset.player));
       });
       if (panel) renderSettings();
     }
     setPanel(null);
     function closePanelOnEscape(event) {
-      if (event.key === 'Escape' && !settings.hidden) {
+      if (event.key === 'Escape' && settings.dataset.panel) {
         const trigger = get('[aria-expanded=true]');
         setPanel(null);
         trigger?.focus({preventScroll:true});
@@ -429,10 +478,13 @@ window.PWAPlayer = (() => {
           break;
         }
         case 'captions':
+          setPanel(null);
+          await toggleCaptions();
+          break;
         case 'audio':
         case 'settings': {
           const panel = button.dataset.player;
-          setPanel(!settings.hidden && settings.dataset.panel === panel ? null : panel);
+          setPanel(settings.dataset.panel === panel ? null : panel);
           break;
         }
         case 'fullscreen': {
@@ -444,7 +496,7 @@ window.PWAPlayer = (() => {
         case 'rotate': {
           const rotated = overlay.classList.toggle('local-player-rotated');
           button.setAttribute('aria-pressed', String(rotated));
-          if (surface) await controlSurface('rotate', rotated);
+          if (surface) await controlSurface('rotateAnimated', rotated);
           break;
         }
         case 'retry':
