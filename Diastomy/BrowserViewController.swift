@@ -163,7 +163,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         guard active, let x = data["x"] as? Double, let y = data["y"] as? Double,
               let length = data["length"] as? Double, [x, y, length].allSatisfy(\.isFinite),
               (20...300).contains(length), webView.bounds.contains(CGPoint(x: x, y: y)) else {
-            playerVolumeView?.isHidden = true
+            if let slider = playerVolumeView { setPlayerVolumeVisible(active: false, slider: slider, animated: active) }
             return false
         }
         let slider: MPVolumeView
@@ -173,15 +173,46 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             slider = MPVolumeView(frame: .zero)
             slider.showsRouteButton = false
             slider.tintColor = .systemRed
+            let thumbSize = CGSize(width: 24, height: 16)
+            let thumb = UIGraphicsImageRenderer(size: thumbSize).image { context in
+                UIColor.white.setFill()
+                let rect = CGRect(origin: .zero, size: thumbSize)
+                context.cgContext.addPath(UIBezierPath(roundedRect: rect, cornerRadius: 8).cgPath)
+                context.cgContext.fillPath()
+            }.withRenderingMode(.alwaysOriginal)
+            slider.setVolumeThumbImage(thumb, for: .normal)
+            slider.setVolumeThumbImage(thumb, for: .highlighted)
             slider.accessibilityLabel = "بلندی صدا"
+            slider.alpha = 0
+            slider.isHidden = true
+            slider.isUserInteractionEnabled = false
             view.addSubview(slider)
             playerVolumeView = slider
         }
         slider.bounds = CGRect(x: 0, y: 0, width: length, height: 28)
         slider.center = webView.convert(CGPoint(x: x, y: y), to: view)
         slider.transform = CGAffineTransform(rotationAngle: data["horizontal"] as? Bool == true ? 0 : -.pi / 2)
-        slider.isHidden = false
+        setPlayerVolumeVisible(active: true, slider: slider)
         return true
+    }
+
+    private func setPlayerVolumeVisible(active: Bool, slider: MPVolumeView, animated: Bool = true) {
+        let opacity: CGFloat = active ? 1 : 0
+        if !animated || UIAccessibility.isReduceMotionEnabled {
+            slider.layer.removeAllAnimations()
+            slider.alpha = opacity
+            slider.isUserInteractionEnabled = active
+            slider.isHidden = !active
+            return
+        }
+        guard slider.isUserInteractionEnabled != active else { return }
+        slider.isUserInteractionEnabled = active
+        if active { slider.isHidden = false }
+        UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+            slider.alpha = opacity
+        } completion: { finished in
+            if finished && !slider.isUserInteractionEnabled { slider.isHidden = true }
+        }
     }
 
     private final class TitleButton: UIButton {
@@ -760,10 +791,14 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                     replyHandler(["ok": false, "error": "حذف فایل ممکن نشد."], nil)
                 }
             }
+        } else if action == "downloadProgress", let token = data["token"] as? String,
+                  let task = activeDownloads[token] {
+            replyHandler(["received": task.countOfBytesReceived, "expected": task.countOfBytesExpectedToReceive], nil)
         } else if ["downloadMovie", "downloadSeries"].contains(action), let slug = data["slug"] as? String,
                   let id = data["id"] as? Int, id > 0,
+                  let token = data["token"] as? String, UUID(uuidString: token) != nil,
                   slug.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil {
-            downloadVideo(kind: action == "downloadSeries" ? "series" : "movie", slug: slug, id: id, dubbed: action == "downloadMovie" && data["dubbed"] as? Bool == true) { replyHandler($0, nil) }
+            downloadVideo(kind: action == "downloadSeries" ? "series" : "movie", slug: slug, id: id, dubbed: action == "downloadMovie" && data["dubbed"] as? Bool == true, token: token) { replyHandler($0, nil) }
         } else if action == "checkout", let plan = data["plan"] as? Int, plan > 0 {
             send("/accounts/api/create-payment/", method: "POST", body: ["plan_id": plan, "discount_code": data["discount"] as? String ?? ""]) { result in
                 guard let info = result["data"] as? [String: Any], info["success"] as? Bool == true,
@@ -882,15 +917,32 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         return url
     }
 
-    private func downloadVideo(kind: String, slug: String, id: Int, dubbed: Bool, completion: @escaping ([String: Any]) -> Void) {
+    private var activeDownloads: [String: URLSessionDownloadTask] = [:]
+    private lazy var downloadsSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.httpCookieStorage = .shared
+        config.httpShouldSetCookies = true
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        config.timeoutIntervalForRequest = 45
+        config.timeoutIntervalForResource = 10_800
+        return URLSession(configuration: config)
+    }()
+
+    private func downloadVideo(kind: String, slug: String, id: Int, dubbed: Bool, token: String, completion: @escaping ([String: Any]) -> Void) {
         let variant = dubbed ? "dubbed/" : ""
         let url = URL(string: "/movie/\(kind)/\(slug)/download/\(id)/\(variant)", relativeTo: server)!.absoluteURL
         // The existing Django download route checks the session before redirecting.
-        URLSession.shared.downloadTask(with: url) { [documents] file, response, _ in
+        guard activeDownloads[token] == nil else {
+            completion(["ok": false, "error": "این فایل در حال دانلود است."])
+            return
+        }
+        let task = downloadsSession.downloadTask(with: url) { [weak self, documents] file, response, error in
             let result: [String: Any]
             if let file = file, let http = response as? HTTPURLResponse,
                http.statusCode == 200, http.url?.scheme == "https",
-               let mime = http.mimeType, mime.hasPrefix("video/") || mime == "application/octet-stream" {
+               let mime = http.mimeType,
+               mime.hasPrefix("video/") || ["application/octet-stream", "application/x-matroska", "application/matroska"].contains(mime),
+               let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize, size > 0 {
                 let suggestedExtension = ((http.suggestedFilename ?? "") as NSString).pathExtension.lowercased()
                 let suffix = ["mp4", "mkv", "mov", "webm", "m4v"].contains(suggestedExtension) ? suggestedExtension : "mp4"
                 let name = "\(slug)-\(id)-\(UUID().uuidString.prefix(8)).\(suffix)"
@@ -901,10 +953,24 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                     result = ["ok": false, "error": "ذخیرهٔ فایل ناموفق بود."]
                 }
             } else {
-                result = ["ok": false, "error": "دانلود در دسترس نیست. وضعیت حساب و اشتراک را بررسی کنید."]
+                let code = (response as? HTTPURLResponse)?.statusCode
+                let message: String
+                if code == 401 || code == 403 || code == 302 {
+                    message = "برای دانلود، وضعیت ورود و اشتراک را بررسی کنید."
+                } else if (error as? URLError)?.code == .timedOut {
+                    message = "پاسخ منبع دانلود طول کشید. دوباره تلاش کنید."
+                } else {
+                    message = "دریافت فایل ناموفق بود. دوباره تلاش کنید."
+                }
+                result = ["ok": false, "error": message]
             }
-            DispatchQueue.main.async { completion(result) }
-        }.resume()
+            DispatchQueue.main.async {
+                self?.activeDownloads.removeValue(forKey: token)
+                completion(result)
+            }
+        }
+        activeDownloads[token] = task
+        task.resume()
     }
 
     override func viewDidLayoutSubviews() {
@@ -1046,7 +1112,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             let attributes: [String: Any] = [
                 kCMTextMarkupAttribute_RelativeFontSize as String: sizes[style["size"] as? String ?? ""] ?? 100,
                 kCMTextMarkupAttribute_ForegroundColorARGB as String: colors[style["color"] as? String ?? ""] ?? [1, 1, 1, 1],
-                kCMTextMarkupAttribute_BackgroundColorARGB as String: [(style["background"] as? Bool == false ? 0.0 : 0.78), 0.0, 0.0, 0.0]
+                kCMTextMarkupAttribute_BackgroundColorARGB as String: [(style["background"] as? Bool == false ? 0.0 : 0.78), 0.0, 0.0, 0.0],
+                kCMTextMarkupAttribute_CharacterBackgroundColorARGB as String: [0.0, 0.0, 0.0, 0.0]
             ]
             if let rule = AVTextStyleRule(textMarkupAttributes: attributes) { item?.textStyleRules = [rule] }
         case "audio":

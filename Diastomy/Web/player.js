@@ -55,7 +55,7 @@ window.PWAPlayer = (() => {
       dialog.querySelector('[data-resume-continue]').focus({preventScroll:true});
     });
   }
-  function open({info, groups, group, kind, id, room, roomControl, onClose, initialVolume = 1, roomSubtitleMode, roomAudio, native, save, onError}) {
+  function open({info, groups, group, kind, id, room, roomControl, roomChat, onClose, initialVolume = 1, roomSubtitleMode, roomAudio, native, save, onError}) {
     close();
     const overlay = document.createElement('section');
     overlay.className = 'local-pwa-player';
@@ -73,7 +73,7 @@ window.PWAPlayer = (() => {
       '<div class="local-player-caption-status" role="status" dir="rtl" hidden></div><div class="local-player-bottom"><div class="local-player-bar">' +
       control('back','۱۰ ثانیه عقب','backward') + control('toggle','پخش یا توقف','play') + control('forward','۱۰ ثانیه جلو','forward') +
       '<div class="local-player-timeline"><div><output>0:00</output><output>0:00</output></div><div class="local-player-seek"><span aria-hidden="true"></span><input type="range" min="0" max="0" value="0" step=".1" aria-label="موقعیت پخش" disabled></div></div>' +
-      (kind === 'series' ? control('next','قسمت بعد','forward') : '') + control('captions','زیرنویس','captions') + control('audio','زبان صدا','microphone') + control('settings','تنظیمات پخش','setting-2') + control('fullscreen','پر کردن صفحه','fullscreen') +
+      (kind === 'series' ? control('next','قسمت بعد','forward') : '') + control('captions','زیرنویس','captions') + control('audio','زبان صدا','microphone') + control('settings','تنظیمات پخش','setting-2') + (roomChat ? control('chat','چت اتاق','room-chat') : '') + control('fullscreen','پر کردن صفحه','fullscreen') +
       '</div></div><div class="local-player-settings dm-ref-settings" hidden></div><div class="local-player-error" hidden role="alert"><p>پخش ویدیو در این حالت ممکن نشد.</p><button type="button" data-player="retry">تلاش دوباره</button></div>';
     const get = selector => overlay.querySelector(selector);
     const video = get('video');
@@ -81,6 +81,26 @@ window.PWAPlayer = (() => {
     const timelineFill = get('.local-player-seek > span');
     const [elapsed, end] = overlay.querySelectorAll('output');
     const settings = get('.local-player-settings');
+    const chatAnchor = document.createComment('room chat');
+    function showChat(open) {
+      if (!roomChat || open === chatAnchor.isConnected) return;
+      if (open) {
+        roomChat.before(chatAnchor);
+        overlay.append(roomChat);
+        roomChat.classList.add('local-player-room-chat');
+        const log = roomChat.querySelector('#room-chat');
+        log.scrollTop = log.scrollHeight;
+      } else {
+        roomChat.querySelector('input')?.blur();
+        chatAnchor.replaceWith(roomChat);
+        roomChat.classList.remove('local-player-room-chat');
+      }
+      get('[data-player=chat]').setAttribute('aria-expanded', String(open));
+      updateViewport();
+    }
+    roomChat?.addEventListener('click', shieldChat);
+    function shieldChat(event) { if (chatAnchor.isConnected) event.stopPropagation(); }
+    get('[data-player=chat]')?.setAttribute('aria-expanded','false');
     settings.addEventListener('click', event => event.stopPropagation());
     let source = info, selected = id, revision = 0, resume = Number(info.position) || 0, lastSaved = 0, played = false;
     const updateTransport = paused => {
@@ -99,6 +119,7 @@ window.PWAPlayer = (() => {
       if (saved && Object.hasOwn(sizes,saved.size) && Object.hasOwn(colors,saved.color) && typeof saved.background === 'boolean') captionStyle = saved;
     } catch (_) {}
     function applyCaptionStyle() {
+      overlay.classList.toggle('local-player-no-caption-background', !captionStyle.background);
       overlay.style.setProperty('--caption-size', sizes[captionStyle.size]);
       overlay.style.setProperty('--caption-color', colors[captionStyle.color]);
       overlay.style.setProperty('--caption-background', captionStyle.background ? '#000c' : 'transparent');
@@ -250,7 +271,7 @@ window.PWAPlayer = (() => {
     function updateViewport(active = true) {
       if (!nativeViewport) return;
       const request = ++viewportRequest;
-      const showVolume = active && !rotationTimer && !settings.dataset.panel && !overlay.classList.contains('local-player-controls-hidden');
+      const showVolume = active && !rotationTimer && !chatAnchor.isConnected && !settings.dataset.panel && !overlay.classList.contains('local-player-controls-hidden');
       const rect = volume.getBoundingClientRect();
       const horizontal = overlay.classList.contains('local-player-rotated');
       const geometry = showVolume ? {
@@ -258,12 +279,12 @@ window.PWAPlayer = (() => {
         length:horizontal ? rect.width : rect.height, horizontal
       } : {};
       native({action:'playerViewport', active, detail:Boolean(document.querySelector('.movie-detail-shell')), ...geometry}).then(result => {
-        if (request !== viewportRequest) return;
+        if (request !== viewportRequest || !showVolume) return;
         const systemVolume = result?.ok === true;
         volume.inert = systemVolume;
         overlay.classList.toggle('local-player-system-volume', systemVolume);
       }).catch(() => {
-        if (request !== viewportRequest) return;
+        if (request !== viewportRequest || !showVolume) return;
         volume.inert = false;
         overlay.classList.remove('local-player-system-volume');
       });
@@ -461,6 +482,8 @@ window.PWAPlayer = (() => {
     function audioLabel(index, count) { return count === 1 ? 'صدای اصلی' : 'مسیر صوتی ' + (index + 1); }
     function dismiss() {
       progress(true);
+      showChat(false);
+      roomChat?.removeEventListener('click', shieldChat);
       clearTimeout(captionNoticeTimer);
       clearTimeout(rotationTimer);
       window.removeEventListener('resize', resizeViewport);
@@ -474,6 +497,7 @@ window.PWAPlayer = (() => {
       video.load();
       overlay.remove();
       document.body.classList.remove('local-player-open');
+      if (pageRoot) pageRoot.inert = pageWasInert;
       onClose?.();
     }
     closeCurrent = dismiss;
@@ -546,6 +570,12 @@ window.PWAPlayer = (() => {
     }
     setPanel(null);
     function closePanelOnEscape(event) {
+      if (event.key === 'Escape' && chatAnchor.isConnected) {
+        showChat(false);
+        get('[data-player=chat]')?.focus({preventScroll:true});
+        event.preventDefault();
+        return;
+      }
       if (event.key === 'Escape' && settings.dataset.panel) {
         const trigger = get('[aria-expanded=true]');
         setPanel(null);
@@ -558,9 +588,12 @@ window.PWAPlayer = (() => {
       const button = event.target.closest('[data-player]');
       if (!button) {
         if (event.target.closest('input, label, .local-player-top, .local-player-bottom, .local-player-settings')) return;
+        const hidden = overlay.classList.toggle('local-player-controls-hidden');
+        overlay.querySelectorAll('.local-player-top,.local-player-bottom,.local-player-side,.local-player-center').forEach(control => {
+          control.inert = hidden;
+        });
         setPanel(null);
-        overlay.classList.toggle('local-player-controls-hidden');
-        updateViewport();
+        showChat(false);
         return;
       }
       switch (button.dataset.player) {
@@ -578,10 +611,15 @@ window.PWAPlayer = (() => {
           if (next) await changeSource(Number(next.id), group + 1);
           break;
         }
+        case 'chat':
+          setPanel(null);
+          showChat(!chatAnchor.isConnected);
+          break;
         case 'captions':
         case 'audio':
         case 'settings': {
           const panel = button.dataset.player;
+          showChat(false);
           setPanel(settings.dataset.panel === panel ? null : panel);
           break;
         }
@@ -609,13 +647,16 @@ window.PWAPlayer = (() => {
           break;
       }
     };
+    const pageRoot = document.querySelector('.dmf3-root');
+    const pageWasInert = pageRoot?.inert;
+    if (pageRoot) pageRoot.inert = true;
     applyCaptionStyle();
     document.body.append(overlay);
     document.body.classList.add('local-player-open');
     window.addEventListener('resize', resizeViewport);
     updateViewport();
     overlay.addEventListener('touchmove', event => {
-      if (event.cancelable && !event.target.closest('input[type=range],.local-player-settings')) event.preventDefault();
+      if (event.cancelable && !event.target.closest('input[type=range],.local-player-settings,.local-player-room-chat')) event.preventDefault();
     }, {passive:false});
     updateNext();
     if (room && !roomControl) {

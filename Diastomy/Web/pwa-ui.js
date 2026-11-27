@@ -138,6 +138,11 @@ window.PWA = (() => {
     return history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
       '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';
   }
+  function railTitle(rail) {
+    return ({pwa_turkish_series:'سریال‌های ترکیه‌ای',pwa_free_movies:'بدون نیاز به اشتراک',
+      trending_movies:'ترندترین‌ها',pwa_latest_movies:'جدیدترین فیلم‌ها',pwa_latest_series:'جدیدترین سریال‌ها',
+      pwa_dubbed_movies:'فیلم‌های دوبله فارسی',pwa_dubbed_series:'سریال‌های دوبله فارسی'})[rail.key] || rail.title;
+  }
   function home(data, history = []) {
     const order = [
       'trending_movies', 'genres', 'continue_watching', 'pwa_turkish_series', 'pwa_free_movies',
@@ -156,9 +161,9 @@ window.PWA = (() => {
       const key = rail.key || 'pwa_latest_movies';
       if (key === 'pwa_free_series' || !rail.items.length) continue;
       const wide = key === 'pwa_free_movies';
-      const heading = ({pwa_turkish_series: 'سریال‌های ترکیه‌ای', pwa_free_movies: 'بدون نیاز به اشتراک',
-        trending_movies: 'ترندترین‌ها'})[key] || rail.title;
-      const link = '#/browse/' + (key.includes('series') ? 'series' : 'movie');
+      const heading = railTitle(rail);
+      const kind = key.includes('series') ? 'series' : ['pwa_recommended','animations'].includes(key) ? 'all' : 'movie';
+      const link = '#/browse/' + kind + '?rail=' + encodeURIComponent(key);
       sections.set(key, '<section class="dm54-section' + (wide ? ' dm54-free dm54-horizontal-section' : '') +
         '"><div class="dm54-head"><h2>' + esc(heading) + '</h2><a href="' + link +
         '">بیشتر</a></div><div class="' + (wide ? 'dm54-htrack' : 'dm54-vtrack') + '">' +
@@ -235,7 +240,7 @@ window.PWA = (() => {
       (series ? '<div class="film-download-pickers"><label>فصل<select id="download-season"></select></label>' +
         '<label>قسمت<select id="download-episode"></select></label></div>' : '') +
       '<div class="film-download-tabs"><button type="button" data-download-tab="subbed" aria-pressed="true">نسخه زیرنویس</button><button type="button" data-download-tab="dubbed" aria-pressed="false">نسخه دوبله</button></div>' +
-      '<div class="film-download-content">' + filmDownloadPanels(options, series) + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 2h8a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm4 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm5.6-3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 3.1a1 1 0 0 0-1-.2L2.3 10.1c-1 .4-1 1 .1 1.3l4.8 1.5 11-7c.5-.3.8-.1.4.3l-9 8.3 6.7 5c.8.6 1.4.3 1.6-.7l3.9-14.4c.2-.6.2-1 0-1.3Z"/></svg>کانال تلگرام ما</button></div></dialog>';
+      '<p class="film-download-status" role="status" hidden></p><div class="film-download-content">' + filmDownloadPanels(options, series) + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 2h8a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm4 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm5.6-3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 3.1a1 1 0 0 0-1-.2L2.3 10.1c-1 .4-1 1 .1 1.3l4.8 1.5 11-7c.5-.3.8-.1.4.3l-9 8.3 6.7 5c.8.6 1.4.3 1.6-.7l3.9-14.4c.2-.6.2-1 0-1.3Z"/></svg>کانال تلگرام ما</button></div></dialog>';
   }
 
   const reportReasons = ['پخش فیلم یا سریال انجام نمی‌شود','لینک دانلود خراب است','مشکل در زیرنویس',
@@ -604,5 +609,5 @@ window.PWA = (() => {
       '<circle class="pull-refresh-track" cx="20" cy="20" r="17"/><circle class="pull-refresh-progress" cx="20" cy="20" r="17" pathLength="100"/></svg>' +
       '<svg class="pull-refresh-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 10a7.6 7.6 0 1 0-1.6 7.1M19.5 5.5V10H15"/></svg></div>';
   }
-  return {activityIndicator, card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, continueWatching, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page, setDisclosure, animateHeight, animateDetails};
+  return {activityIndicator, railTitle, card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, continueWatching, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page, setDisclosure, animateHeight, animateDetails};
 })();

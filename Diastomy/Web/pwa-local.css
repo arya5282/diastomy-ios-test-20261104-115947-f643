@@ -1627,7 +1627,7 @@ body #app .local-room-detail .mr-room-body{display:flex;flex-direction:column;ju
 #app .local-room-detail .local-room-chat header{background:#191c27;border-color:#333742}
 
 html:has(body[data-page=local-title]),body[data-page=local-title]{overscroll-behavior-y:none}
-body[data-page=local-title] #toast.app-notice{top:calc(env(safe-area-inset-top,0px) + 60px)}
+body[data-page=local-title] #toast.app-notice{top:calc(env(safe-area-inset-top,0px) + 60px);bottom:auto}
 html.dmf3-active body[data-page=local-account] .dmf3-root{
   background:radial-gradient(ellipse 105% 35% at 0 0,#2b1018 0%,transparent 75%),
     radial-gradient(ellipse 105% 38% at 100% 100%,#281018 0%,transparent 78%),#101118!important;
@@ -1704,9 +1704,11 @@ body:not(:is([data-page=home],[data-page=local-title])) .pull-refresh,.pull-refr
   .pull-refresh-face{transition:color 160ms ease,box-shadow 180ms ease}
   .pull-refresh:not([hidden]) .pull-refresh-face{animation:pull-refresh-in 180ms cubic-bezier(.22,.75,.22,1)}
   :is(.pull-refresh,.local-player-loading)[data-phase=refreshing] .pull-refresh-ring{animation:pull-refresh-spin 850ms linear infinite}
+  .local-player-loading[data-phase=refreshing] .pull-refresh-arrow{animation:player-refresh-spin 850ms linear infinite}
 }
 @keyframes pull-refresh-in{from{opacity:0;scale:.84}to{opacity:1;scale:1}}
 @keyframes pull-refresh-spin{to{rotate:270deg}}
+@keyframes player-refresh-spin{to{rotate:360deg}}
 
 body:is([data-page=local-profile],[data-page=local-subscription],[data-page=local-payments],[data-page=local-notifications],[data-page=local-settings],[data-page=local-followed-actors],[data-page=local-account]){
   --account-bg:#101118;--account-card:#151823;--account-edge:#303440;--account-row-height:38px;
@@ -1999,3 +2001,41 @@ body #connection.app-notice,body #toast.app-notice{
   width:min(calc(100% - 42px),290px);min-height:31px;border-color:#343946;background:#12151f;
 }
 body #connection.app-notice .app-notice-message,body #toast.app-notice .app-notice-message{font-weight:550}
+
+#app .archive-reference-sort{min-height:28px;gap:6px}
+.archive-sort-control{position:relative;display:inline-grid;align-items:center}
+.archive-sort-control::after{
+  content:"";position:absolute;inset-inline-end:9px;width:5px;height:5px;
+  border:solid #a6acbb;border-width:0 1.5px 1.5px 0;rotate:45deg;pointer-events:none;
+}
+#app .archive-reference-sort select{
+  appearance:none;min-height:27px;padding:3px 8px 3px 22px;
+  border-radius:999px;background:#1a1e2a;font-size:10px;
+}
+#app .film-download-pickers select[hidden]{display:none}
+#app .film-download-pickers .filter-choice-toggle{
+  min-height:32px;padding:4px 8px 4px 20px;position:relative;
+  border:1px solid #393e4c;border-radius:10px;background:#1a1e2a;color:#fff;text-align:start;font-size:11px;
+}
+#app .film-download-pickers .filter-choice-toggle::after{left:9px;transition:rotate 150ms ease}
+#app .film-download-pickers .filter-choice-toggle[aria-expanded=true]::after{rotate:180deg}
+#app .film-download-pickers .filter-choice-list{
+  display:grid;max-height:112px;padding:3px;gap:3px;background:#171a24;border:1px solid #393e4c;
+}
+#app .film-download-pickers .filter-choice-list[hidden]{display:none}
+#app .film-download-pickers .filter-choice-list button{
+  min-height:30px;padding:3px 7px;border:0;border-radius:7px;background:transparent;color:#e5e6ee;text-align:start;font-size:11px;
+}
+#app .film-download-pickers .filter-choice-list [aria-pressed=true]{background:#381822;color:#ff9198}
+#app .film-download-status{
+  margin:0 0 8px;padding:5px 8px;border-radius:8px;background:#202431;color:#e0e3eb;font-size:10px;
+}
+
+.local-room-chat #room-chat{display:flex;flex-direction:column;gap:7px;overscroll-behavior:contain}
+.room-chat-message{gap:2px;flex:none}
+.room-chat-message strong{padding-inline:7px;color:#c2c7d6;font-size:10px;font-weight:600}
+.room-chat-message .local-support-bubble{padding:5px 9px;border-radius:12px}
+.room-chat-message.mine .local-support-bubble{border-bottom-right-radius:4px}
+.room-chat-message.operator .local-support-bubble{border-bottom-left-radius:4px}
+.room-chat-message small{display:flex;align-items:center;gap:4px;padding-inline:5px;color:#b1b5c3;font-size:9px}
+.room-chat-message .support-delivery svg{width:12px;height:12px}

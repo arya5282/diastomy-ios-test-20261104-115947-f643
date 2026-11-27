@@ -214,7 +214,7 @@
     closeWithMotion(dialog, event.submitter?.value);
   });
   document.addEventListener('cancel', event => {
-    if (!(event.target instanceof HTMLDialogElement)) return;
+    if (!(event.target instanceof HTMLDialogElement) || event.target.querySelector('.filter-choice-toggle[aria-expanded=true]')) return;
     event.preventDefault();
     closeWithMotion(event.target);
   }, true);
@@ -416,6 +416,7 @@
           button.onclick = event => {
             event.preventDefault();
             select.value = option.value;
+            select.dispatchEvent(new Event('change', {bubbles:true}));
             update();
             closeMenu();
             toggle.focus();
@@ -435,7 +436,7 @@
       toggle.focus();
     });
     form.closest('dialog').addEventListener('close', closeMenu);
-    return () => refresh.forEach(update => update());
+    return () => { closeMenu(); refresh.forEach(update => update()); };
   }
   function openFilters() {
     const dialog = $('#local-filters');
@@ -597,15 +598,20 @@
   }
   async function browse(seq, kind, params) {
     const route = '#/browse/' + enc(kind);
+    const railKey = params.get('rail');
+    const paginatedRail = ['pwa_latest_movies','pwa_latest_series','pwa_dubbed_movies','pwa_dubbed_series'].includes(railKey);
+    const editorialRail = railKey && !paginatedRail;
     const similarSource = params.get('similar')?.match(/^(movie|series)\/([^/]+)$/);
     const titles = state.user?.language === 'en'
       ? {movie:'Movies', series:'Series', all:'Movies and series'}
       : {movie:'آرشیو فیلم‌ها', series:'آرشیو سریال‌ها', all:'آرشیو فیلم و سریال'};
     mount('<section class="archive-reference-shell"><header class="archive-reference-header"><a href="#/home" aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</a><h1 data-dm-archive-title dir="auto">' +
-      esc(titles[kind] || titles.all) + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">' + PWA_SOURCE.actorMenu + '</button></header>' +
-      '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><select id="sort">' +
-      '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="most_viewed">پربازدیدترین</option>' +
-      '<option value="highest_rating">بالاترین امتیاز</option></select></div><div id="catalogue"><div class="loading"></div></div></section>');
+      esc(paginatedRail ? PWA.railTitle({key:railKey}) : (titles[kind] || titles.all)) + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">' + PWA_SOURCE.actorMenu + '</button></header>' +
+      '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><span class="archive-sort-control"><select id="sort">' +
+      (editorialRail ? '<option value="editorial">ترتیب مجموعه</option>' : '') +
+      '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option>' +
+      (editorialRail ? '' : '<option value="most_viewed">پربازدیدترین</option>') +
+      '<option value="highest_rating">بالاترین امتیاز</option></select></span></div><div id="catalogue"><div class="loading"></div></div></section>');
     if (similarSource) {
       const [, sourceKind, sourceSlug] = similarSource;
       $('.archive-reference-header a').href = '#/title/' + sourceKind + '/' + enc(sourceSlug) + '?tab=similar';
@@ -622,13 +628,36 @@
       } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
       return;
     }
-    $('#sort').value = params.get('sort') || 'newest';
+    $('#sort').value = params.get('sort') || (editorialRail ? 'editorial' : 'newest');
     $('#sort').onchange = event => {
       params.set('sort', event.target.value);
       params.delete('page');
       location.hash = route + '?' + params;
     };
+    if (editorialRail) {
+      try {
+        const data = await api('/api/app/v1/home/', {cache:true});
+        whenCurrent(seq, () => {
+          const rail = data.rails?.find(rail => rail.key === railKey || (!rail.key && railKey === 'pwa_latest_movies'));
+          if (!rail) { $('#catalogue').innerHTML = empty('این مجموعه در دسترس نیست.'); return; }
+          $('[data-dm-archive-title]').textContent = PWA.railTitle(rail);
+          const items = [...rail.items];
+          const order = $('#sort').value;
+          if (order === 'highest_rating') items.sort((a,b) => (Number(b.imdb_rating) || 0) - (Number(a.imdb_rating) || 0));
+          if (order === 'newest' || order === 'oldest') {
+            const direction = order === 'newest' ? -1 : 1;
+            items.sort((a,b) => direction * ((Number(a.production_year) || 0) - (Number(b.production_year) || 0)));
+          }
+          $('#catalogue').innerHTML = items.length ? '<div class="archive-reference-grid">' +
+            items.map(item => '<article class="archive-reference-card">' + PWA.homePoster(item) + '</article>').join('') +
+            '</div>' : empty('عنوانی پیدا نشد.');
+        });
+      } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
+      return;
+    }
     const query = new URLSearchParams(params);
+    query.delete('rail');
+    if (paginatedRail && railKey.startsWith('pwa_dubbed_')) query.set('lang','dubbed');
     query.set('type', kind || 'all');
     try {
       const data = await api('/movie/api/filter/?' + query, { cache: true });
@@ -784,8 +813,8 @@
           whenCurrent(seq, () => {
             $('#title-report-form').reset();
             output.textContent = '';
-            closeWithMotion(report);
-            toast('گزارش برای پشتیبانی ارسال شد.', 'success');
+            closeWithMotion(report, undefined, () =>
+              whenCurrent(seq, () => toast('گزارش برای پشتیبانی ارسال شد.', 'success')));
           });
         });
         const season = $('#series-season');
@@ -896,6 +925,7 @@
           });
           const downloadSeason = $('#download-season');
           const downloadEpisode = $('#download-episode');
+          let refreshDownloadChoices;
           const available = episodeList.filter(entry => entry.download_options?.length);
           const variantInUse = () => downloadOptions.querySelector('[data-download-tab][aria-pressed=true]').dataset.downloadTab;
           const resetEpisodes = number => {
@@ -923,12 +953,15 @@
             } else {
               selectDownloadTab(variant);
             }
+            refreshDownloadChoices?.();
             downloadOptions.showModal();
           };
           if (downloadSeason) {
             const seasons = [...new Set(available.map(entry => entry.season))];
             downloadSeason.replaceChildren(...seasons.map(season => new Option('فصل ' + season, season)));
-            downloadSeason.onchange = () => { resetEpisodes(); renderEpisodeDownloads(variantInUse()); };
+            resetEpisodes();
+            refreshDownloadChoices = installFilterChoices(downloadOptions.querySelector('.film-download-pickers'));
+            downloadSeason.onchange = () => { resetEpisodes(); renderEpisodeDownloads(variantInUse()); refreshDownloadChoices(); };
             downloadEpisode.onchange = () => renderEpisodeDownloads(variantInUse());
             $('#series-episodes')?.addEventListener('click', event => {
               const trigger = event.target.closest('[data-episode-download]');
@@ -952,16 +985,43 @@
             }
           });
         }
+        let downloading = false;
         $('.movie-detail-shell').addEventListener('click', async event => {
           const button = event.target.closest('[data-download]');
-          if (!button || button.disabled) return;
+          if (!button || button.disabled || downloading) return;
+          const status = downloadOptions.querySelector('.film-download-status');
+          const bytes = crypto.getRandomValues(new Uint8Array(16));
+          bytes[6] = (bytes[6] & 15) | 64;
+          bytes[8] = (bytes[8] & 63) | 128;
+          const token = Array.from(bytes, (byte, index) =>
+            ([4,6,8,10].includes(index) ? '-' : '') + byte.toString(16).padStart(2,'0')).join('');
+          downloading = true;
           button.disabled = true;
+          button.setAttribute('aria-busy','true');
+          status.hidden = false;
+          status.textContent = 'در حال آماده‌سازی دانلود…';
+          const progress = setInterval(async () => {
+            try {
+              const data = await native({action:'downloadProgress',token});
+              if (!downloading || !status.isConnected || !data?.received) return;
+              const format = new Intl.NumberFormat('fa', {maximumFractionDigits:0});
+              status.textContent = data.expected > 0 ? 'در حال دانلود · ' +
+                format.format(Math.min(99, Math.floor(100 * data.received / data.expected))) + '٪' :
+                'در حال دانلود · ' + format.format(data.received / 1048576) + ' مگابایت';
+            } catch (_) {}
+          }, 700);
           try {
             const action = kind === 'series' ? 'downloadSeries' : 'downloadMovie';
-            const result = await native({action, slug, id:Number(button.dataset.download), dubbed:button.dataset.variant === "dubbed"});
-            toast(result.ok ? 'فایل در برنامه Files ذخیره شد.' : result.error);
-          } catch (error) { toast(error); }
-          finally { button.disabled = false; }
+            const result = await native({action, slug, id:Number(button.dataset.download), dubbed:button.dataset.variant === "dubbed",token});
+            status.textContent = result.ok ? 'فایل در برنامه Files ذخیره شد.' : (result.error || 'دانلود ناموفق بود.');
+            if (!downloadOptions.open && seq === state.sequence) toast(status.textContent, result.ok ? 'success' : 'error');
+          } catch (error) { status.textContent = error.message; }
+          finally {
+            downloading = false;
+            clearInterval(progress);
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+          }
         });
         const bookmark = $('#bookmark');
         let bookmarkTouched = false;
@@ -2385,7 +2445,7 @@
         PWAPlayer.open({
           info:{...roomSource, position:position(), target:null}, groups:[], group:0, kind:'movie',
           id:quality, room:code, native, onError:toast, save:() => {}, initialVolume:player.muted ? 0 : player.volume, roomSubtitleMode:subtitleMode, roomAudio,
-          roomControl:data.is_host ? sendControl : undefined,
+          roomControl:data.is_host ? sendControl : undefined, roomChat:$('.local-room-chat'),
           onClose:() => { nativeFallback = false; if (seq === state.sequence) sync(); }
         });
       }
@@ -2439,10 +2499,16 @@
       document.querySelectorAll('.local-room-reactions button').forEach(button => {
         button.onclick = () => { $('#room-chat-form input').value += button.textContent; $('#room-chat-form input').focus(); };
       });
-      submit('room-chat-form', async body => {
-        const result = await native({action:'roomSend',message:{type:'chat',text:body.text}});
+      submit('room-chat-form', async (body, output) => {
+        const text = body.text.trim();
+        if (!text) { output.textContent = ''; return; }
+        const result = await native({action:'roomSend',message:{type:'chat',text}});
         if (!result.ok) throw Error('ارسال پیام ناموفق بود.');
-        whenCurrent(seq, () => { $('#room-chat-form input').value = ''; });
+        whenCurrent(seq, () => {
+          const field = $('#room-chat-form input');
+          if (field.value === body.text) field.value = '';
+          output.textContent = '';
+        });
       });
       document.querySelectorAll('[data-control]').forEach(button => button.onclick = () => {
         const control = button.dataset.control;
@@ -2474,9 +2540,26 @@
   window.addEventListener('diastomy-room', event => {
     if (!state.roomCode || !$('#room-chat')) return;
     const data = event.detail;
-    const message = m => '<div class="message"><small>' + esc(m.name) + '</small><p>' + esc(m.text) + '</p></div>';
-    if (data.type === 'history') $('#room-chat').innerHTML = data.messages.map(message).join('');
-    if (data.type === 'chat') $('#room-chat').insertAdjacentHTML('beforeend', message(data.message));
+    const log = $('#room-chat');
+    const message = m => {
+      const mine = state.user?.id != null && String(m.user_id) === String(state.user.id);
+      const time = new Date(m.ts);
+      return '<article class="local-support-message room-chat-message ' + (mine ? 'mine' : 'operator') + '">' +
+        (mine ? '' : '<strong dir="auto">' + esc(m.name) + '</strong>') +
+        '<p class="local-support-bubble" dir="auto">' + esc(m.text) + '</p><small dir="ltr">' +
+        (Number.isNaN(time.valueOf()) ? '' : esc(time.toLocaleTimeString('fa', {hour:'2-digit',minute:'2-digit'}))) +
+        (mine ? ' <span class="support-delivery" role="img" aria-label="ارسال‌شده"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 12 5 5L21 5"/></svg></span>' : '') +
+        '</small></article>';
+    };
+    if (data.type === 'history' || data.type === 'chat') {
+      const follow = data.type === 'history' || log.scrollHeight - log.clientHeight - log.scrollTop < 50;
+      if (data.type === 'history') log.innerHTML = data.messages.map(message).join('');
+      else {
+        if (!log.querySelector('.room-chat-message')) log.replaceChildren();
+        log.insertAdjacentHTML('beforeend', message(data.message));
+      }
+      if (follow || (data.type === 'chat' && String(data.message.user_id) === String(state.user?.id))) log.scrollTop = log.scrollHeight;
+    }
     if (data.type === 'presence') $('#room-status').textContent = data.users.length + ' کاربر آنلاین';
     if (data.type === 'error') { $('#room-status').textContent = 'اتصال قطع شد'; toast(data.message, 'error'); }
     if (state.handleRoomState) state.handleRoomState(data);
