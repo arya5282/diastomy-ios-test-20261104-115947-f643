@@ -570,6 +570,11 @@ body[data-page=my-library] #app .library-tabs{margin:0 0 32px!important}
 body[data-page=my-library] #app .library-tabs button{padding:14px 2px!important;font-size:14px;line-height:24px}
 body[data-page=my-library] #app .library-history-meta{display:flex;direction:ltr;align-items:center;justify-content:space-between;margin-top:3px;color:#ccc;font:9px/18px Arial,sans-serif}
 body[data-page=my-library] #app .library-history-meta small{font:inherit}
+body[data-page=local-continue-watching] #app .pwa-internal{width:min(100%,720px);margin-inline:auto}
+#continue-watching-list .library-history-card{margin:0;min-width:0}
+#continue-watching-list .library-history-thumb{height:auto}
+#continue-watching-list .library-history-meta{display:flex;direction:ltr;align-items:center;justify-content:space-between;margin-top:3px}
+#continue-watching-list .library-remove{min-width:36px;min-height:36px}
 #app .library-history-thumb .local-history-mark{width:27px;height:24px;right:7px;bottom:12px;pointer-events:none}
 #app .local-library-progress{direction:ltr;appearance:none;-webkit-appearance:none;inset:auto 7px 5px;width:calc(100% - 14px);height:2px;border:0;border-radius:3px;overflow:hidden;background:#aaa}
 #app .local-library-progress::-webkit-progress-bar{background:#aaa}
@@ -601,43 +606,49 @@ html.dmf3-active body[data-page=my-library] #app .local-library-saved .dm54-post
   }
 }
 #app .film-download-dialog{
-  box-sizing:border-box;width:min(264px,calc(100% - 32px));max-height:min(340px,calc(100dvh - 40px));
-  margin:auto;padding:12px 19px 19px;overflow:hidden;border:1px solid var(--title-dialog-border);border-radius:16px;
-  background:var(--title-dialog-bg);color:white;
+  box-sizing:border-box;width:min(352px,calc(100% - 32px));max-height:calc(100dvh - 40px);
+  margin:auto;padding:16px;overflow:auto;overscroll-behavior:contain;
+  border:1px solid var(--title-dialog-border);border-radius:20px;
+  background:var(--title-dialog-bg);color:white;box-shadow:0 20px 60px #0007;
 }
-.film-download-dialog::backdrop{background:var(--title-dialog-backdrop);backdrop-filter:blur(2px)}
+.film-download-dialog::backdrop{background:var(--title-dialog-backdrop);backdrop-filter:blur(4px)}
 #app .film-download-dialog[open]{display:flex;flex-direction:column}
-#app .film-download-heading{position:relative;flex:none;margin-bottom:8px}
-#app .film-download-heading form{margin:0;padding:0}
-#app .film-download-dialog h2{margin:0 0 0 30px;text-align:right;font-size:12px;font-weight:600;line-height:24px;outline:none}
+#app .film-download-heading{display:flex;align-items:center;justify-content:space-between;flex:none;margin-bottom:12px}
+#app .film-download-heading form{order:1;margin:0;padding:0}
+#app .film-download-dialog h2{margin:0;text-align:right;font-size:16px;font-weight:650;line-height:24px;outline:none}
 #app .film-download-dialog .film-download-close{
-  position:absolute;top:50%;left:-4px;translate:0 -50%;width:32px;height:32px;min-height:0;
-  padding:0;border:0;border-radius:8px;background:none;color:white;display:grid;place-items:center;
+  width:44px;height:44px;padding:0;border:1px solid #343744;border-radius:12px;
+  background:#1b1e29;color:#f5f5f7;display:grid;place-items:center;
 }
-#app .film-download-close svg{display:block;width:17px;height:17px}
-#app .film-download-tabs{display:flex;flex:none;margin-bottom:11px;border:1px solid #343744;border-radius:999px;background:#171a24}
+#app .film-download-close svg{display:block;width:18px;height:18px}
+#app .film-download-tabs{
+  display:flex;flex:none;gap:4px;padding:3px;margin-bottom:12px;
+  border:1px solid #343744;border-radius:13px;background:#171a24;
+}
 #app .film-download-tabs button{
-  flex:1;min-height:28px;padding:4px;border:1px solid transparent;border-radius:999px;
-  background:none;color:#b9bbc4;font-size:9px;transition:background-color 170ms,color 170ms;
+  flex:1;min-height:44px;padding:4px;border:1px solid transparent;border-radius:9px;
+  background:none;color:#b9bbc4;font-size:12px;transition:background-color 170ms,color 170ms;
 }
-#app .film-download-tabs [aria-pressed=true]{background:#e00000;border-color:#ff5656;color:white}
-#app .film-download-content{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
+#app .film-download-tabs [aria-pressed=true]{background:#381822;border-color:#72313b;color:#ffabb0}
+#app .film-download-content{min-height:84px;max-height:min(310px,42dvh);overflow:auto;overscroll-behavior:contain}
 #app .film-download-card{
-  display:grid;gap:4px;margin:0 0 7px;padding:8px 9px;border:1px solid #303441;border-radius:9px;
+  display:grid;gap:6px;margin:0 0 7px;padding:10px;border:1px solid #303441;border-radius:12px;
   background:#171a24;text-align:left;
 }
 #app .film-download-card:last-child{margin-bottom:0}
 #app .film-download-meta{display:grid;justify-items:start;gap:2px}
-#app .film-download-meta strong{color:#ff666b;font-size:10px;font-weight:600}
+#app .film-download-card .film-download-meta strong{color:#ff858a;font-size:13px;font-weight:650}
 #app .film-download-number{font-family:"PWA Inter",Arial,sans-serif}
-#app .film-download-card small,#app .film-download-format,#app .film-download-empty{color:#a7a9b5;font-size:9px}
+#app .film-download-card small,#app .film-download-format,#app .film-download-empty{color:#b4b8c5;font-size:11px}
 #app .film-download-format{display:flex;justify-content:space-between}
+#app .film-download-empty{margin:0;padding:14px;border:1px solid #303441;border-radius:12px}
 #app .film-download-card button{
-  display:flex;justify-content:center;align-items:center;gap:5px;min-height:28px;padding:3px 8px;
-  border:1px solid #383d4b;border-radius:999px;background:#171a24;color:#fff;font-size:9px;
+  display:flex;justify-content:center;align-items:center;gap:6px;min-height:44px;padding:4px 8px;
+  border:1px solid #383d4b;border-radius:9px;background:#202431;color:#fff;font-size:12px;
 }
-#app .film-download-card button svg{width:14px;height:14px;flex:none}
-#app .film-download-dialog :is(button):focus-visible{outline:2px solid #eee;outline-offset:-2px}
+#app .film-download-card button svg{width:15px;height:15px;flex:none}
+#app .film-download-dialog[data-downloading] [data-download]{opacity:.55;cursor:progress}
+#app .film-download-dialog button:focus-visible{outline:2px solid #eee;outline-offset:-2px}
 @media(prefers-reduced-motion:reduce){#app .film-download-tabs button{transition:none}}
 #route-loading[hidden]{display:none}
 #route-loading{position:fixed;inset:0;z-index:1100;display:grid;place-items:center;background:#10131c;animation:route-slide-in 220ms ease-out}
@@ -745,8 +756,6 @@ body[data-page=archive-reference] .dmf3-root #app{padding:0 0 calc(100px + env(s
 #app .archive-reference-header h1{font:650 16px/24px "PWA Yekan","PWA Inter",Arial,sans-serif}
 #app .archive-reference-header :is(a,button){display:grid;place-items:center;width:44px;height:44px;border:0;background:none;padding:0}
 #app .archive-reference-header svg{display:block;width:22px;height:22px}
-#app .archive-reference-sort{min-height:34px;height:auto;justify-content:flex-start;gap:8px;margin:0 0 13px;color:#aaa;font-size:11px}
-#app .archive-reference-sort select{width:auto;min-height:32px;padding:4px 9px;border:1px solid #323232;border-radius:9px;background:#141414;color:#eee;font:inherit}
 #app .archive-reference-grid{grid-template-columns:repeat(3,minmax(0,1fr));direction:ltr;gap:18px clamp(11px,3.6vw,18px)}
 #app .archive-reference-card .dm54-poster{height:auto;aspect-ratio:3/4}
 #app .archive-reference-card .dm54-vmeta strong{font-size:11px;line-height:15px}
@@ -1533,7 +1542,6 @@ html.dmf3-active body[data-page=local-title]:has(.movie-detail-shell){
 #app #title-comment-emojis:not([hidden]){display:flex;gap:4px;margin-top:6px}
 #app #title-comment-emojis button{padding:3px 6px;background:#1a1e2a;border:1px solid #393d49;border-radius:8px}
 #app .movie-detail-shell .film-download-card .film-download-meta{justify-items:left;text-align:left}
-#app .movie-detail-shell .film-download-card .film-download-meta strong{color:#fa5157;font-size:11px}
 #app .film-download-social button{min-width:88px;font-size:9px;min-height:28px}
 #app .film-download-social svg{width:15px;height:15px}
 #app .film-download-social [data-social=telegram]{background:#04a7ed}
@@ -1666,12 +1674,10 @@ body[data-page=local-account] #dm-app-menu #logout{color:#e1454c}
   border:1px solid #343946;border-radius:50%;background:#282b34;color:#fff;
 }
 #app .reference-episode-head .reference-episode-download:active{background:#421921;color:#ff585d}
-#app .film-download-pickers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}
-#app .film-download-pickers label{display:grid;gap:3px;color:#b6b9c3;font-size:10px}
-#app .film-download-pickers select{
-  width:100%;min-width:0;min-height:31px;padding:2px 5px;
-  background:#171a24;color:#fff;border:1px solid #343744;border-radius:7px;font-size:12px;
+#app .film-download-pickers{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;flex:none;gap:8px;margin-bottom:12px;
 }
+#app .film-download-field{position:relative;display:grid;gap:4px;color:#b6b9c3;font-size:11px}
 
 html,body{overflow-x:hidden;overflow-x:clip;overscroll-behavior:none}
 body .dmf3-root{overflow-x:clip}
@@ -1704,7 +1710,7 @@ body:not(:is([data-page=home],[data-page=local-title])) .pull-refresh,.pull-refr
   .pull-refresh-face{transition:color 160ms ease,box-shadow 180ms ease}
   .pull-refresh:not([hidden]) .pull-refresh-face{animation:pull-refresh-in 180ms cubic-bezier(.22,.75,.22,1)}
   :is(.pull-refresh,.local-player-loading)[data-phase=refreshing] .pull-refresh-ring{animation:pull-refresh-spin 850ms linear infinite}
-  .local-player-loading[data-phase=refreshing] .pull-refresh-arrow{animation:player-refresh-spin 850ms linear infinite}
+  :is(.pull-refresh-inline,.local-player-loading)[data-phase=refreshing] .pull-refresh-arrow{animation:player-refresh-spin 850ms linear infinite}
 }
 @keyframes pull-refresh-in{from{opacity:0;scale:.84}to{opacity:1;scale:1}}
 @keyframes pull-refresh-spin{to{rotate:270deg}}
@@ -1853,8 +1859,6 @@ body[data-page=archive-reference] .dmf3-root{background:#10131c}
 #app .archive-reference-header a{justify-self:start}
 #app .archive-reference-header button{justify-self:end}
 #app .archive-reference-header a svg{width:24px;height:24px;stroke-linecap:round;stroke-linejoin:round}
-#app .archive-reference-sort:not([hidden]){direction:rtl}
-#app .archive-reference-sort select{background:#171a24;border-color:#343946}
 #app .archive-reference-grid{
   grid-template-columns:repeat(3,minmax(0,27%));justify-content:space-between;
   column-gap:0;row-gap:clamp(18px,5.6vw,27px);
@@ -2002,33 +2006,78 @@ body #connection.app-notice,body #toast.app-notice{
 }
 body #connection.app-notice .app-notice-message,body #toast.app-notice .app-notice-message{font-weight:550}
 
-#app .archive-reference-sort{min-height:28px;gap:6px}
-.archive-sort-control{position:relative;display:inline-grid;align-items:center}
-.archive-sort-control::after{
-  content:"";position:absolute;inset-inline-end:9px;width:5px;height:5px;
-  border:solid #a6acbb;border-width:0 1.5px 1.5px 0;rotate:45deg;pointer-events:none;
+#app .archive-reference-sort{
+  display:flex;align-items:center;justify-content:flex-start;direction:rtl;height:auto;margin:-6px 0 5px;
 }
-#app .archive-reference-sort select{
-  appearance:none;min-height:27px;padding:3px 8px 3px 22px;
-  border-radius:999px;background:#1a1e2a;font-size:10px;
+#app .archive-reference-sort[hidden],#app .archive-sort-control select[hidden]{display:none}
+.archive-sort-control{position:relative;display:inline-grid}
+#app .archive-sort-control .filter-choice-toggle{
+  position:relative;isolation:isolate;width:auto;min-height:44px;padding:0 11px 0 25px;
+  border:0;background:none;color:#eceef4;font-size:12px;font-weight:600;text-align:start;white-space:nowrap;
 }
+#app .archive-sort-control .filter-choice-toggle::before{
+  content:"";position:absolute;z-index:-1;inset:8px 0;border-radius:999px;
+  background:#1b1e29;border:1px solid #343946;transition:background-color 150ms,border-color 150ms;
+}
+#app .archive-sort-control .filter-choice-toggle::after{left:11px;transition:rotate 150ms}
+#app .archive-sort-control .filter-choice-toggle[aria-expanded=true]::before{background:#24212d;border-color:#74505e}
+#app .archive-sort-control .filter-choice-toggle[aria-expanded=true]::after{rotate:180deg}
+#app .archive-sort-control .filter-choice-list{
+  position:absolute;z-index:5;inset-inline-start:0;top:calc(100% - 5px);width:max-content;min-width:148px;
+  display:grid;max-height:min(196px,55dvh);gap:2px;padding:4px;overscroll-behavior:contain;
+  border:1px solid #3b4050;border-radius:12px;background:#1a1e2a;box-shadow:0 10px 24px #0008;
+}
+#app .archive-sort-control .filter-choice-list[hidden]{display:none}
+#app .archive-sort-control .filter-choice-list button{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:0 9px;
+  border:0;border-radius:8px;background:transparent;color:#e5e6ee;text-align:start;font-size:12px;white-space:nowrap;
+}
+#app .archive-sort-control .filter-choice-list [aria-pressed=true]{background:#381822;color:#ffabb0}
+#app .archive-sort-control .filter-choice-list [aria-pressed=true]::after{
+  content:"";width:6px;height:10px;margin-inline:3px;border:solid currentColor;
+  border-width:0 1.5px 1.5px 0;transform:rotate(45deg);
+}
+#app .archive-sort-control button:focus-visible{outline:2px solid #ffabb0;outline-offset:-2px}
 #app .film-download-pickers select[hidden]{display:none}
 #app .film-download-pickers .filter-choice-toggle{
-  min-height:32px;padding:4px 8px 4px 20px;position:relative;
-  border:1px solid #393e4c;border-radius:10px;background:#1a1e2a;color:#fff;text-align:start;font-size:11px;
+  min-height:44px;padding:4px 10px 4px 26px;position:relative;
+  border:1px solid #393e4c;border-radius:10px;background:#1a1e2a;color:#fff;text-align:start;font-size:13px;
 }
-#app .film-download-pickers .filter-choice-toggle::after{left:9px;transition:rotate 150ms ease}
+#app .film-download-pickers .filter-choice-toggle::after{left:12px;transition:rotate 150ms ease}
+#app .film-download-pickers .filter-choice-toggle[aria-expanded=true]{border-color:#a64751}
 #app .film-download-pickers .filter-choice-toggle[aria-expanded=true]::after{rotate:180deg}
 #app .film-download-pickers .filter-choice-list{
-  display:grid;max-height:112px;padding:3px;gap:3px;background:#171a24;border:1px solid #393e4c;
+  position:absolute;z-index:2;inset-inline:0;top:calc(100% + 4px);display:grid;
+  max-height:160px;padding:4px;gap:2px;overscroll-behavior:contain;background:#202431;border:1px solid #444959;
+  border-radius:12px;box-shadow:0 8px 24px #0008;
 }
 #app .film-download-pickers .filter-choice-list[hidden]{display:none}
 #app .film-download-pickers .filter-choice-list button{
-  min-height:30px;padding:3px 7px;border:0;border-radius:7px;background:transparent;color:#e5e6ee;text-align:start;font-size:11px;
+  min-height:44px;padding:3px 8px;border:0;border-radius:8px;background:transparent;color:#e5e6ee;text-align:start;font-size:12px;
 }
-#app .film-download-pickers .filter-choice-list [aria-pressed=true]{background:#381822;color:#ff9198}
-#app .film-download-status{
-  margin:0 0 8px;padding:5px 8px;border-radius:8px;background:#202431;color:#e0e3eb;font-size:10px;
+#app .film-download-pickers .filter-choice-list [aria-pressed=true]{background:#381822;color:#ffabb0}
+#app .film-download-feedback{
+  flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding:6px 10px;
+  border-radius:10px;background:#202431;color:#e0e3eb;font-size:12px;
+}
+#app .film-download-status{margin:0}
+#app .film-download-feedback[data-state=loading] .film-download-status{display:flex;align-items:center;gap:8px}
+#app .film-download-feedback[data-state=loading] .film-download-status::before{
+  content:"";width:13px;height:13px;flex:none;border:2px solid #ffffff26;border-top-color:#ff858a;
+  border-radius:50%;
+}
+@media(prefers-reduced-motion:no-preference){
+  #app .film-download-feedback[data-state=loading] .film-download-status::before{animation:film-download-spin 800ms linear infinite}
+}
+@keyframes film-download-spin{to{transform:rotate(360deg)}}
+#app .film-download-feedback[data-state=error]{color:#ffb1b5}
+#app .film-download-feedback[data-state=success]{color:#a7e6be}
+#app .film-download-retry{
+  flex:none;min-height:44px;padding:0 9px;border:0;border-radius:8px;background:#39212c;color:#ffd2d4;font-size:12px;
+}
+#app .film-download-feedback[hidden],#app .film-download-retry[hidden]{display:none}
+@media(max-height:500px){
+  #app .film-download-content{flex-shrink:0;max-height:200px}
 }
 
 .local-room-chat #room-chat{display:flex;flex-direction:column;gap:7px;overscroll-behavior:contain}

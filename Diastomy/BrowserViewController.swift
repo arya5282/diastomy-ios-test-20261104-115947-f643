@@ -8,7 +8,7 @@ import ImageIO
 
 // All documents, scripts, fonts and styles are shipped in Web/.
 // Only JSON APIs and explicitly authorized media use the network.
-final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate {
+final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScriptMessageHandler, WKScriptMessageHandlerWithReply, URLSessionTaskDelegate, AVPlayerViewControllerDelegate, AVPlayerItemLegibleOutputPushDelegate {
     var initialTabRoute = "home"
     var isSecondaryTab = false
     private var waitingForTabRoute = true
@@ -60,6 +60,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var startupDocumentCommitted = false
     private var inlineRoom: String?
     private var inlineLayer: AVPlayerLayer?
+    private var inlineCaptionOutput: AVPlayerItemLegibleOutput?
     private var inlineRoomItemStatus: NSKeyValueObservation?
     private var inlineGeneration = 0
     private var inlineRotated = false
@@ -172,7 +173,19 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         } else {
             slider = MPVolumeView(frame: .zero)
             slider.showsRouteButton = false
-            slider.tintColor = .systemRed
+            func trackImage(_ color: UIColor) -> UIImage {
+                UIGraphicsImageRenderer(size: CGSize(width: 7, height: 3)).image { _ in
+                    color.setFill()
+                    UIBezierPath(roundedRect: CGRect(x: 0, y: 0, width: 7, height: 3), cornerRadius: 1.5).fill()
+                }.resizableImage(withCapInsets: UIEdgeInsets(top: 0, left: 3, bottom: 0, right: 3))
+                    .withRenderingMode(.alwaysOriginal)
+            }
+            let playedTrack = trackImage(UIColor(red: 238.0 / 255, green: 0, blue: 0, alpha: 1))
+            let remainingTrack = trackImage(UIColor(white: 1, alpha: 0.38))
+            for state in [UIControl.State.normal, .highlighted] {
+                slider.setMinimumVolumeSliderImage(playedTrack, for: state)
+                slider.setMaximumVolumeSliderImage(remainingTrack, for: state)
+            }
             let thumbSize = CGSize(width: 24, height: 16)
             let thumb = UIGraphicsImageRenderer(size: thumbSize).image { context in
                 UIColor.white.setFill()
@@ -923,7 +936,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         config.httpCookieStorage = .shared
         config.httpShouldSetCookies = true
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        config.timeoutIntervalForRequest = 45
+        config.timeoutIntervalForRequest = 90
         config.timeoutIntervalForResource = 10_800
         return URLSession(configuration: config)
     }()
@@ -931,14 +944,24 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private func downloadVideo(kind: String, slug: String, id: Int, dubbed: Bool, token: String, completion: @escaping ([String: Any]) -> Void) {
         let variant = dubbed ? "dubbed/" : ""
         let url = URL(string: "/movie/\(kind)/\(slug)/download/\(id)/\(variant)", relativeTo: server)!.absoluteURL
-        // The existing Django download route checks the session before redirecting.
+        // The Django route validates the session and streams the media from its source.
         guard activeDownloads[token] == nil else {
             completion(["ok": false, "error": "این فایل در حال دانلود است."])
             return
         }
+        beginDownload(url: url, slug: slug, id: id, token: token, retriesRemaining: 1, completion: completion)
+    }
+
+    private func beginDownload(url: URL, slug: String, id: Int, token: String, retriesRemaining: Int,
+                               completion: @escaping ([String: Any]) -> Void) {
         let task = downloadsSession.downloadTask(with: url) { [weak self, documents] file, response, error in
+            let code = (response as? HTTPURLResponse)?.statusCode
+            let connectionError = (error as? URLError)?.code
+            let upstreamFailed = code == 502 || code == 503 || code == 504
+            let connectionInterrupted = connectionError == .timedOut || connectionError == .networkConnectionLost ||
+                connectionError == .cannotConnectToHost
             let result: [String: Any]
-            if let file = file, let http = response as? HTTPURLResponse,
+            if error == nil, let file = file, let http = response as? HTTPURLResponse,
                http.statusCode == 200, http.url?.scheme == "https",
                let mime = http.mimeType,
                mime.hasPrefix("video/") || ["application/octet-stream", "application/x-matroska", "application/matroska"].contains(mime),
@@ -950,21 +973,29 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
                     try FileManager.default.moveItem(at: file, to: documents.appendingPathComponent(name))
                     result = ["ok": true]
                 } catch {
-                    result = ["ok": false, "error": "ذخیرهٔ فایل ناموفق بود."]
+                    result = ["ok": false, "error": "ذخیرهٔ فایل ناموفق بود.", "retryable": false]
                 }
             } else {
-                let code = (response as? HTTPURLResponse)?.statusCode
+                let needsAccess = code == 401 || code == 403 || code == 302
                 let message: String
-                if code == 401 || code == 403 || code == 302 {
+                if needsAccess {
                     message = "برای دانلود، وضعیت ورود و اشتراک را بررسی کنید."
-                } else if (error as? URLError)?.code == .timedOut {
-                    message = "پاسخ منبع دانلود طول کشید. دوباره تلاش کنید."
+                } else if upstreamFailed || connectionError == .timedOut {
+                    message = "اتصال به منبع دانلود برقرار نشد."
+                } else if connectionError == .notConnectedToInternet || connectionError == .networkConnectionLost {
+                    message = "اتصال اینترنت قطع شد."
                 } else {
-                    message = "دریافت فایل ناموفق بود. دوباره تلاش کنید."
+                    message = "دریافت فایل ناموفق بود."
                 }
-                result = ["ok": false, "error": message]
+                result = ["ok": false, "error": message, "retryable": !needsAccess]
             }
             DispatchQueue.main.async {
+                if let self, let attempt = self.activeDownloads[token], retriesRemaining > 0,
+                   upstreamFailed || (connectionInterrupted && attempt.countOfBytesReceived == 0) {
+                    self.beginDownload(url: url, slug: slug, id: id, token: token,
+                                       retriesRemaining: retriesRemaining - 1, completion: completion)
+                    return
+                }
                 self?.activeDownloads.removeValue(forKey: token)
                 completion(result)
             }
@@ -1012,8 +1043,30 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         layer.add(transition, forKey: "playerRotation")
     }
 
+    func legibleOutput(_ output: AVPlayerItemLegibleOutput,
+                       didOutputAttributedStrings strings: [NSAttributedString],
+                       nativeSampleBuffers: [Any], forItemTime: CMTime) {
+        guard output === inlineCaptionOutput else { return }
+        publishInlineCaption(strings.map(\.string).joined(separator: "\n"))
+    }
+
+    func outputSequenceWasFlushed(_ output: AVPlayerItemOutput) {
+        if output === inlineCaptionOutput { publishInlineCaption("") }
+    }
+
+    private func publishInlineCaption(_ text: String) {
+        webView.callAsyncJavaScript(
+            "window.dispatchEvent(new CustomEvent('diastomy-inline-caption', {detail: text}))",
+            arguments: ["text": text], in: nil, in: .page, completionHandler: nil)
+    }
+
     private func stopInlinePlayer() {
         inlineGeneration += 1
+        if let output = inlineCaptionOutput {
+            inlineCaptionOutput = nil
+            inlineLayer?.player?.currentItem?.remove(output)
+            output.setDelegate(nil, queue: nil)
+        }
         inlineRoomItemStatus?.invalidate()
         inlineRoomItemStatus = nil
         inlineLayer?.player?.pause()
@@ -1034,6 +1087,11 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         let asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
         let item = AVPlayerItem(asset: asset)
+        let captions = AVPlayerItemLegibleOutput(mediaSubtypesForNativeRepresentation: [])
+        captions.suppressesPlayerRendering = true
+        captions.setDelegate(self, queue: .main)
+        inlineCaptionOutput = captions
+        item.add(captions)
         let playback = AVPlayer(playerItem: item)
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
@@ -1103,19 +1161,6 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             layoutInlinePlayer(animated: command == "rotateAnimated")
         case "fill":
             inlineLayer?.videoGravity = data["value"] as? Bool == true ? .resizeAspectFill : .resizeAspect
-        case "captionStyle":
-            let style = data["value"] as? [String: Any] ?? [:]
-            let sizes: [String: Int] = ["small": 80, "normal": 100, "large": 130]
-            let colors: [String: [Double]] = [
-                "white": [1, 1, 1, 1], "yellow": [1, 1, 0.88, 0.26], "cyan": [1, 0.48, 0.93, 1]
-            ]
-            let attributes: [String: Any] = [
-                kCMTextMarkupAttribute_RelativeFontSize as String: sizes[style["size"] as? String ?? ""] ?? 100,
-                kCMTextMarkupAttribute_ForegroundColorARGB as String: colors[style["color"] as? String ?? ""] ?? [1, 1, 1, 1],
-                kCMTextMarkupAttribute_BackgroundColorARGB as String: [(style["background"] as? Bool == false ? 0.0 : 0.78), 0.0, 0.0, 0.0],
-                kCMTextMarkupAttribute_CharacterBackgroundColorARGB as String: [0.0, 0.0, 0.0, 0.0]
-            ]
-            if let rule = AVTextStyleRule(textMarkupAttributes: attributes) { item?.textStyleRules = [rule] }
         case "audio":
             if let audioGroup, let index = data["value"] as? Int, audioGroup.options.indices.contains(index) {
                 item?.select(audioGroup.options[index], in: audioGroup)
@@ -1135,6 +1180,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
             playback.appliesMediaSelectionCriteriaAutomatically = false
             if index == -1 {
                 if let current { lastInlineCaption = captions[current] }
+                publishInlineCaption("")
                 item.select(nil, in: captionGroup)
             } else if captions.indices.contains(index) {
                 lastInlineCaption = captions[index]
@@ -1150,9 +1196,16 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let selectedAudio = audioGroup.flatMap { group in
             item?.currentMediaSelection.selectedMediaOption(in: group).flatMap { group.options.firstIndex(of: $0) }
         } ?? -1
+        let captionInset: CGFloat
+        if let layer = inlineLayer, !layer.videoRect.isEmpty {
+            captionInset = max(0, layer.bounds.maxY - layer.videoRect.maxY)
+        } else {
+            captionInset = 0
+        }
         return ["ok": true, "duration": duration.isFinite ? duration : 0,
                 "frameReady": inlineLayer?.isReadyForDisplay == true,
                 "captions": captions.map(\.displayName), "selectedCaption": selectedCaption,
+                "captionInset": captionInset,
                 "audio": audioGroup?.options.map(\.displayName) ?? [], "selectedAudio": selectedAudio,
                 "position": position.isFinite ? position : 0, "muted": playback.isMuted,
                 "paused": playback.timeControlStatus == .paused,

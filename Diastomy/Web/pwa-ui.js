@@ -135,7 +135,7 @@ window.PWA = (() => {
       "sci-fi": "/static/public/assets/images/genre-user-v2/sci-fi-a837508e6156.jpg"
     };
   function continueWatching(history) {
-    return history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/library?tab=history">بیشتر</a></div>' +
+    return history.length ? '<section class="dm54-section reference-continue-section"><div class="dm54-head"><h2>ادامه تماشا</h2><a href="#/continue-watching">بیشتر</a></div>' +
       '<div class="reference-continue">' + history.slice(0, 12).map((item,i) => historyCard(item,i,true)).join('') + '</div></section>' : '';
   }
   function railTitle(rail) {
@@ -173,7 +173,7 @@ window.PWA = (() => {
       order.map(key => sections.get(key) || '').join('') +
       [...sections].filter(([key]) => !order.includes(key)).map(([, html]) => html).join('') + '</div>';
   }
-  function historyCard(item, index, home = false) {
+  function historyCard(item, index, home = false, resume = home) {
     const progress = item.total > 0 ? Math.min(100, Math.max(0, Math.round(100 * item.position / item.total))) : 0;
     const remaining = Math.max(0, Math.floor((item.total || 0) - (item.position || 0)));
     const time = Math.floor(remaining / 60) + ':' + String(remaining % 60).padStart(2, '0');
@@ -181,14 +181,18 @@ window.PWA = (() => {
     const homeTime = (minutes >= 60 ? Math.floor(minutes / 60) + 'h ' : '') + minutes % 60 + 'm left';
     const frame = String(item.snapshot || '').match(/^(?:https:\/\/diastomy\.top)?(\/api\/watch-frame\/[1-9]\d*\/(?:\?v=\d+)?)$/)?.[1];
     const kind = item.type || 'movie';
-    const playback = home === true && (item.video_id || kind === 'movie')
+    const artwork = item.history_cover || item.landscape_artwork || item.banner;
+    const useFrame = frame && (!home || !artwork);
+    const image = home || (resume && !useFrame) ? media(artwork || item.cover) :
+      '/static/public/assets/img/continue-scene-pending-v1.svg';
+    const playback = resume && (item.video_id || kind === 'movie')
       ? ' data-play="' + esc(item.video_id || '') + '" data-kind="' + esc(kind) +
         '" data-history-position="' + esc(item.position || 0) + '" data-history-slug="' + esc(item.slug) + '" aria-haspopup="dialog"'
       : '';
     return '<article class="library-history-card"><a class="library-history-thumb" href="' + titleURL(item) + '"' +
       playback + ' aria-label="ادامه تماشا">' +
-      '<img src="' + (home ? media(item.history_cover || item.landscape_artwork || item.banner || item.cover) : '/static/public/assets/img/continue-scene-pending-v1.svg') + '" alt="' + esc(item.title) + '"' +
-      (frame && (!home || !item.history_cover && !item.landscape_artwork && !item.banner) ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
+      '<img src="' + image + '" alt="' + esc(item.title) + '"' +
+      (useFrame ? ' data-history-frame="' + esc(frame) + '"' : '') + '>' + PWA_SOURCE.historyMark.replace('<svg', '<svg class="local-history-mark"') +
       '<progress class="local-library-progress" dir="ltr" max="100" value="' + progress + '"></progress></a><div class="library-history-meta"><small dir="ltr">' +
       (home ? homeTime : time + ' باقی‌مانده') + '</small>' + (index == null ? '' : '<button type="button" class="library-remove" data-history-more="' +
       index + '" aria-haspopup="dialog" aria-label="گزینه‌های ادامه تماشا">⋮</button>') + '</div></article>';
@@ -237,10 +241,10 @@ window.PWA = (() => {
     return '<dialog id="film-download-options" class="film-download-dialog" dir="rtl" aria-labelledby="film-download-title">' +
       '<div class="film-download-heading"><form method="dialog"><button class="film-download-close" aria-label="بازگشت">' +
       PWA_SOURCE.actorBack + '</button></form><h2 id="film-download-title" tabindex="-1" autofocus>لینک‌های دانلود</h2></div>' +
-      (series ? '<div class="film-download-pickers"><label>فصل<select id="download-season"></select></label>' +
-        '<label>قسمت<select id="download-episode"></select></label></div>' : '') +
+      (series ? '<div class="film-download-pickers"><div class="film-download-field"><label for="download-season">فصل</label><select id="download-season"></select></div>' +
+        '<div class="film-download-field"><label for="download-episode">قسمت</label><select id="download-episode"></select></div></div>' : '') +
       '<div class="film-download-tabs"><button type="button" data-download-tab="subbed" aria-pressed="true">نسخه زیرنویس</button><button type="button" data-download-tab="dubbed" aria-pressed="false">نسخه دوبله</button></div>' +
-      '<p class="film-download-status" role="status" hidden></p><div class="film-download-content">' + filmDownloadPanels(options, series) + '</div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 2h8a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm4 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm5.6-3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 3.1a1 1 0 0 0-1-.2L2.3 10.1c-1 .4-1 1 .1 1.3l4.8 1.5 11-7c.5-.3.8-.1.4.3l-9 8.3 6.7 5c.8.6 1.4.3 1.6-.7l3.9-14.4c.2-.6.2-1 0-1.3Z"/></svg>کانال تلگرام ما</button></div></dialog>';
+      '<div class="film-download-content">' + filmDownloadPanels(options, series) + '</div><div class="film-download-feedback" hidden><p class="film-download-status" role="status"></p><button class="film-download-retry" type="button" hidden>تلاش دوباره</button></div><div class="film-download-social"><button type="button" data-social="instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M8 2h8a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6H8a6 6 0 0 1-6-6V8a6 6 0 0 1 6-6Zm4 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm5.6-3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 0 0 0-2.4Z"/></svg>اینستاگرام ما</button><button type="button" data-social="telegram"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.8 3.1a1 1 0 0 0-1-.2L2.3 10.1c-1 .4-1 1 .1 1.3l4.8 1.5 11-7c.5-.3.8-.1.4.3l-9 8.3 6.7 5c.8.6 1.4.3 1.6-.7l3.9-14.4c.2-.6.2-1 0-1.3Z"/></svg>کانال تلگرام ما</button></div></dialog>';
   }
 
   const reportReasons = ['پخش فیلم یا سریال انجام نمی‌شود','لینک دانلود خراب است','مشکل در زیرنویس',
@@ -456,7 +460,7 @@ window.PWA = (() => {
     document.getElementById('pwa-header').innerHTML = PWA_SOURCE.header;
     document.querySelector('.dmf3-filter').removeAttribute('data-local-search');
     document.body.dataset.page = name === 'library' ? 'my-library' : name === 'browse' ? 'archive-reference' : name === 'home' || name === 'search' ? name : 'local-' + name;
-    document.getElementById('pwa-header').hidden = ['startup','login','otp','register','forgot','reset','account','title','browse','library','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments','followed-actors'].includes(name);
+    document.getElementById('pwa-header').hidden = ['startup','login','otp','register','forgot','reset','account','title','browse','library','continue-watching','settings','notifications','support','subscription','rooms','room','about','actor','actors','profile','payments','followed-actors'].includes(name);
     const slot = ({home:'home',rooms:'room',room:'room',search:'search',browse:'search',library:'movies'})[name];
     const nav = document.getElementById('dm-app-bottom-nav');
     const links = [...nav.querySelectorAll('[data-nav-slot]')];

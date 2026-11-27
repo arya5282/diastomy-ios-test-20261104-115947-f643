@@ -195,12 +195,12 @@
     const {opacity, transform} = getComputedStyle(dialog);
     dialog.setAttribute('data-closing','');
     const download = dialog.matches('.film-download-dialog');
-    const exitTransform = download ? 'translateY(calc(-50dvh - 50%))' :
+    const exitTransform = download ? 'translateY(8px) scale(.98)' :
       dialog.matches('#local-filters,#settings-choice') ? 'translateY(18px)' : 'translateY(6px) scale(.985)';
     const motion = dialog.animate([
       {opacity, transform},
       {opacity:0, transform:exitTransform}
-    ], {duration:download ? 255 : 125, easing:'ease-in', fill:'forwards'});
+    ], {duration:download ? 155 : 125, easing:'ease-in', fill:'forwards'});
     motion.finished.catch(() => {}).then(() => {
       close();
       dialog.removeAttribute('data-closing');
@@ -343,7 +343,7 @@
     philippines:'فیلیپین', 'soviet-union':'اتحاد جماهیر شوروی', thailand:'تایلند',
     'united-arab-emirates':'امارات متحده عربی'
   };
-  function installFilterChoices(form) {
+  function installFilterChoices(form, scope = form.closest('dialog')) {
     const refresh = [];
     let openMenu;
     function closeMenu() {
@@ -392,11 +392,16 @@
       toggle.className = 'filter-choice-toggle';
       toggle.setAttribute('aria-expanded','false');
       list.className = 'filter-choice-list';
+      if (select.id) {
+        list.id = select.id + '-choices';
+        toggle.setAttribute('aria-controls', list.id);
+      }
       list.hidden = true;
       select.after(toggle, list);
       const update = () => {
         toggle.textContent = select.selectedOptions[0]?.text || 'همه';
-        toggle.setAttribute('aria-label', select.parentElement.firstChild.textContent.trim() + ' ' + toggle.textContent);
+        const label = select.getAttribute('aria-label') || select.parentElement.firstChild.textContent.trim();
+        toggle.setAttribute('aria-label', label + ' ' + toggle.textContent);
       };
       refresh.push(update);
       update();
@@ -425,17 +430,27 @@
         }));
       };
     }
-    form.addEventListener('click', event => {
+    scope.addEventListener('click', event => {
       if (!event.target.closest('.filter-choice-toggle,.filter-choice-list')) closeMenu();
     });
-    form.closest('dialog').addEventListener('cancel', event => {
+    const closeAndFocus = event => {
       if (!openMenu) return;
       event.preventDefault();
       const toggle = openMenu.toggle;
       closeMenu();
       toggle.focus();
-    });
-    form.closest('dialog').addEventListener('close', closeMenu);
+    };
+    if (scope.matches('dialog')) {
+      scope.addEventListener('cancel', closeAndFocus);
+      scope.addEventListener('close', closeMenu);
+    } else {
+      scope.addEventListener('keydown', event => {
+        if (event.key === 'Escape') closeAndFocus(event);
+      });
+      form.addEventListener('focusout', event => {
+        if (!form.contains(event.relatedTarget)) closeMenu();
+      });
+    }
     return () => { closeMenu(); refresh.forEach(update => update()); };
   }
   function openFilters() {
@@ -596,6 +611,7 @@
     };
     if (!homeContent) return queue(true);
   }
+  let archiveSortFocus;
   async function browse(seq, kind, params) {
     const route = '#/browse/' + enc(kind);
     const railKey = params.get('rail');
@@ -607,11 +623,11 @@
       : {movie:'آرشیو فیلم‌ها', series:'آرشیو سریال‌ها', all:'آرشیو فیلم و سریال'};
     mount('<section class="archive-reference-shell"><header class="archive-reference-header"><a href="#/home" aria-label="بازگشت">' + PWA_SOURCE.actorBack + '</a><h1 data-dm-archive-title dir="auto">' +
       esc(paginatedRail ? PWA.railTitle({key:railKey}) : (titles[kind] || titles.all)) + '</h1><button type="button" data-local-menu aria-label="منوی کاربری">' + PWA_SOURCE.actorMenu + '</button></header>' +
-      '<div class="archive-reference-sort"><label for="sort">مرتب‌سازی</label><span class="archive-sort-control"><select id="sort">' +
+      '<div class="archive-reference-sort"><div class="archive-sort-control"><select id="sort" aria-label="مرتب‌سازی">' +
       (editorialRail ? '<option value="editorial">ترتیب مجموعه</option>' : '') +
       '<option value="newest">جدیدترین</option><option value="oldest">قدیمی‌ترین</option>' +
       (editorialRail ? '' : '<option value="most_viewed">پربازدیدترین</option>') +
-      '<option value="highest_rating">بالاترین امتیاز</option></select></span></div><div id="catalogue"><div class="loading"></div></div></section>');
+      '<option value="highest_rating">بالاترین امتیاز</option></select></div></div><div id="catalogue"><div class="loading"></div></div></section>');
     if (similarSource) {
       const [, sourceKind, sourceSlug] = similarSource;
       $('.archive-reference-header a').href = '#/title/' + sourceKind + '/' + enc(sourceSlug) + '?tab=similar';
@@ -628,11 +644,22 @@
       } catch (error) { whenCurrent(seq, () => fail($('#catalogue'), error)); }
       return;
     }
-    $('#sort').value = params.get('sort') || (editorialRail ? 'editorial' : 'newest');
-    $('#sort').onchange = event => {
+    const sort = $('#sort');
+    const order = params.get('sort');
+    if ([...sort.options].some(option => option.value === order)) sort.value = order;
+    const sortControl = $('.archive-sort-control');
+    installFilterChoices(sortControl, $('.archive-reference-shell'));
+    if (location.hash === archiveSortFocus) {
+      archiveSortFocus = '';
+      sortControl.querySelector('.filter-choice-toggle').focus({preventScroll:true});
+    }
+    sort.onchange = event => {
       params.set('sort', event.target.value);
       params.delete('page');
-      location.hash = route + '?' + params;
+      const hash = route + '?' + params;
+      if (hash === location.hash) return;
+      archiveSortFocus = hash;
+      location.hash = hash;
     };
     if (editorialRail) {
       try {
@@ -900,11 +927,21 @@
         };
         $('#film-comments').onclick = showComments;
         if (downloadOptions) {
+          const feedback = downloadOptions.querySelector('.film-download-feedback');
+          const retry = downloadOptions.querySelector('.film-download-retry');
+          let downloading = false;
+          const clearFeedback = () => {
+            if (downloading) return;
+            feedback.hidden = true;
+            retry.hidden = true;
+            retry.onclick = null;
+          };
           let panelMotion;
           const selectDownloadTab = (variant, animate = false) => {
             const active = downloadOptions.querySelector('[data-download-panel]:not([hidden])');
             if (active.dataset.downloadPanel === variant &&
                 downloadOptions.querySelector('[data-download-tab][aria-pressed=true]').dataset.downloadTab === variant) return;
+            clearFeedback();
             panelMotion?.cancel();
             downloadOptions.querySelector('.film-download-content').scrollTop = 0;
             downloadOptions.querySelectorAll('[data-download-tab]').forEach(button => {
@@ -935,6 +972,7 @@
             if ([...downloadEpisode.options].some(option => option.value === number)) downloadEpisode.value = number;
           };
           const renderEpisodeDownloads = preferred => {
+            clearFeedback();
             const entry = available.find(item => String(item.season) === downloadSeason.value && String(item.number) === downloadEpisode.value);
             const options = entry?.download_options || [];
             const content = downloadOptions.querySelector('.film-download-content');
@@ -984,45 +1022,63 @@
                   event.clientY < bounds.top || event.clientY > bounds.bottom) closeWithMotion(downloadOptions);
             }
           });
-        }
-        let downloading = false;
-        $('.movie-detail-shell').addEventListener('click', async event => {
-          const button = event.target.closest('[data-download]');
-          if (!button || button.disabled || downloading) return;
-          const status = downloadOptions.querySelector('.film-download-status');
-          const bytes = crypto.getRandomValues(new Uint8Array(16));
-          bytes[6] = (bytes[6] & 15) | 64;
-          bytes[8] = (bytes[8] & 63) | 128;
-          const token = Array.from(bytes, (byte, index) =>
-            ([4,6,8,10].includes(index) ? '-' : '') + byte.toString(16).padStart(2,'0')).join('');
-          downloading = true;
-          button.disabled = true;
-          button.setAttribute('aria-busy','true');
-          status.hidden = false;
-          status.textContent = 'در حال آماده‌سازی دانلود…';
-          const progress = setInterval(async () => {
-            try {
-              const data = await native({action:'downloadProgress',token});
-              if (!downloading || !status.isConnected || !data?.received) return;
-              const format = new Intl.NumberFormat('fa', {maximumFractionDigits:0});
-              status.textContent = data.expected > 0 ? 'در حال دانلود · ' +
-                format.format(Math.min(99, Math.floor(100 * data.received / data.expected))) + '٪' :
-                'در حال دانلود · ' + format.format(data.received / 1048576) + ' مگابایت';
-            } catch (_) {}
-          }, 700);
-          try {
+          const status = feedback.querySelector('.film-download-status');
+          async function startDownload(button) {
+            if (downloading || !button.isConnected) return;
+            clearFeedback();
+            const bytes = crypto.getRandomValues(new Uint8Array(16));
+            bytes[6] = (bytes[6] & 15) | 64;
+            bytes[8] = (bytes[8] & 63) | 128;
+            const token = Array.from(bytes, (byte, index) =>
+              ([4,6,8,10].includes(index) ? '-' : '') + byte.toString(16).padStart(2,'0')).join('');
+            downloading = true;
+            downloadOptions.dataset.downloading = '';
+            button.setAttribute('aria-busy', 'true');
+            feedback.hidden = false;
+            feedback.dataset.state = 'loading';
+            status.textContent = 'در حال اتصال به منبع دانلود…';
+            let finished = false;
+            const format = new Intl.NumberFormat('fa', {maximumFractionDigits:0});
+            const progress = setInterval(async () => {
+              try {
+                const data = await native({action:'downloadProgress',token});
+                if (finished || !data?.received) return;
+                status.textContent = data.expected > 0 ? 'در حال دانلود · ' +
+                  format.format(Math.min(99, Math.floor(100 * data.received / data.expected))) + '٪' :
+                  'در حال دانلود · ' + format.format(data.received / 1048576) + ' مگابایت';
+              } catch (_) {}
+            }, 700);
             const action = kind === 'series' ? 'downloadSeries' : 'downloadMovie';
-            const result = await native({action, slug, id:Number(button.dataset.download), dubbed:button.dataset.variant === "dubbed",token});
+            let result;
+            try {
+              result = await native({action, slug, id:Number(button.dataset.download), dubbed:button.dataset.variant === 'dubbed',token});
+            } catch (error) {
+              result = {ok:false, error:error.message};
+            } finally {
+              finished = true;
+              downloading = false;
+              clearInterval(progress);
+              delete downloadOptions.dataset.downloading;
+              button.removeAttribute('aria-busy');
+            }
+            if (!downloadOptions.open || !button.isConnected || button.closest('[data-download-panel]').hidden) {
+              clearFeedback();
+              if (seq === state.sequence) toast(result.ok ? 'فایل در برنامه Files ذخیره شد.' :
+                (result.error || 'دانلود ناموفق بود.'), result.ok ? 'success' : 'error');
+              return;
+            }
+            feedback.dataset.state = result.ok ? 'success' : 'error';
             status.textContent = result.ok ? 'فایل در برنامه Files ذخیره شد.' : (result.error || 'دانلود ناموفق بود.');
-            if (!downloadOptions.open && seq === state.sequence) toast(status.textContent, result.ok ? 'success' : 'error');
-          } catch (error) { status.textContent = error.message; }
-          finally {
-            downloading = false;
-            clearInterval(progress);
-            button.disabled = false;
-            button.removeAttribute('aria-busy');
+            if (!result.ok && result.retryable !== false) {
+              retry.hidden = false;
+              retry.onclick = () => startDownload(button);
+            }
           }
-        });
+          downloadOptions.addEventListener('click', event => {
+            const button = event.target.closest('[data-download]');
+            if (button && !button.disabled) startDownload(button);
+          });
+        }
         const bookmark = $('#bookmark');
         let bookmarkTouched = false;
         api('/api/app/v1/library/').then(result => whenCurrent(seq, () => {
@@ -1115,6 +1171,55 @@
       });
     } catch (error) { whenCurrent(seq, () => fail($('#actors-data'), error)); }
   }
+  function renderWatchHistory(target, menu, entries, seq, reload, resume = false) {
+    target.innerHTML = entries.length ? '<div class="library-history-grid">' +
+      entries.map((entry, index) => PWA.historyCard(entry, index, !resume, resume)).join('') +
+      '</div>' : '<p class="library-empty">هنوز چیزی تماشا نکرده‌ای.</p>';
+    loadHistoryFrames(target);
+    target.querySelectorAll('[data-history-more]').forEach(button => {
+      button.onclick = () => {
+        const item = entries[Number(button.dataset.historyMore)];
+        const details = menu.querySelector('a');
+        details.href = '#/title/' + enc(item.type) + '/' + enc(item.slug);
+        details.textContent = item.type === 'series' ? 'اطلاعات سریال' : 'اطلاعات فیلم';
+        details.onclick = event => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          event.preventDefault();
+          closeWithMotion(menu, undefined, () => { location.href = details.href; });
+        };
+        menu.querySelector('.home-history-title').textContent = item.title || '';
+        const remove = menu.querySelector('[data-remove-history]');
+        const id = item.history_id || String(item.snapshot || '').match(/\/api\/watch-frame\/(\d+)\//)?.[1];
+        remove.hidden = !id;
+        remove.onclick = async () => {
+          remove.disabled = true;
+          try {
+            await api('/api/watch-history/' + enc(id) + '/remove/', {body:{}});
+            if (seq !== state.sequence) return;
+            closeWithMotion(menu);
+            await reload();
+          } catch (error) { toast(error); }
+          finally { remove.disabled = false; }
+        };
+        menu.showModal();
+      };
+    });
+  }
+  async function continueWatchingPage(seq) {
+    mount(shell('ادامه تماشا', '<div id="continue-watching-list"><p role="status">دریافت فهرست…</p></div>') +
+      historyMenu('continue-watching-menu'));
+    const target = $('#continue-watching-list');
+    const menu = $('#continue-watching-menu');
+    async function load() {
+      try {
+        const collection = await api('/api/app/v1/library/');
+        whenCurrent(seq, () => renderWatchHistory(target, menu, collection.history || [], seq, load, true));
+      } catch (error) {
+        whenCurrent(seq, () => fail(target, error));
+      }
+    }
+    await load();
+  }
   function library(seq, params) {
     const tabs = [['history','ادامه تماشا'], ['saved','فیلم و سریال من'], ['downloads','دانلودها']];
     mount(PWA_SOURCE.libraryHeader + historyMenu('history-menu') +
@@ -1137,38 +1242,7 @@
           '<article class="local-library-saved">' + PWA.homePoster(item) + '<button type="button" class="library-heart" data-remove-saved="' + index +
           '" aria-label="حذف از لیست من">' + PWA_SOURCE.libraryHeart + '</button></article>').join('');
       panel('saved').innerHTML = cards ? '<div class="library-grid">' + cards + '</div>' : '<p class="library-empty">هنوز عنوانی ذخیره نکرده‌ای.</p>';
-      panel('history').innerHTML = data.history.length ? '<div class="library-history-grid">' + data.history.map(PWA.historyCard).join('') +
-        '</div>' : '<p class="library-empty">هنوز چیزی تماشا نکرده‌ای.</p>';
-      loadHistoryFrames(panel('history'));
-      const menu = $('#history-menu');
-      panel('history').querySelectorAll('[data-history-more]').forEach(button => {
-        button.onclick = () => {
-          const item = data.history[Number(button.dataset.historyMore)];
-          const details = menu.querySelector('a');
-          details.href = '#/title/' + enc(item.type) + '/' + enc(item.slug);
-          details.textContent = item.type === 'series' ? 'اطلاعات سریال' : 'اطلاعات فیلم';
-          details.onclick = event => {
-            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            event.preventDefault();
-            closeWithMotion(menu, undefined, () => { location.href = details.href; });
-          };
-          menu.querySelector('.home-history-title').textContent = item.title || '';
-          const remove = menu.querySelector('[data-remove-history]');
-          const id = item.history_id || String(item.snapshot || '').match(/\/api\/watch-frame\/(\d+)\//)?.[1];
-          remove.hidden = !id;
-          remove.onclick = async () => {
-            remove.disabled = true;
-            try {
-              await api('/api/watch-history/' + enc(id) + '/remove/', {body:{}});
-              if (seq !== state.sequence) return;
-              closeWithMotion(menu);
-              await loadCollection();
-            } catch (error) { toast(error); }
-            finally { remove.disabled = false; }
-          };
-          menu.showModal();
-        };
-      });
+      renderWatchHistory(panel('history'), $('#history-menu'), data.history, seq, loadCollection);
       $('.library-shell').querySelectorAll('[data-remove-saved]').forEach(button => {
         button.onclick = async () => {
           const item = data.saved[Number(button.dataset.removeSaved)];
@@ -2547,7 +2621,7 @@
       return '<article class="local-support-message room-chat-message ' + (mine ? 'mine' : 'operator') + '">' +
         (mine ? '' : '<strong dir="auto">' + esc(m.name) + '</strong>') +
         '<p class="local-support-bubble" dir="auto">' + esc(m.text) + '</p><small dir="ltr">' +
-        (Number.isNaN(time.valueOf()) ? '' : esc(time.toLocaleTimeString('fa', {hour:'2-digit',minute:'2-digit'}))) +
+        (Number.isNaN(time.valueOf()) ? '' : esc(time.toLocaleTimeString('fa', {hour:'2-digit',minute:'2-digit',numberingSystem:'latn'}))) +
         (mine ? ' <span class="support-delivery" role="img" aria-label="ارسال‌شده"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m4 12 5 5L21 5"/></svg></span>' : '') +
         '</small></article>';
     };
@@ -2649,6 +2723,7 @@
       else if (name === 'title') await detail(seq, parts[1], parts[2]);
       else if (name === 'actors' || name === 'actor') await actors(seq, parts[1], parts[2], params);
       else if (name === 'library') await library(seq, params);
+      else if (name === 'continue-watching') await continueWatchingPage(seq);
       else if (name === 'login') login();
       else if (name === 'otp') otp(params);
       else if (name === 'forgot') forgot(params);

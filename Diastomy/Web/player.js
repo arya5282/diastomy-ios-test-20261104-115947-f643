@@ -62,7 +62,7 @@ window.PWAPlayer = (() => {
     if (room) overlay.classList.add('local-player-room');
     overlay.setAttribute('aria-label', 'پلیر فیلم');
     const control = (action, title, icon) => '<button type="button" data-player="' + action + '" aria-label="' + title + '">' + icons[icon] + '</button>';
-    overlay.innerHTML = '<video playsinline webkit-playsinline></video><div class="local-player-dim"></div><div class="local-player-top">' +
+    overlay.innerHTML = '<video playsinline webkit-playsinline></video><div class="local-player-dim"></div><div class="local-player-captions" hidden><span dir="auto"></span></div><div class="local-player-top">' +
       '<button type="button" data-player="close" aria-label="بازگشت"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12H3m7-7-7 7 7 7"/></svg></button>' +
       '<div class="local-player-title"><h2></h2><p hidden></p></div>' + control('rotate','چرخش تصویر','player-phone-rotate') + '</div>' +
       '<label class="local-player-side local-player-brightness"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 1v3m0 16v3M1 12h3m16 0h3M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/></svg></span><input type="range" min="0" max="1" value="1" step=".01" aria-label="روشنایی تصویر"><span class="local-player-brightness-track" aria-hidden="true"><i></i></span></label>' +
@@ -119,11 +119,9 @@ window.PWAPlayer = (() => {
       if (saved && Object.hasOwn(sizes,saved.size) && Object.hasOwn(colors,saved.color) && typeof saved.background === 'boolean') captionStyle = saved;
     } catch (_) {}
     function applyCaptionStyle() {
-      overlay.classList.toggle('local-player-no-caption-background', !captionStyle.background);
       overlay.style.setProperty('--caption-size', sizes[captionStyle.size]);
       overlay.style.setProperty('--caption-color', colors[captionStyle.color]);
       overlay.style.setProperty('--caption-background', captionStyle.background ? '#000c' : 'transparent');
-      if (surface) controlSurface('captionStyle', captionStyle).catch(() => {});
     }
     function setCaptionStyle(key, value) {
       captionStyle[key] = value;
@@ -132,6 +130,14 @@ window.PWAPlayer = (() => {
     }
     const loading = get('.local-player-loading');
     const captionStatus = get('.local-player-caption-status');
+    const captionView = get('.local-player-captions');
+    function showCaption(text) {
+      captionView.firstElementChild.textContent = text;
+      captionView.hidden = !text;
+    }
+    function onNativeCaption(event) {
+      if ((surface || surfaceStarting) && typeof event.detail === 'string') showCaption(event.detail.trim());
+    }
     let captionNoticeTimer;
     let captionChange = 0;
     function setLoading(active) {
@@ -174,6 +180,8 @@ window.PWAPlayer = (() => {
       lastState = null;
       pendingSeek = null;
       scrubbing = false;
+      showCaption('');
+      captionView.style.removeProperty('--caption-inset');
       overlay.classList.remove('local-player-native');
       document.body.classList.remove('local-player-native-open');
     }
@@ -198,7 +206,6 @@ window.PWAPlayer = (() => {
         await controlSurface('rotate', overlay.classList.contains('local-player-rotated'));
         if (!overlay.isConnected || request !== revision) return;
         controlSurface('rate', playbackRate).catch(() => {});
-        applyCaptionStyle();
         controlSurface('volume', Number(volume.value)).catch(() => {});
         controlSurface('fill', overlay.classList.contains('local-player-fill')).catch(() => {});
         if (video.muted) controlSurface('mute').catch(() => {});
@@ -214,6 +221,10 @@ window.PWAPlayer = (() => {
             const optionsChanged = (lastState?.captions?.length || 0) !== (state.captions?.length || 0) ||
               (lastState?.audio?.length || 0) !== (state.audio?.length || 0);
             lastState = state;
+            if (Number.isFinite(state.captionInset)) {
+              captionView.style.setProperty('--caption-inset', Math.max(0, state.captionInset) + 'px');
+            }
+            if (state.selectedCaption < 0) showCaption('');
             if (pendingRoomSubtitle && state.captions?.length) {
               pendingRoomSubtitle = false;
               const index = state.captions.indexOf(roomSubtitleMode);
@@ -289,7 +300,16 @@ window.PWAPlayer = (() => {
         overlay.classList.remove('local-player-system-volume');
       });
     }
-    const resizeViewport = () => updateViewport();
+    const resizeViewport = () => {
+      updateViewport();
+      updateWebCaptionInset();
+    };
+    function updateWebCaptionInset() {
+      if (surface || !video.videoWidth || !video.videoHeight) return;
+      const height = overlay.classList.contains('local-player-fill') ? overlay.clientHeight :
+        Math.min(overlay.clientHeight, overlay.clientWidth * video.videoHeight / video.videoWidth);
+      captionView.style.setProperty('--caption-inset', Math.max(0, (overlay.clientHeight - height) / 2) + 'px');
+    }
     function paintTitle(title) {
       get('h2').textContent = title || '';
       const subtitle = get('.local-player-title p');
@@ -327,6 +347,7 @@ window.PWAPlayer = (() => {
     function sourceChanged(next, position, preferSurface = false) {
       stopSurface();
       source = next;
+      selectedWebCaption = undefined;
       resume = position;
       played = false;
       setLoading(true);
@@ -418,7 +439,7 @@ window.PWAPlayer = (() => {
           const tracks = captionTracks();
           if (tracks.length > 1) options('زبان زیرنویس', tracks.map((track,i) => [i,
             track.label && !creditMarker.test(track.label) ? track.label : track.language || 'زیرنویس ' + (i + 1)]),
-          tracks.findIndex(track => track.mode === 'showing'), value => selectWebCaption(tracks[value]));
+          tracks.indexOf(selectedWebCaption), value => selectWebCaption(tracks[value]));
         }
         return;
       }
@@ -437,13 +458,13 @@ window.PWAPlayer = (() => {
       }
     }
     const captionButton = get('[data-player=captions]');
-    let lastWebCaption;
+    let lastWebCaption, selectedWebCaption;
     function captionTracks() {
       return Array.from(video.textTracks || []).filter(track => ['captions','subtitles'].includes(track.kind));
     }
     function syncCaptionButton() {
       const enabled = surface ? (lastState?.selectedCaption ?? -1) >= 0 :
-        captionTracks().some(track => track.mode === 'showing');
+        Boolean(selectedWebCaption);
       captionButton.setAttribute('aria-pressed', String(enabled));
     }
     async function selectNativeCaption(index) {
@@ -460,6 +481,7 @@ window.PWAPlayer = (() => {
           return;
         }
         lastState = state;
+        if (state.selectedCaption < 0) showCaption('');
         syncCaptionButton();
         if (!settings.hidden && ['settings','captions'].includes(settings.dataset.panel)) renderSettings();
       } catch (_) {
@@ -467,14 +489,16 @@ window.PWAPlayer = (() => {
       } finally { captionButton.disabled = false; }
     }
     function selectWebCaption(selected) {
-      for (const track of captionTracks()) track.mode = track === selected ? 'showing' : 'hidden';
+      selectedWebCaption = selected;
+      for (const track of captionTracks()) if (track.mode === 'showing' || track === selected) track.mode = 'hidden';
       if (selected) lastWebCaption = selected;
+      updateWebCaption();
       syncCaptionButton();
     }
     function setCaptions(enabled) {
       if (surface) return selectNativeCaption(enabled ? undefined : -1);
       const tracks = captionTracks();
-      const current = tracks.find(track => track.mode === 'showing');
+      const current = selectedWebCaption;
       if (current) lastWebCaption = current;
       if (!tracks.length) { captionNotice('زیرنویس قابل تغییر در دسترس نیست.'); return; }
       selectWebCaption(!enabled ? null : tracks.includes(lastWebCaption) ? lastWebCaption : tracks[0]);
@@ -487,6 +511,7 @@ window.PWAPlayer = (() => {
       clearTimeout(captionNoticeTimer);
       clearTimeout(rotationTimer);
       window.removeEventListener('resize', resizeViewport);
+      window.removeEventListener('diastomy-inline-caption', onNativeCaption);
       updateViewport(false);
       document.removeEventListener('keydown', closePanelOnEscape);
       closeCurrent = null;
@@ -517,16 +542,33 @@ window.PWAPlayer = (() => {
       }
       return cues.some(cue => typeof cue.text === 'string' && cue.text.trim() && cue.endTime > cue.startTime);
     }
+    function updateWebCaption() {
+      if (surface || surfaceStarting) return;
+      const cues = Array.from(selectedWebCaption?.activeCues || []);
+      showCaption(cues.map(cue => cue.getCueAsHTML?.().textContent ?? cue.text ?? '').join('\n').trim());
+    }
+    function syncWebTracks() {
+      if (surface || surfaceStarting) return;
+      const tracks = captionTracks();
+      const showing = tracks.find(track => track.mode === 'showing');
+      if (showing || (selectedWebCaption && !tracks.includes(selectedWebCaption))) selectWebCaption(showing);
+    }
     syncCaptionButton();
-    video.textTracks?.addEventListener('change', syncCaptionButton);
+    video.textTracks?.addEventListener('change', syncWebTracks);
+    video.textTracks?.addEventListener('removetrack', syncWebTracks);
     video.textTracks?.addEventListener('addtrack', event => {
       const track = event.track;
       if (!['captions','subtitles'].includes(track.kind)) return;
-      track.addEventListener('cuechange', () => cleanCaptionTrack(track));
-      syncCaptionButton();
+      track.addEventListener('cuechange', () => {
+        cleanCaptionTrack(track);
+        if (track === selectedWebCaption) updateWebCaption();
+      });
+      syncWebTracks();
       if (settings.dataset.panel === 'captions') renderSettings();
     });
     video.addEventListener('loadedmetadata', () => {
+      syncWebTracks();
+      updateWebCaptionInset();
       if (resume > 0 && Number.isFinite(video.duration)) video.currentTime = Math.min(resume, video.duration);
       refresh();
       if (!settings.hidden) renderSettings();
@@ -627,6 +669,7 @@ window.PWAPlayer = (() => {
           const fill = overlay.classList.toggle('local-player-fill');
           button.setAttribute('aria-pressed', String(fill));
           if (surface) await controlSurface('fill', fill);
+          else updateWebCaptionInset();
           break;
         }
         case 'rotate': {
@@ -635,7 +678,7 @@ window.PWAPlayer = (() => {
           clearTimeout(rotationTimer);
           rotationTimer = setTimeout(() => {
             rotationTimer = undefined;
-            updateViewport();
+            resizeViewport();
           }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 340);
           updateViewport();
           if (surface) await controlSurface('rotateAnimated', rotated);
@@ -654,6 +697,7 @@ window.PWAPlayer = (() => {
     document.body.append(overlay);
     document.body.classList.add('local-player-open');
     window.addEventListener('resize', resizeViewport);
+    window.addEventListener('diastomy-inline-caption', onNativeCaption);
     updateViewport();
     overlay.addEventListener('touchmove', event => {
       if (event.cancelable && !event.target.closest('input[type=range],.local-player-settings,.local-player-room-chat')) event.preventDefault();

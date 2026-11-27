@@ -61,13 +61,13 @@ body:has(.movie-detail-shell) #app:focus{outline:none!important;box-shadow:none!
     animation:playback-dialog-in 170ms cubic-bezier(.2,.75,.25,1) both;
   }
   #app .film-download-dialog[open]:not([data-closing]){
-    animation:download-dialog-in 315ms cubic-bezier(.22,.75,.22,1) both;
+    animation:download-dialog-in 180ms cubic-bezier(.22,.75,.22,1) both;
   }
   #dm-playback-choice::before,.film-download-dialog[open]:not([data-closing])::backdrop{
     animation:playback-backdrop-in 130ms ease-out both;
   }
-  .film-download-dialog[data-closing]::backdrop{animation:playback-backdrop-in 255ms ease-in reverse both}
+  .film-download-dialog[data-closing]::backdrop{animation:playback-backdrop-in 155ms ease-in reverse both}
 }
-@keyframes download-dialog-in{from{transform:translateY(calc(-50dvh - 50%))}to{transform:none}}
+@keyframes download-dialog-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes playback-dialog-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes playback-backdrop-in{from{opacity:0}to{opacity:1}}
