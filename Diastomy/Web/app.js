@@ -267,6 +267,32 @@
       '<p class="home-history-title" dir="auto"></p><div class="home-history-actions">' +
       '<button type="button" data-remove-history>حذف از ادامه تماشا</button><a>اطلاعات فیلم</a></div></dialog>';
   }
+  async function showHomeAnnouncement(seq) {
+    const user = state.user;
+    if (!user || localStorage.getItem('diastomy_notifications_enabled') === 'false' ||
+        localStorage.getItem('diastomy_notifications_news') === 'false') return;
+    try {
+      const result = await api('/accounts/api/notifications/?show_on_home=1');
+      whenCurrent(seq, () => {
+        if (state.user !== user || document.querySelector('dialog[open], .local-pwa-player, #dm-playback-choice')) return;
+        const seenKey = id => 'diastomy_home_announcement:' + user.id + ':' + id;
+        const notice = (result.notifications || []).find(item => !localStorage.getItem(seenKey(item.id)));
+        if (!notice) return;
+        const dialog = document.createElement('dialog');
+        dialog.className = 'home-announcement';
+        dialog.dir = 'rtl';
+        dialog.setAttribute('aria-labelledby', 'home-announcement-title');
+        dialog.innerHTML = '<h2 id="home-announcement-title">' + esc(notice.title) + '</h2><p>' + esc(notice.message) +
+          '</p><form method="dialog"><button autofocus>باشه</button></form>';
+        dialog.addEventListener('close', () => {
+          localStorage.setItem(seenKey(notice.id), '1');
+          dialog.remove();
+        }, {once:true});
+        app.append(dialog);
+        dialog.showModal();
+      });
+    } catch (_) {}
+  }
   async function home(seq, pullRefresh) {
     const search = PWA.searchInput('');
     search.classList.add('home-search-form');
@@ -279,6 +305,7 @@
     homeContent.onclick = null;
     $('#catalogue').closest('.home-live-search').hidden = true;
     bindLiveSearch(seq, search, $('#catalogue'), homeContent);
+    showHomeAnnouncement(seq);
     try {
       const data = await api('/api/app/v1/home/', { cache: true });
       whenCurrent(seq, () => {

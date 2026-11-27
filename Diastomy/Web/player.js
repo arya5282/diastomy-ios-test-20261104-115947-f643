@@ -278,11 +278,11 @@ window.PWAPlayer = (() => {
     };
     const nativeViewport = document.documentElement.classList.contains('diastomy-native-tabs');
     let viewportRequest = 0;
-    let rotationTimer;
+    let rotating = false;
     function updateViewport(active = true) {
       if (!nativeViewport) return;
       const request = ++viewportRequest;
-      const showVolume = active && !rotationTimer && !chatAnchor.isConnected && !settings.dataset.panel && !overlay.classList.contains('local-player-controls-hidden');
+      const showVolume = active && !rotating && !chatAnchor.isConnected && !settings.dataset.panel && !overlay.classList.contains('local-player-controls-hidden');
       const rect = volume.getBoundingClientRect();
       const horizontal = overlay.classList.contains('local-player-rotated');
       const geometry = showVolume ? {
@@ -509,7 +509,6 @@ window.PWAPlayer = (() => {
       showChat(false);
       roomChat?.removeEventListener('click', shieldChat);
       clearTimeout(captionNoticeTimer);
-      clearTimeout(rotationTimer);
       window.removeEventListener('resize', resizeViewport);
       window.removeEventListener('diastomy-inline-caption', onNativeCaption);
       updateViewport(false);
@@ -673,15 +672,31 @@ window.PWAPlayer = (() => {
           break;
         }
         case 'rotate': {
-          const rotated = overlay.classList.toggle('local-player-rotated');
-          button.setAttribute('aria-pressed', String(rotated));
-          clearTimeout(rotationTimer);
-          rotationTimer = setTimeout(() => {
-            rotationTimer = undefined;
-            resizeViewport();
-          }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 340);
+          if (rotating) break;
+          const animate = !matchMedia('(prefers-reduced-motion: reduce)').matches && overlay.animate;
+          const shade = document.createElement('div');
+          shade.className = 'local-player-rotation-shade';
+          shade.setAttribute('aria-hidden', 'true');
+          rotating = true;
           updateViewport();
-          if (surface) await controlSurface('rotateAnimated', rotated);
+          try {
+            if (animate) {
+              overlay.append(shade);
+              await shade.animate([{opacity:0},{opacity:1}], {duration:100,fill:'forwards'}).finished;
+            }
+            if (!overlay.isConnected) break;
+            const rotated = overlay.classList.toggle('local-player-rotated');
+            button.setAttribute('aria-pressed', String(rotated));
+            if (surface) await controlSurface('rotate', rotated);
+            if (animate && overlay.isConnected) {
+              await shade.animate([{opacity:1},{opacity:0}], {duration:150,easing:'ease-out',fill:'forwards'}).finished;
+            }
+          } catch (_) {
+          } finally {
+            shade.remove();
+            rotating = false;
+            if (overlay.isConnected) resizeViewport();
+          }
           break;
         }
         case 'retry':

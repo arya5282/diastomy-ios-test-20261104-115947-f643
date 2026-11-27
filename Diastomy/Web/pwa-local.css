@@ -2088,3 +2088,16 @@ body #connection.app-notice .app-notice-message,body #toast.app-notice .app-noti
 .room-chat-message.operator .local-support-bubble{border-bottom-left-radius:4px}
 .room-chat-message small{display:flex;align-items:center;gap:4px;padding-inline:5px;color:#b1b5c3;font-size:9px}
 .room-chat-message .support-delivery svg{width:12px;height:12px}
+
+#app .home-announcement{
+  box-sizing:border-box;width:min(340px,calc(100% - 32px));max-height:calc(100dvh - 40px);
+  margin:auto;padding:20px;border:1px solid var(--title-dialog-border);border-radius:18px;
+  background:var(--title-dialog-bg);color:#f5f5f7;box-shadow:0 12px 40px #0007;
+}
+.home-announcement::backdrop{background:var(--title-dialog-backdrop);backdrop-filter:blur(4px)}
+#app .home-announcement h2{margin:0 0 8px;font-size:17px}
+#app .home-announcement p{margin:0 0 16px;color:#d4d7e1;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.75}
+#app .home-announcement form{margin:0}
+#app .home-announcement button{
+  width:100%;min-height:44px;border:1px solid #78343d;border-radius:10px;background:#401b24;color:#ffced1;
+}

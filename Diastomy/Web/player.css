@@ -5,9 +5,7 @@ body.local-player-open .dmf3-root{visibility:hidden;opacity:0;pointer-events:non
 .local-pwa-player{position:fixed;inset:50% auto auto 50%;width:100dvw;height:100dvh;transform:translate(-50%,-50%) rotate(0deg);z-index:9000;background:#000;color:white;direction:ltr;overflow:hidden;
   --player-top:env(safe-area-inset-top,0px);--player-right:env(safe-area-inset-right,0px);
   --player-bottom:env(safe-area-inset-bottom,0px);--player-left:env(safe-area-inset-left,0px)}
-@media(prefers-reduced-motion:no-preference){
-  .local-pwa-player{transition:width 320ms ease-in-out,height 320ms ease-in-out,transform 320ms ease-in-out}
-}
+.local-player-rotation-shade{position:absolute;inset:0;z-index:20;background:#000;pointer-events:none}
 .local-pwa-player.local-player-rotated{width:100dvh;height:100dvw;transform:translate(-50%,-50%) rotate(90deg);
   --player-top:env(safe-area-inset-right,0px);--player-right:env(safe-area-inset-bottom,0px);
   --player-bottom:env(safe-area-inset-left,0px);--player-left:env(safe-area-inset-top,0px)}
