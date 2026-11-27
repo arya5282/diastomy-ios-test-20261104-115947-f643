@@ -65,10 +65,11 @@ window.PWAPlayer = (() => {
     overlay.innerHTML = '<video playsinline webkit-playsinline></video><div class="local-player-dim"></div><div class="local-player-top">' +
       '<button type="button" data-player="close" aria-label="بازگشت"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12H3m7-7-7 7 7 7"/></svg></button>' +
       '<div class="local-player-title"><h2></h2><p hidden></p></div>' + control('rotate','چرخش تصویر','player-phone-rotate') + '</div>' +
-      '<label class="local-player-side local-player-brightness"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 1v3m0 16v3M1 12h3m16 0h3M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/></svg></span><input type="range" min="0" max="1" value="1" step=".01" aria-label="روشنایی تصویر"></label>' +
+      '<label class="local-player-side local-player-brightness"><span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 1v3m0 16v3M1 12h3m16 0h3M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/></svg></span><input type="range" min="0" max="1" value="1" step=".01" aria-label="روشنایی تصویر"><span class="local-player-brightness-track" aria-hidden="true"><i></i></span></label>' +
       '<label class="local-player-side local-player-volume">' + icons.volume + '<input type="range" min="0" max="1" value="1" step=".01" aria-label="بلندی صدا"></label>' +
       '<div class="local-player-center">' + control('toggle','پخش یا توقف','play') + '</div>' +
-      '<div class="local-player-loading" role="status" dir="rtl" hidden><span class="startup-spinner" aria-hidden="true"></span>در حال بارگذاری ویدیو…</div>' +
+      '<div class="local-player-loading" data-phase="refreshing" role="status" dir="rtl" hidden>' + PWA.activityIndicator() +
+      '<span>در حال بارگذاری ویدیو…</span></div>' +
       '<div class="local-player-caption-status" role="status" dir="rtl" hidden></div><div class="local-player-bottom"><div class="local-player-bar">' +
       control('back','۱۰ ثانیه عقب','backward') + control('toggle','پخش یا توقف','play') + control('forward','۱۰ ثانیه جلو','forward') +
       '<div class="local-player-timeline"><div><output>0:00</output><output>0:00</output></div><div class="local-player-seek"><span aria-hidden="true"></span><input type="range" min="0" max="0" value="0" step=".1" aria-label="موقعیت پخش" disabled></div></div>' +
@@ -85,9 +86,8 @@ window.PWAPlayer = (() => {
     const updateTransport = paused => {
       overlay.classList.toggle('local-player-playing', !paused);
       overlay.querySelectorAll('[data-player=toggle]').forEach(button => {
-        button.innerHTML = !paused ? icons.pause : button.closest('.local-player-center')
-          ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 5.8a1 1 0 0 0-1.6.8v10.8a1 1 0 0 0 1.6.8l8.4-5.4a1 1 0 0 0 0-1.6Z"/></svg>'
-          : icons.play;
+        button.innerHTML = paused ? icons.play : icons.pause;
+        button.setAttribute('aria-label', paused ? 'پخش' : 'توقف');
       });
     };
     let surface, surfaceStarting = false, polling, startupCheck, lastState, playbackRate = 1;
@@ -228,7 +228,9 @@ window.PWAPlayer = (() => {
     const brightness = get('.local-player-brightness input');
     function paintLevel(input) { input.style.setProperty('--played', Number(input.value) * 100 + '%'); }
     brightness.oninput = () => {
-      paintLevel(brightness);
+      const level = Number(brightness.value);
+      brightness.parentElement.style.setProperty('--played', level * 100 + '%');
+      brightness.parentElement.style.setProperty('--brightness-level', level);
       get('.local-player-dim').style.opacity = 1 - Number(brightness.value);
     };
     const volume = get('.local-player-volume input');

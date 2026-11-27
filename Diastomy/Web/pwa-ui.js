@@ -599,5 +599,10 @@ window.PWA = (() => {
     if (motion) motion.opens = !open;
     return true;
   }
-  return {card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, continueWatching, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page, setDisclosure, animateHeight, animateDetails};
+  function activityIndicator() {
+    return '<div class="pull-refresh-face" aria-hidden="true"><svg class="pull-refresh-ring" viewBox="0 0 40 40" fill="none">' +
+      '<circle class="pull-refresh-track" cx="20" cy="20" r="17"/><circle class="pull-refresh-progress" cx="20" cy="20" r="17" pathLength="100"/></svg>' +
+      '<svg class="pull-refresh-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 10a7.6 7.6 0 1 0-1.6 7.1M19.5 5.5V10H15"/></svg></div>';
+  }
+  return {activityIndicator, card, homePoster, reportReasons, savedCard:card, actorPage, actorProfile, home, continueWatching, historyCard, episodeCards, filmDownloadPanels, detail, account, watchTimeCard, auth, searchDiscovery, searchInput, install, page, setDisclosure, animateHeight, animateDetails};
 })();

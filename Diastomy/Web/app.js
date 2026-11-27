@@ -2610,8 +2610,7 @@
     indicator.className = 'pull-refresh';
     indicator.dir = 'rtl';
     indicator.hidden = true;
-    indicator.innerHTML = '<svg class="pull-refresh-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2 6m2-11v5h-5"/></svg>' +
-      '<span class="startup-spinner" aria-hidden="true"></span><span class="pull-refresh-label" role="status"></span>';
+    indicator.innerHTML = PWA.activityIndicator() + '<span class="pull-refresh-label" role="status"></span>';
     document.body.append(indicator);
     const label = indicator.querySelector('[role=status]');
     const threshold = 72;
@@ -2654,7 +2653,7 @@
       if (deltaY < 8 && !touch.distance) return;
       if (event.cancelable) event.preventDefault();
       touch.distance = Math.max(0, deltaY);
-      indicator.style.setProperty('--pull-turn', Math.min(1, touch.distance / threshold) * 180 + 'deg');
+      indicator.style.setProperty('--pull-progress', String(Math.min(100, touch.distance / threshold * 100)));
       const armed = touch.distance >= threshold;
       show(armed ? 'armed' : 'pulling', armed ? 'برای تازه‌سازی رها کن' : 'برای تازه‌سازی بکش');
     }, {passive:false});
@@ -2662,8 +2661,8 @@
     document.addEventListener('touchend', async event => {
       if (!touch || !Array.from(event.changedTouches).some(point => point.identifier === touch.identifier)) return;
       const armed = touch.distance >= threshold && touch.page === document.body.dataset.page;
-      cancel();
-      if (!armed || blocked()) return;
+      if (!armed || blocked()) { cancel(); return; }
+      touch = undefined;
       running = true;
       show('refreshing', 'در حال تازه‌سازی…');
       try {

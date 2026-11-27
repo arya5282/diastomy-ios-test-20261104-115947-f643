@@ -51,6 +51,8 @@ body:has(.movie-detail-shell) #app:focus{outline:none!important;box-shadow:none!
   width:44px;height:44px;padding:0;border-radius:50%;color:#fff;-webkit-tap-highlight-color:transparent;
 }
 #app .dm-film-topbar :is(a,button):active,#app .dm-film-topbar #bookmark[aria-pressed=true]{color:#ff424b}
+#app .dm-film-topbar #bookmark[aria-pressed=true]{background:#fff}
+#app .dm-film-topbar #bookmark[aria-pressed=true] svg{fill:#e00000;stroke:#e00000}
 #app .dm-film-topbar svg{width:16px;height:16px}
 #app .dm-film-topbar :is(a,button):focus-visible{outline:1px solid #ccc;outline-offset:-5px;border-radius:50%}
 

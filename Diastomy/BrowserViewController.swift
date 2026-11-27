@@ -60,6 +60,7 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
     private var startupDocumentCommitted = false
     private var inlineRoom: String?
     private var inlineLayer: AVPlayerLayer?
+    private var inlineRoomItemStatus: NSKeyValueObservation?
     private var inlineGeneration = 0
     private var inlineRotated = false
     private var inlineRate: Float = 1
@@ -219,7 +220,10 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         let saved = data["saved"] as? Bool == true
         if let bookmark = titleBookmarkButton, bookmark.isSelected != saved {
             bookmark.isSelected = saved
-            bookmark.configuration?.image = UIImage(systemName: saved ? "heart.fill" : "heart")
+            let heart = UIImage(systemName: saved ? "heart.fill" : "heart")
+            bookmark.configuration?.image = saved
+                ? heart?.withTintColor(UIColor(red: 0.88, green: 0, blue: 0, alpha: 1), renderingMode: .alwaysOriginal)
+                : heart
             bookmark.accessibilityLabel = saved ? "حذف از لیست من" : "ذخیره در لیست من"
         }
         titleBookmarkButton?.isEnabled = data["busy"] as? Bool != true
@@ -944,6 +948,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
 
     private func stopInlinePlayer() {
         inlineGeneration += 1
+        inlineRoomItemStatus?.invalidate()
+        inlineRoomItemStatus = nil
         inlineLayer?.player?.pause()
         inlineLayer?.removeFromSuperlayer()
         inlineLayer = nil
@@ -961,7 +967,8 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         stopInlinePlayer()
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         let asset = AVURLAsset(url: url, options: [AVURLAssetHTTPCookiesKey: cookies])
-        let playback = AVPlayer(playerItem: AVPlayerItem(asset: asset))
+        let item = AVPlayerItem(asset: asset)
+        let playback = AVPlayer(playerItem: item)
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
         let layer = AVPlayerLayer(player: playback)
@@ -975,7 +982,13 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         webView.backgroundColor = .clear
         webView.scrollView.backgroundColor = .clear
         if room != nil {
-            syncRoom()
+            inlineRoomItemStatus = item.observe(\.status, options: [.initial, .new]) { [weak self, weak layer] item, _ in
+                guard item.status == .readyToPlay else { return }
+                DispatchQueue.main.async {
+                    guard let self, let layer, self.inlineLayer === layer else { return }
+                    self.syncRoom(loadFirstFrame: true)
+                }
+            }
         } else if position.isFinite, position > 0 {
             let time = CMTime(seconds: position, preferredTimescale: 600)
             playback.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak layer] _ in
@@ -1151,20 +1164,36 @@ final class BrowserViewController: UIViewController, WKNavigationDelegate, WKScr
         }
     }
 
-    private func syncRoom() {
+    private func syncRoom(loadFirstFrame: Bool = false) {
         guard let code = roomCode, let state = roomState else { return }
         let roomPlayer = inlineRoom == code ? inlineLayer?.player :
             (playingRoom == code && playerController?.presentingViewController != nil ? player : nil)
         guard let player = roomPlayer else { return }
-        if state["closed"] as? Bool == true { player.pause(); return }
+        let inline = inlineRoom == code
+        if inline && player.currentItem?.status != .readyToPlay { return }
         let paused = state["paused_position"] as? Double
-        let start = state["starts_at"] as? Double ?? Date().timeIntervalSince1970
-        let position = paused ?? Date().timeIntervalSince1970 + serverOffset - start
-        let duration = state["duration"] as? Double ?? 0
-        if position < 0 || (duration > 0 && position >= duration) { player.pause(); return }
+        let now = Date().timeIntervalSince1970 + serverOffset
+        let start = state["starts_at"] as? Double ?? now
+        let requestedPosition = paused ?? now - start
+        let roomDuration = state["duration"] as? Double ?? 0
+        let mediaDuration = player.currentItem?.duration.seconds ?? 0
+        let durations = [roomDuration, mediaDuration].filter { $0.isFinite && $0 > 0 }
+        let duration = durations.min() ?? 0
+        let ended = duration > 0 && requestedPosition >= duration
+        let shouldPause = paused != nil || requestedPosition < 0 || ended || state["closed"] as? Bool == true
+        let safeEnd = duration > 0 ? max(0, duration - 0.5) : Double.greatestFiniteMagnitude
+        let position = min(max(0, requestedPosition), safeEnd)
         let current = player.currentTime().seconds
-        if !current.isFinite || abs(current - position) > 2 { player.seek(to: CMTime(seconds: position, preferredTimescale: 600)) }
-        if paused != nil { player.pause() } else { player.play() }
+        if shouldPause { player.pause() }
+        if loadFirstFrame || !current.isFinite || abs(current - position) > 2 {
+            let time = CMTime(seconds: position, preferredTimescale: 600)
+            if loadFirstFrame && shouldPause {
+                player.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero)
+            } else {
+                player.seek(to: time)
+            }
+        }
+        if !shouldPause { player.play() }
     }
 
 }
